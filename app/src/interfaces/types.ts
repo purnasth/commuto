@@ -1,14 +1,16 @@
 export interface RideFormData {
-  id?: number;
+  id?: string;
   from: string;
-  fromLat?: number;
-  fromLng?: number;
   to: string;
-  toLat?: number;
-  toLng?: number;
   message: string;
   role: string;
+  fromLat?: number;
+  fromLng?: number;
+  toLat?: number;
+  toLng?: number;
   timestamp?: string;
+  status?: string;
+  riderId?: string;
 }
 
 export interface AvailableListProps {

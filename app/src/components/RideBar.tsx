@@ -5,8 +5,9 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom';
 import { yupResolver } from '@hookform/resolvers/yup';
 
-import { ImEye } from 'react-icons/im';
 import { TbUser, TbMapPin, TbBrandHipchat } from 'react-icons/tb';
+import { TbMoodTongueWink2 } from 'react-icons/tb';
+import { PiSmileyMeltingBold } from 'react-icons/pi';
 
 import { findRideFormFields } from '../constants/data';
 
@@ -27,6 +28,7 @@ import useScrollVisibility from '../hooks/useScrollVisibility';
 
 import { rideFormSchema } from '../schemas/formSchema';
 import { apiFetch } from '../utils/api';
+import CurrentRideStatus from './ui/CurrentRideStatus';
 
 const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showLocationPopup, setShowLocationPopup] = useState(false);
@@ -35,7 +37,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [ridesFound, setRidesFound] = useState<RideFormData[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [showAvailableRidesBtn, setShowAvailableRidesBtn] = useState(false);
+  const [showRideStatusModal, setShowRideStatusModal] = useState(false);
   const navigate = useNavigate();
   const showRideBar = useScrollVisibility(100);
 
@@ -68,6 +70,17 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [fromCoords, setFromCoords] = useState<[number, number] | null>(null);
   const [toCoords, setToCoords] = useState<[number, number] | null>(null);
 
+  // Store last search params for 'search again' feature
+  const [lastSearchParams, setLastSearchParams] = useState<{
+    role: string;
+    fromLat?: number;
+    fromLng?: number;
+    to?: string;
+    from?: string;
+    message?: string;
+    timestamp?: string;
+  } | null>(null);
+
   const handleInputClick = (fieldName: string) => {
     if (fieldName === 'from' || fieldName === 'to') {
       setActiveInput(fieldName as 'from' | 'to');
@@ -79,7 +92,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     }
   };
 
-  const handleLocationSelect = (location: string, coordinates?: [number, number]) => {
+  const handleLocationSelect = (
+    location: string,
+    coordinates?: [number, number],
+  ) => {
     setValue(activeInput!, location);
     if (activeInput === 'from') setFromCoords(coordinates || null);
     if (activeInput === 'to') setToCoords(coordinates || null);
@@ -91,15 +107,43 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     setShowMessagePopup(false);
   };
 
-  const fetchAvailableRides = async (role: string, fromLat?: number, fromLng?: number, timestamp?: string) => {
+  const fetchAvailableRides = async (
+    role: string,
+    fromLat?: number,
+    fromLng?: number,
+    timestamp?: string,
+    storeParams = true,
+  ) => {
     if (!fromLat || !fromLng || !timestamp) return [];
+    if (storeParams) setLastSearchParams({ role, fromLat, fromLng, timestamp });
     try {
       const result = await apiFetch<{ rides: RideFormData[] }>(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/match?fromLat=${fromLat}&fromLng=${fromLng}&timestamp=${encodeURIComponent(timestamp)}&role=${role === 'rider' ? 'passenger' : 'rider'}`,
+        `${import.meta.env.VITE_API_BASE_URL}/rides/match?fromLat=${fromLat}&fromLng=${fromLng}&timestamp=${encodeURIComponent(timestamp)}&role=${role}`,
       );
       return result.rides;
     } catch {
       return [];
+    }
+  };
+
+  // Add a handler for 'Search Again'
+  const handleSearchAgain = async () => {
+    if (!lastSearchParams) return;
+    setShowRideStatusModal(false); // Always close ride status modal when searching again
+    setIsLoading(true);
+    const availableRides = await fetchAvailableRides(
+      lastSearchParams.role,
+      lastSearchParams.fromLat,
+      lastSearchParams.fromLng,
+      lastSearchParams.timestamp,
+      false,
+    );
+    setRidesFound(availableRides);
+    setIsLoading(false);
+    if (availableRides.length > 0) {
+      setShowModal(true);
+    } else {
+      setShowModal(true);
     }
   };
 
@@ -134,8 +178,24 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       toast.dismiss(loadingToastId);
       setIsLoading(true);
       setTimeout(async () => {
-        const availableRides = await fetchAvailableRides(data.role, rideWithTimestamp.fromLat, rideWithTimestamp.fromLng, rideWithTimestamp.timestamp);
+        const availableRides = await fetchAvailableRides(
+          data.role,
+          rideWithTimestamp.fromLat,
+          rideWithTimestamp.fromLng,
+          rideWithTimestamp.timestamp,
+        );
         setRidesFound(availableRides);
+
+        // Save all ride details in lastSearchParams for status modal
+        setLastSearchParams({
+          role: data.role,
+          fromLat: fromCoords ? fromCoords[1] : undefined,
+          fromLng: fromCoords ? fromCoords[0] : undefined,
+          to: data.to,
+          from: data.from,
+          message: data.message,
+          timestamp: new Date().toISOString(),
+        });
 
         if (availableRides.length > 0) {
           toast.success(
@@ -198,14 +258,12 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
   const handleCloseModal = () => {
     setShowModal(false);
-    if (ridesFound.length > 0) {
-      setShowAvailableRidesBtn(true);
-    }
+    // useEffect will update mainAction
   };
 
   const handleShowAvailableRides = () => {
     setShowModal(true);
-    setShowAvailableRidesBtn(false);
+    // useEffect will update mainAction
   };
 
   const handleConfirm = async (ride: RideFormData) => {
@@ -249,6 +307,49 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     }
   };
 
+  // Cancel Ride handler
+  const handleCancelRide = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        toast.error('You must be logged in to cancel a ride.');
+        return;
+      }
+      const user = JSON.parse(userStr);
+      // Try to get the user's latest ride that is not already CANCELLED or REJECTED
+      const res = await apiFetch<{ rides: RideFormData[] }>(
+        `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${user.id}`,
+      );
+      const rides = res.rides || [];
+      // Find the latest ride that is not already CANCELLED or REJECTED
+      const cancellableRide = rides.find(
+        (r) =>
+          r.riderId === user.id &&
+          r.status !== undefined &&
+          r.status !== 'CANCELLED' &&
+          r.status !== 'REJECTED',
+      );
+      if (!cancellableRide) {
+        toast.info('No ride to cancel.');
+        return;
+      }
+      // Call cancel endpoint
+      await apiFetch(
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${cancellableRide.id}/cancel`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ userId: user.id }),
+        },
+      );
+      toast.success('Your ride has been cancelled.');
+      setShowRideStatusModal(false);
+      setLastSearchParams(null);
+      setRidesFound([]);
+    } catch {
+      toast.error('Failed to cancel ride.');
+    }
+  };
+
   // Determine if the user's role matches the RideBar's role (case-insensitive)m
   let userRole: string | null = null;
   if (typeof window !== 'undefined') {
@@ -263,6 +364,25 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   }
   const roleMismatch =
     userRole && role && userRole.toLowerCase() !== role.toLowerCase();
+
+  // Helper to get current ride details from lastSearchParams
+  const getCurrentRideDetails = () => {
+    if (!lastSearchParams) return null;
+    // Ensure role is either "rider" or "passenger"
+    const roleValue =
+      lastSearchParams.role === 'rider' || lastSearchParams.role === 'passenger'
+        ? lastSearchParams.role
+        : 'rider';
+    return {
+      from: lastSearchParams.from || '-',
+      to: lastSearchParams.to || '-',
+      message: lastSearchParams.message || '-',
+      role: roleValue as 'rider' | 'passenger',
+      time: lastSearchParams.timestamp
+        ? new Date(lastSearchParams.timestamp).toLocaleString()
+        : '',
+    };
+  };
 
   if (isLoading) {
     return (
@@ -397,20 +517,56 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
               handleReject={handleReject}
             />
           ) : (
-            <NoRideFound />
+            <>
+              <NoRideFound />
+            </>
           )}
         </Modal>
       )}
 
-      {showAvailableRidesBtn && ridesFound.length > 0 && (
+      {/* Ride Status Modal */}
+      {showRideStatusModal && lastSearchParams && (
+        <Modal
+          onClose={() => setShowRideStatusModal(false)}
+          aria-labelledby="ride-status-modal-title"
+        >
+          {(() => {
+            const details = getCurrentRideDetails();
+            if (!details) return null;
+            return (
+              <CurrentRideStatus
+                details={details}
+                onSearchAgain={handleSearchAgain}
+                onCancelRide={handleCancelRide}
+              />
+            );
+          })()}
+        </Modal>
+      )}
+
+      {/* Show Available Rides button if there are rides and modal is closed */}
+      {ridesFound.length > 0 && !showModal && (
         <button
           type="button"
           aria-label="Show available rides"
           onClick={handleShowAvailableRides}
           className="fixed left-1/2 top-0 z-50 flex origin-center -translate-x-1/2 items-center gap-1.5 rounded-xl rounded-t-none bg-gradient-to-r from-teal-300 via-teal-400 to-teal-600 py-1.5 pl-4 pr-5 text-xs font-normal text-dark shadow-xl transition-all duration-200 hover:scale-105 hover:from-teal-400 hover:to-teal-500 md:text-base"
         >
-          <ImEye className="text-sm md:text-lg" />
+          <TbMoodTongueWink2 className="text-sm md:text-lg" />
           Available Rides
+        </button>
+      )}
+
+      {/* Show My Current Ride Status button if no rides found, modal is closed, and user still has an active ride (ridesFound.length === 0) */}
+      {ridesFound.length === 0 && !showModal && lastSearchParams && (
+        <button
+          type="button"
+          aria-label="Current Ride Status"
+          onClick={() => setShowRideStatusModal(true)}
+          className="fixed left-1/2 top-0 z-50 flex origin-center -translate-x-1/2 items-center gap-1.5 rounded-xl rounded-t-none bg-gradient-to-r from-teal-300 via-teal-400 to-teal-400 px-5 py-1.5 text-xs font-normal text-dark shadow-xl transition-all duration-200 hover:scale-105 hover:from-teal-400 hover:to-teal-500 md:text-base"
+        >
+          <PiSmileyMeltingBold className="text-sm md:text-lg" />
+          Current Ride Status
         </button>
       )}
     </>
