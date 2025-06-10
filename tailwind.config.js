@@ -2,6 +2,7 @@
 module.exports = {
   darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  safelist: ['font-regular'],
   theme: {
     extend: {
       colors: {
@@ -19,6 +20,10 @@ module.exports = {
         // 'teal-900': '#134e4a',
         // 'teal-950': '#042f2e',
       },
+      fontSize: {
+        xxs: '0.625rem', // 10px
+        inherit: 'inherit',
+      },
       fontFamily: {
         body: [
           // 'purna_shrestha',
@@ -29,6 +34,9 @@ module.exports = {
           'sans-serif',
         ],
       },
+      fontWeight: {
+        regular: 400,
+      },
       textShadow: {
         dark: '0px 0px 2px rgba(0, 0, 0, 1)',
         light: '0px 0px 2px rgba(255, 255, 255, 1)',
@@ -36,9 +44,6 @@ module.exports = {
         'light-glow':
           '1px 1px 2px #F8F8FF,  0 0 1em #F8F8FF, 0 0 0.2em #F8F8FF',
         'dark-glow': '1px 1px 2px #000111,  0 0 1em #000111, 0 0 0.2em #000111',
-      },
-      fontSize: {
-        inherit: 'inherit',
       },
       screens: {
         sm: '640px',

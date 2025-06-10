@@ -130,6 +130,10 @@
     @apply origin-right rounded-full px-4 py-2.5 text-xs font-normal capitalize transition-all duration-100 group-hover:bg-teal-300 group-hover:uppercase group-hover:tracking-widest group-hover:text-teal-50;
   }
 
+  .sticky-navlink {
+    @apply origin-right rounded-full px-3 py-1.5 text-xs font-normal capitalize transition-all duration-100 group-hover:bg-teal-300 group-hover:uppercase group-hover:tracking-widest group-hover:text-teal-50 md:px-4 md:py-2.5;
+  }
+
   .overlay {
     @apply pointer-events-none absolute inset-0 z-0 select-none bg-black/20;
   }

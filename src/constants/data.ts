@@ -1,3 +1,5 @@
+import { getCurrentYear } from '../utils/functions';
+
 import rider from '../assets/vector/hero-rider.svg';
 import passenger from '../assets/vector/passenger.svg';
 
@@ -634,39 +636,6 @@ export const quickMessages = [
   'See you at the location',
 ];
 
-export const policies = [
-  {
-    id: 'ride-cancellation',
-    title: 'Ride Cancellation Policy',
-    link: '/policies/ride-cancellation',
-    content: [
-      'Cancellations made within 30 minutes of the ride start time may incur a penalty.',
-      'Repeated cancellations may result in temporary suspension of your account.',
-      'Contact support for emergencies or disputes regarding cancellations.',
-    ],
-  },
-  {
-    id: 'terms',
-    title: 'Terms of Service',
-    link: '/policies/terms',
-    content: [
-      'Provide accurate information when creating your account and booking rides.',
-      'Respect other users and adhere to community guidelines.',
-      'Any misuse of the platform may result in account suspension or termination.',
-    ],
-  },
-  {
-    id: 'privacy',
-    title: 'Privacy Policy',
-    link: '/policies/privacy',
-    content: [
-      'We collect only the necessary information to provide our services.',
-      'Your data is stored securely and is not shared with third parties without your consent.',
-      'You can request to delete your account and associated data at any time.',
-    ],
-  },
-];
-
 export const userRoles = [
   {
     id: 'rider',
@@ -752,6 +721,24 @@ export const navLinks = [
   },
 ];
 
+export const footerLinks = [
+  {
+    id: 'policies',
+    title: 'Terms & Policies',
+    link: '/legal/policies',
+  },
+  {
+    id: 'copyright',
+    title: 'Trademark & Copyright',
+    link: '/legal/copyright',
+  },
+  {
+    id: 'brand',
+    title: 'Brand Guidelines',
+    link: '/brand',
+  },
+];
+
 export const authorizedUsers = [
   {
     user_id: 1,
@@ -815,5 +802,152 @@ export const findRideFormFields: Array<{
     label: "I'm a",
     type: 'select',
     options: ['Rider', 'Passenger'],
+  },
+];
+
+export const policies = [
+  {
+    id: 'terms',
+    title: 'Terms of Service',
+    description:
+      'By using Commuto, you agree to abide by the following terms and conditions. These terms are designed to ensure a safe, respectful, and reliable experience for all users.',
+    list: [
+      'Provide accurate and up-to-date information when creating your account and booking rides.',
+      'Respect other users and adhere to community guidelines at all times.',
+      'Do not misuse the platform for fraudulent, illegal, or harmful activities.',
+      'Any misuse of the platform may result in account suspension or termination.',
+      'Commuto reserves the right to update these terms at any time. Continued use of the platform constitutes acceptance of any changes.',
+    ],
+  },
+  {
+    id: 'privacy',
+    title: 'Privacy Policy',
+    description:
+      'Your privacy is important to us. This policy explains how we collect, use, and protect your personal information.',
+    list: [
+      'We collect only the necessary information to provide our services, such as your name, email, and ride details.',
+      'Your data is stored securely and is not shared with third parties without your explicit consent, except as required by law.',
+      'We use industry-standard security measures to protect your information from unauthorized access.',
+      'You can request to delete your account and associated data at any time by contacting support.',
+      'We may use anonymized data for analytics and service improvement.',
+    ],
+  },
+  {
+    id: 'cancellation',
+    title: 'Ride Cancellation Policy',
+    description:
+      'We understand that plans can change. Our cancellation policy is designed to be fair to both riders and passengers.',
+    list: [
+      'Cancellations made within 30 minutes of the ride start time may incur a penalty or affect your reliability rating.',
+      'Repeated last-minute cancellations may result in temporary suspension of your account.',
+      'If you need to cancel due to an emergency, please contact support for assistance.',
+      'We encourage timely communication with your ride partners if you need to cancel or reschedule.',
+    ],
+  },
+  {
+    id: 'community',
+    title: 'Community Guidelines',
+    description:
+      'To foster a positive and respectful community, all users are expected to:',
+    list: [
+      'Treat others with respect, kindness, and consideration.',
+      'Communicate clearly and promptly with your ride partners.',
+      'Report any inappropriate behavior or safety concerns to Commuto support.',
+      'Help maintain a safe, inclusive, and welcoming environment for everyone.',
+    ],
+  },
+  {
+    id: 'safety',
+    title: 'Safety Policy',
+    description:
+      'Your safety is our top priority. Please follow these guidelines to ensure a safe commute:',
+    list: [
+      'Verify the identity of your ride partners before starting a trip.',
+      'Share your trip details with a trusted contact if possible.',
+      'Follow all local traffic laws and safety regulations.',
+      'Do not share sensitive personal information with strangers.',
+      'Contact support immediately if you feel unsafe or experience any issues during your ride.',
+    ],
+  },
+  {
+    id: 'contact',
+    title: 'Contact & Support',
+    description:
+      'If you have any questions, concerns, or need assistance regarding our policies or your experience on Commuto, please contact us.',
+    list: [],
+  },
+  {
+    id: 'disclaimer',
+    title: 'Disclaimer',
+    description:
+      'The information provided on this page is for general guidance only and does not constitute legal advice. For specific legal concerns, please consult a qualified attorney.',
+    list: [],
+  },
+];
+
+export const copyrightSections = [
+  {
+    id: 'trademark',
+    title: 'Commuto Trademark',
+    description:
+      'The name Commuto, its logo, and all related brand assets are trademarks of Commuto. These trademarks are protected by applicable intellectual property laws and may not be used, reproduced, or distributed without explicit written permission from the Commuto team.',
+    list: [
+      'Do not use the Commuto name or logo in a way that suggests endorsement or partnership without permission.',
+      'Do not modify, distort, or alter the Commuto logo or brand assets in any way.',
+      'Do not use Commuto trademarks as part of your own product, service, or company name.',
+    ],
+  },
+  {
+    id: 'copyright',
+    title: 'Copyright Notice',
+    description:
+      '© ' +
+      getCurrentYear() +
+      ' Commuto. All rights reserved. All content, including but not limited to text, graphics, logos, icons, images, and software, is the property of Commuto or its content suppliers and is protected by international copyright laws.',
+    list: [
+      'You may not copy, reproduce, republish, upload, post, transmit, or distribute any material from this website without prior written consent from Commuto.',
+      'Content may be used for personal, non-commercial reference only, provided that all copyright and proprietary notices remain intact.',
+      'Any unauthorized use of the content may violate copyright, trademark, and other laws.',
+    ],
+  },
+  {
+    id: 'thirdparty',
+    title: 'Third-Party Content & Attribution',
+    description:
+      'Some images, icons, or other assets used on this website may be the property of third parties and are used under license or with permission. All such content is credited to its respective owners where required.',
+    list: [
+      'If you believe your copyrighted work has been used in a way that constitutes copyright infringement, please contact us with details for prompt resolution.',
+    ],
+  },
+  {
+    id: 'reporting',
+    title: 'Reporting Violations',
+    description:
+      'If you notice any misuse of Commuto trademarks or copyrighted materials, or have questions about proper use, please contact us at hello@commuto.app.',
+    list: [],
+  },
+  {
+    id: 'disclaimer',
+    title: 'Disclaimer',
+    description:
+      'The information provided on this page is for general guidance only and does not constitute legal advice. For specific legal concerns, please consult a qualified attorney.',
+    list: [],
+  },
+];
+
+export const legalPages = [
+  {
+    id: 'policies',
+    title: 'Terms, Policies & Legal',
+    intro:
+      'This page outlines the key policies, terms, and legal information for using Commuto. Please read carefully to understand your rights, responsibilities, and our commitment to your privacy, safety, and a positive community experience.',
+    sections: policies,
+  },
+  {
+    id: 'copyright',
+    title: 'Trademark and Copyright Notice',
+    intro:
+      "This page outlines the trademark and copyright policies for Commuto. Unauthorized use of our trademarks or copyrighted materials may result in legal action. Please read carefully to understand your rights and responsibilities regarding the use of Commuto's intellectual property.",
+    sections: copyrightSections,
   },
 ];

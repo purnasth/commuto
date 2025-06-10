@@ -20,7 +20,8 @@ export const highlightMatch = (text: string, query: string) => {
   const regex = new RegExp(`(${query})`, 'gi'); // Create a regex to match the query
   return text.replace(
     regex,
-    (match) => `<span class="bg-teal-100 dark:bg-teal-600 font-medium">${match}</span>`,
+    (match) =>
+      `<span class="bg-teal-100 dark:bg-teal-600 font-medium">${match}</span>`,
   );
 };
 
@@ -71,4 +72,12 @@ export const getUserGreeting = (): string | null => {
     return getFirstNameFromEmail(parsedUser.email);
   }
   return null;
+};
+
+/**
+ * Gets the current year as a number.
+ * @returns The current year.
+ */
+export const getCurrentYear = (): number => {
+  return new Date().getFullYear();
 };
