@@ -187,9 +187,7 @@ const MapPopup: React.FC<MapPopupProps> = ({
   const handleConfirm = () => {
     setIsConfirmed(true);
     onSelect(address, selectedCoords);
-    toast.success(
-      `"${truncateLocation(address)}" has been successfully confirmed!`,
-    );
+    onClose();
   };
 
   const handleSuggestionClick = (suggestion: Suggestion) => {

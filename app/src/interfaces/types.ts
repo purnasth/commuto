@@ -1,10 +1,16 @@
 export interface RideFormData {
-  id?: number;
+  id?: string;
   from: string;
   to: string;
   message: string;
   role: string;
+  fromLat?: number;
+  fromLng?: number;
+  toLat?: number;
+  toLng?: number;
   timestamp?: string;
+  status?: string;
+  riderId?: string;
 }
 
 export interface AvailableListProps {
@@ -21,7 +27,7 @@ export interface FaqItemProps {
 export interface LocationPopupProps {
   activeInput?: 'from' | 'to' | null;
   onClose: () => void;
-  onSelect: (location: string) => void;
+  onSelect: (location: string, coordinates?: [number, number]) => void;
   initialSearchQuery: string;
 }
 

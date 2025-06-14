@@ -18,6 +18,8 @@ interface RideHistory {
   passengers: { id: number; fullname: string; email: string }[];
 }
 
+// TODO: add the status for the cancel.
+
 const Dashboard: React.FC = () => {
   const [rides, setRides] = useState<RideHistory[]>([]);
   const [userId, setUserId] = useState<number | null>(null);
@@ -41,7 +43,7 @@ const Dashboard: React.FC = () => {
   const requestedRides = rides.filter((ride) =>
     ride.passengers?.some((p) => p.id === userId),
   );
-  const confirmedRides = rides.filter((ride) => ride.status === 'COMPLETED');
+  const confirmedRides = rides.filter((ride) => ride.status === 'CONFIRMED');
   const statusCount = (arr: RideHistory[], status: string) =>
     arr.filter((r) => r.status === status).length;
 
@@ -68,9 +70,11 @@ const Dashboard: React.FC = () => {
               {postedRides.length}
             </div>
             <div className="mt-2 text-xs text-gray-700 dark:text-gray-300">
-              Active: {statusCount(postedRides, 'ACTIVE')} | Completed:{' '}
-              {statusCount(postedRides, 'COMPLETED')} | Rejected:{' '}
-              {statusCount(postedRides, 'REJECTED')}
+              Active: {statusCount(postedRides, 'ACTIVE')} | Confirmed:{' '}
+              {statusCount(postedRides, 'CONFIRMED')} | Rejected:{' '}
+              {statusCount(postedRides, 'REJECTED')} | Expired:{' '}
+              {statusCount(postedRides, 'EXPIRED')} | Cancelled:{' '}
+              {statusCount(postedRides, 'CANCELLED')}
             </div>
           </div>
         )}
@@ -83,9 +87,11 @@ const Dashboard: React.FC = () => {
               {requestedRides.length}
             </div>
             <div className="mt-2 text-xs text-gray-700 dark:text-gray-300">
-              Active: {statusCount(requestedRides, 'ACTIVE')} | Completed:{' '}
-              {statusCount(requestedRides, 'COMPLETED')} | Rejected:{' '}
-              {statusCount(requestedRides, 'REJECTED')}
+              Active: {statusCount(requestedRides, 'ACTIVE')} | Confirmed:{' '}
+              {statusCount(requestedRides, 'CONFIRMED')} | Rejected:{' '}
+              {statusCount(requestedRides, 'REJECTED')} | Expired:{' '}
+              {statusCount(requestedRides, 'EXPIRED')} | Cancelled:{' '}
+              {statusCount(requestedRides, 'CANCELLED')}
             </div>
           </div>
         )}
@@ -123,9 +129,6 @@ const Dashboard: React.FC = () => {
                 Role
               </th>
               <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                Type
-              </th>
-              <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
                 Time
               </th>
               <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
@@ -145,10 +148,6 @@ const Dashboard: React.FC = () => {
               </tr>
             ) : (
               rides.map((ride) => {
-                const isPosted = ride.rider?.id === userId;
-                const isRequested = ride.passengers?.some(
-                  (p) => p.id === userId,
-                );
                 return (
                   <tr
                     key={ride.id}
@@ -158,26 +157,34 @@ const Dashboard: React.FC = () => {
                     <td className="px-4 py-3">{ride.to}</td>
                     <td className="px-4 py-3">{ride.message || '-'}</td>
                     <td className="px-4 py-3 capitalize">{ride.role}</td>
-                    <td className="px-4 py-3 font-semibold">
-                      {isPosted && (
-                        <span className="text-blue-700">Posted</span>
-                      )}
-                      {isRequested && (
-                        <span className="text-green-700">Requested</span>
-                      )}
-                    </td>
                     <td className="px-4 py-3">
                       {new Date(ride.timestamp).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 font-semibold">
                       {ride.status === 'ACTIVE' && (
-                        <span className="text-blue-600">Active</span>
+                        <span className="rounded-full bg-blue-200 px-2.5 py-1 font-normal text-blue-600">
+                          Active
+                        </span>
                       )}
-                      {ride.status === 'COMPLETED' && (
-                        <span className="text-green-600">Completed</span>
+                      {ride.status === 'CONFIRMED' && (
+                        <span className="rounded-full bg-green-100 px-2.5 py-1 font-normal text-green-600">
+                          Confirmed
+                        </span>
                       )}
                       {ride.status === 'REJECTED' && (
-                        <span className="text-red-600">Rejected</span>
+                        <span className="rounded-full bg-red-100 px-2.5 py-1 font-normal text-red-600">
+                          Rejected
+                        </span>
+                      )}
+                      {ride.status === 'EXPIRED' && (
+                        <span className="rounded-full bg-gray-200 px-2.5 py-1 font-normal text-gray-600">
+                          Expired
+                        </span>
+                      )}
+                      {ride.status === 'CANCELLED' && (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 font-normal text-amber-600">
+                          Cancelled
+                        </span>
                       )}
                     </td>
                   </tr>

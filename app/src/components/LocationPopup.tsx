@@ -47,7 +47,7 @@ const LocationPopup: React.FC<LocationPopupProps> = ({
           );
           const data = await response.json();
           const truncatedLocation = truncateLocation(data.display_name);
-          onSelect(truncatedLocation);
+          onSelect(truncatedLocation, [longitude, latitude]);
           onClose();
         },
         (error) => {
@@ -64,8 +64,8 @@ const LocationPopup: React.FC<LocationPopupProps> = ({
     setShowMapPopup(true);
   };
 
-  const handleMapSelect = (location: string) => {
-    onSelect(location);
+  const handleMapSelect = (location: string, coordinates?: [number, number]) => {
+    onSelect(location, coordinates);
     setShowMapPopup(false);
   };
 
@@ -155,7 +155,7 @@ const LocationPopup: React.FC<LocationPopupProps> = ({
                 type="button"
                 className="group flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-all duration-150 ease-in-out hover:bg-teal-50 dark:border-light/50 dark:bg-teal-300/10 dark:hover:bg-teal-50"
                 onClick={() => {
-                  onSelect('Kathmandu BernHardt College');
+                  onSelect('Kathmandu BernHardt College', undefined);
                   onClose();
                 }}
               >
