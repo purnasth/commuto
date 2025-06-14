@@ -9,10 +9,12 @@ import {
   Param,
   BadRequestException,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 
 import { getNow } from './utils/date.util';
+import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 interface RideDto {
   from: string;
@@ -29,7 +31,11 @@ interface RideDto {
 
 @Controller('rides')
 export class RideController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(WINSTON_MODULE_NEST_PROVIDER)
+    private readonly logger: WinstonLogger,
+  ) {}
 
   /**
    * Calculates the great-circle distance between two points on Earth using the Haversine formula.
@@ -137,6 +143,15 @@ export class RideController {
 
   @Post()
   async createRide(@Body() body: RideDto) {
+    this.logger.log({
+      level: 'info',
+      message: `Create ride attempt by userId=${body.riderId}, from='${body.from}' to='${body.to}', role='${body.role}'`,
+      tag: 'ride',
+      userId: body.riderId,
+      from: body.from,
+      to: body.to,
+      role: body.role,
+    });
     if (!body.from || !body.to || !body.role || !body.riderId) {
       throw new BadRequestException('Missing required fields');
     }
@@ -145,10 +160,24 @@ export class RideController {
       where: { id: body.riderId },
     });
     if (!user) {
+      this.logger.log({
+        level: 'warn',
+        message: `Ride creation failed: User not found (userId=${body.riderId})`,
+        tag: 'ride',
+        userId: body.riderId,
+      });
       throw new NotFoundException('User not found');
     }
     // Case-insensitive role check
     if (user.role.toLowerCase() !== body.role.toLowerCase()) {
+      this.logger.log({
+        level: 'warn',
+        message: `Ride creation failed: Role mismatch for userId=${body.riderId} (userRole='${user.role}', requestedRole='${body.role}')`,
+        tag: 'ride',
+        userId: body.riderId,
+        userRole: user.role,
+        requestedRole: body.role,
+      });
       throw new BadRequestException(
         `Role mismatch: You're a '${user.role}', not a '${body.role}'.`,
       );
@@ -163,8 +192,13 @@ export class RideController {
       },
     });
     if (existingActiveRide) {
+      this.logger.log({
+        level: 'warn',
+        message: `Ride creation failed: UserId=${body.riderId} already has an active ride`,
+        tag: 'ride',
+        userId: body.riderId,
+      });
       throw new BadRequestException(
-        // 'You already have an active ride. You can only post a new ride after your previous ride is confirmed, rejected, or 5 minutes have passed.',
         'You already have an active ride and cannot post another at this time.',
       );
     }
@@ -182,6 +216,13 @@ export class RideController {
         timestamp: body.timestamp ? new Date(body.timestamp) : undefined,
         status: 'ACTIVE',
       },
+    });
+    this.logger.log({
+      level: 'info',
+      message: `Ride created by userId=${body.riderId}: ${JSON.stringify(ride)}`,
+      tag: 'ride',
+      userId: body.riderId,
+      rideId: ride.id,
     });
     return { message: 'Ride created', ride };
   }
@@ -273,6 +314,12 @@ export class RideController {
 
   @Delete(':id')
   async deleteRide(@Param('id') id: string) {
+    this.logger.log({
+      level: 'warn',
+      message: `Deleting ride with id: ${id}`,
+      tag: 'ride',
+      rideId: id,
+    });
     await this.prisma.ride.delete({ where: { id: Number(id) } });
     return { message: 'Ride deleted' };
   }
