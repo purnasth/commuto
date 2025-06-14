@@ -20,6 +20,7 @@ import RoleBasedPage from './pages/RoleBasedPage';
 import UserProfile from './pages/UserProfile';
 import Brand from './pages/Brand';
 import LegalPage from './pages/LegalPage';
+import LogsDashboard from './pages/LogsDashboard';
 
 const App: React.FC = () => {
   const theme = useTheme();
@@ -39,6 +40,7 @@ const App: React.FC = () => {
           <Route path="/role/:roleId" element={<RoleBasedPage />} />
           <Route path="/brand" element={<Brand />} />
           <Route path="/legal/:pageId" element={<LegalPage />} />
+          <Route path="/logs-dashboard" element={<LogsDashboard />} />
           <Route path="*" element={<Error404 />} />
         </Routes>
         <Footer />
