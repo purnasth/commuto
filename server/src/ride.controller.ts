@@ -1,20 +1,21 @@
 import {
-  Controller,
-  Post,
   Get,
   Put,
-  Delete,
+  Post,
   Body,
   Query,
   Param,
-  BadRequestException,
-  NotFoundException,
+  Delete,
   Inject,
+  Controller,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 
 import { getNow } from './utils/date.util';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
+import { USER_ROLE } from './constants/enums';
 
 interface RideDto {
   from: string;
@@ -24,7 +25,7 @@ interface RideDto {
   toLat?: number;
   toLng?: number;
   message?: string;
-  role: string;
+  role: USER_ROLE;
   riderId: number; // user id of the poster
   timestamp?: string;
 }
@@ -112,7 +113,11 @@ export class RideController {
     );
 
     // Always match rides with the OPPOSITE role
-    const oppositeRole = role === 'rider' ? 'passenger' : 'rider';
+    const normalizedRole = role as USER_ROLE;
+    const oppositeRole =
+      normalizedRole === USER_ROLE.RIDER
+        ? USER_ROLE.PASSENGER
+        : USER_ROLE.RIDER;
     const rides = await this.prisma.ride.findMany({
       where: {
         role: oppositeRole,

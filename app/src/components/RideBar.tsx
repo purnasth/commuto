@@ -10,6 +10,7 @@ import { TbMoodTongueWink2 } from 'react-icons/tb';
 import { PiSmileyMeltingBold } from 'react-icons/pi';
 
 import { findRideFormFields } from '../constants/data';
+import { USER_ROLE } from '../constants/enums';
 
 import { RideFormData, RideBarProps } from '../interfaces/types';
 
@@ -199,11 +200,11 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
         if (availableRides.length > 0) {
           toast.success(
-            `Your ride route has been submitted! It will be visible to ${role === 'rider' ? 'passengers' : 'riders'} sharing the same route.`,
+            `Your ride route has been submitted! It will be visible to ${role === USER_ROLE.RIDER ? 'passengers' : 'riders'} sharing the same route.`,
           );
         } else {
           toast.info(
-            `Your ride route has been submitted! Currently, no ${role === 'rider' ? 'passengers' : 'riders'} are sharing the same route.`,
+            `Your ride route has been submitted! Currently, no ${role === USER_ROLE.RIDER ? 'passengers' : 'riders'} are sharing the same route.`,
           );
         }
 
@@ -370,14 +371,15 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     if (!lastSearchParams) return null;
     // Ensure role is either "rider" or "passenger"
     const roleValue =
-      lastSearchParams.role === 'rider' || lastSearchParams.role === 'passenger'
+      lastSearchParams.role === USER_ROLE.RIDER ||
+      lastSearchParams.role === USER_ROLE.PASSENGER
         ? lastSearchParams.role
-        : 'rider';
+        : USER_ROLE.RIDER;
     return {
       from: lastSearchParams.from || '-',
       to: lastSearchParams.to || '-',
       message: lastSearchParams.message || '-',
-      role: roleValue as 'rider' | 'passenger',
+      role: roleValue as USER_ROLE,
       time: lastSearchParams.timestamp
         ? new Date(lastSearchParams.timestamp).toLocaleString()
         : '',

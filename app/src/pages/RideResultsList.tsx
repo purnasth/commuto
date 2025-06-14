@@ -1,6 +1,7 @@
 import React from 'react';
 import { TbCircleDashed, TbMapPin, TbAlarm } from 'react-icons/tb';
 import { RideFormData } from '../interfaces/types';
+import { USER_ROLE } from '../constants/enums';
 
 interface RideResultsListProps {
   ridesFound: RideFormData[];
@@ -21,9 +22,9 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
     <div className="relative size-full max-w-xl p-5 md:h-auto md:rounded-3xl">
       <h3
         id="modal-title"
-        className="pb-4 text-lg md:text-xl font-medium text-teal-500 dark:text-teal-300"
+        className="pb-4 text-lg font-medium text-teal-500 dark:text-teal-300 md:text-xl"
       >
-        Available {role === 'rider' ? 'Passengers' : 'Rides'}
+        Available {role === USER_ROLE.RIDER ? 'Passengers' : 'Rides'}
       </h3>
       <ul className="max-h-[90vh] space-y-3 overflow-y-auto md:max-h-[89vh]">
         {ridesFound.map((ride, index) => (

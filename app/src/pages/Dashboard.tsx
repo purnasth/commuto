@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
+import { USER_ROLE } from '../constants/enums';
 
 interface RideHistory {
   id: number;
@@ -50,9 +51,9 @@ const Dashboard: React.FC = () => {
   // Determine user role (rider or passenger)
   const userRole =
     postedRides.length > 0
-      ? 'rider'
+      ? USER_ROLE.RIDER
       : requestedRides.length > 0
-        ? 'passenger'
+        ? USER_ROLE.PASSENGER
         : null;
 
   return (
@@ -61,7 +62,7 @@ const Dashboard: React.FC = () => {
         Profile & Dashboard
       </h2>
       <div className="mx-auto mb-8 grid grid-cols-1 gap-8 md:grid-cols-3">
-        {userRole === 'rider' && (
+        {userRole === USER_ROLE.RIDER && (
           <div className="rounded-xl bg-gradient-to-br from-teal-200 to-teal-400 p-6 text-center shadow-lg dark:from-teal-900 dark:to-teal-700">
             <div className="mb-2 text-lg font-semibold text-teal-900 dark:text-teal-200">
               Rides Posted
@@ -78,7 +79,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         )}
-        {userRole === 'passenger' && (
+        {userRole === USER_ROLE.PASSENGER && (
           <div className="rounded-xl bg-gradient-to-br from-teal-200 to-teal-400 p-6 text-center shadow-lg dark:from-teal-900 dark:to-teal-700">
             <div className="mb-2 text-lg font-semibold text-teal-900 dark:text-teal-200">
               Rides Requested

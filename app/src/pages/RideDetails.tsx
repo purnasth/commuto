@@ -5,6 +5,7 @@ import { formatFullDate } from '../utils/functions';
 import { FaWalking } from 'react-icons/fa';
 import { MdOutlineDirectionsBike } from 'react-icons/md';
 import { IoClose } from 'react-icons/io5';
+import { USER_ROLE } from '../constants/enums';
 
 const RideDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -32,8 +33,12 @@ const RideDetails: React.FC = () => {
         <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px] dark:opacity-60" />
         <div>
           <p className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-teal-100 px-4 py-1 text-base font-medium text-teal-500 dark:bg-teal-900">
-            {role === 'rider' ? <MdOutlineDirectionsBike /> : <FaWalking />}
-            {role === 'rider' ? 'Rider' : 'Passenger'}
+            {role === USER_ROLE.RIDER ? (
+              <MdOutlineDirectionsBike />
+            ) : (
+              <FaWalking />
+            )}
+            {role === USER_ROLE.RIDER ? 'Rider' : 'Passenger'}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -65,8 +70,10 @@ const RideDetails: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowMap(!showMap)}
-            className={`flex items-center gap-2 rounded-full bg-teal-100 dark:bg-teal-800 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-200 ${
-              showMap ? 'text-teal-700 dark:text-teal-300' : 'text-teal-600 dark:text-teal-300'
+            className={`flex items-center gap-2 rounded-full bg-teal-100 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-200 dark:bg-teal-800 ${
+              showMap
+                ? 'text-teal-700 dark:text-teal-300'
+                : 'text-teal-600 dark:text-teal-300'
             }`}
           >
             {showMap ? (
