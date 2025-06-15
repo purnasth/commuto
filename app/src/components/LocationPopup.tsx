@@ -64,7 +64,10 @@ const LocationPopup: React.FC<LocationPopupProps> = ({
     setShowMapPopup(true);
   };
 
-  const handleMapSelect = (location: string, coordinates?: [number, number]) => {
+  const handleMapSelect = (
+    location: string,
+    coordinates?: [number, number],
+  ) => {
     onSelect(location, coordinates);
     setShowMapPopup(false);
   };
@@ -155,7 +158,15 @@ const LocationPopup: React.FC<LocationPopupProps> = ({
                 type="button"
                 className="group flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-all duration-150 ease-in-out hover:bg-teal-50 dark:border-light/50 dark:bg-teal-300/10 dark:hover:bg-teal-50"
                 onClick={() => {
-                  onSelect('Kathmandu BernHardt College', undefined);
+                  const loc = mockLocations.find(
+                    (l) => l.name === 'Kathmandu BernHardt College',
+                  );
+                  onSelect(
+                    'Kathmandu BernHardt College',
+                    loc && loc.lat !== undefined && loc.lng !== undefined
+                      ? [loc.lng, loc.lat]
+                      : undefined,
+                  );
                   onClose();
                 }}
               >
@@ -174,7 +185,10 @@ const LocationPopup: React.FC<LocationPopupProps> = ({
                 <hr className="dark:opacity-50" />
                 <SearchedLocations
                   suggestions={suggestions}
-                  onSelect={onSelect}
+                  onSelect={(name, coords) => {
+                    onSelect(name, coords);
+                    onClose();
+                  }}
                   onClose={onClose}
                   searchQuery={searchQuery}
                 />

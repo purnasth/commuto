@@ -5,6 +5,8 @@ import CareOurEarth from './ui/CareOurEarth';
 import branch1 from '../assets/images/about/branch1.svg';
 import branch2 from '../assets/images/about/branch2.svg';
 
+import { ROUTE_ABOUT } from '../constants/routes';
+
 const AboutInfo = () => {
   return (
     <>
@@ -39,7 +41,7 @@ const AboutInfo = () => {
             </p>
 
             <Link
-              to="/about"
+              to={ROUTE_ABOUT}
               className="transition-150 group mt-4 flex items-center gap-2.5 rounded-full bg-dark px-4 py-3 pr-5 text-sm font-light text-light shadow-lg hover:bg-teal-600 sm:text-sm md:mt-10"
             >
               <img

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
-import SideNav from './SideNav';
 import { Link, useLocation } from 'react-router-dom';
 import { TbMenu2, TbPlus, TbSearch } from 'react-icons/tb';
-import { getUserGreeting } from '../utils/functions';
+
 import logo from '../assets/logo/commuto.svg';
 import logoAlt from '../assets/logo/commuto-alt.svg';
-import ThemeToggle from '../components/ui/ThemeToggle';
+
+import SideNav from './SideNav';
 import { useTheme } from '../contexts/ThemeProvider';
+import { getUserGreeting } from '../utils/functions';
+import ThemeToggle from '../components/ui/ThemeToggle';
+import { ROUTE_HOME, ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
 
 const navLinks = [
   {
@@ -71,7 +74,7 @@ const Navbar = () => {
       >
         <div className={`flex items-center justify-between md:items-start`}>
           <Link
-            to="/"
+            to={ROUTE_HOME}
             className="inline-flex items-center gap-2.5 text-lg font-semibold text-teal-950 dark:text-teal-300 sm:text-3xl"
           >
             <img
@@ -98,7 +101,7 @@ const Navbar = () => {
             <div className="flex items-center gap-6">
               {userName ? (
                 <Link
-                  to="/profile"
+                  to={ROUTE_PROFILE}
                   className="hidden items-center justify-center gap-2 rounded-full bg-teal-100 py-2 pl-4 pr-5 font-semibold text-teal-600 md:flex"
                 >
                   <span className="animate-wave">&#128075;</span>
@@ -106,7 +109,7 @@ const Navbar = () => {
                 </Link>
               ) : (
                 <Link
-                  to="/login"
+                  to={ROUTE_LOGIN}
                   className="hidden rounded-full bg-teal-300 px-6 py-2 font-semibold dark:text-dark md:flex"
                 >
                   Login

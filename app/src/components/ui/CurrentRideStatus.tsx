@@ -1,5 +1,6 @@
 import React from 'react';
 import { TbAlarm, TbCircleDashed, TbMapPin } from 'react-icons/tb';
+import { USER_ROLE } from '../../constants/enums';
 
 interface CurrentRideStatusProps {
   details: {
@@ -7,7 +8,7 @@ interface CurrentRideStatusProps {
     to: string;
     message: string;
     time?: string;
-    role: 'rider' | 'passenger';
+    role: USER_ROLE;
   };
   onSearchAgain: () => void;
   onCancelRide: () => void;

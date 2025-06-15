@@ -3,8 +3,15 @@ import { PiMapPinAreaBold } from 'react-icons/pi';
 import { highlightMatch } from '../utils/functions';
 
 interface SearchedLocationsProps {
-  suggestions: { id: string; name: string; address: string; type: string }[];
-  onSelect: (location: string) => void;
+  suggestions: {
+    id: string;
+    name: string;
+    address: string;
+    type: string;
+    lat?: number;
+    lng?: number;
+  }[];
+  onSelect: (location: string, coordinates?: [number, number]) => void;
   onClose: () => void;
   searchQuery: string;
 }
@@ -26,9 +33,14 @@ const SearchedLocations: React.FC<SearchedLocationsProps> = ({
           {suggestions.map((location) => (
             <div
               key={location.id}
-              className="group flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-all duration-150 ease-in-out hover:bg-gray-100 hover:text-dark dark:hover:bg-teal-50 dark:border-light/50 dark:bg-teal-50/5"
+              className="group flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-all duration-150 ease-in-out hover:bg-gray-100 hover:text-dark dark:border-light/50 dark:bg-teal-50/5 dark:hover:bg-teal-50"
               onClick={() => {
-                onSelect(location.name);
+                onSelect(
+                  location.name,
+                  location.lat !== undefined && location.lng !== undefined
+                    ? [location.lng, location.lat]
+                    : undefined,
+                );
                 onClose();
               }}
             >
