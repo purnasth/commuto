@@ -12,10 +12,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { getNow } from './utils/date.util';
-import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
-import { USER_ROLE } from './constants/enums';
+import { USER_ROLE, RIDE_STATUS } from './constants/enums';
 
 interface RideDto {
   from: string;
@@ -28,6 +28,7 @@ interface RideDto {
   role: USER_ROLE;
   riderId: number; // user id of the poster
   timestamp?: string;
+  status?: RIDE_STATUS;
 }
 
 @Controller('rides')
@@ -94,7 +95,7 @@ export class RideController {
     @Query('fromLat') fromLat: string,
     @Query('fromLng') fromLng: string,
     @Query('timestamp') timestamp: string,
-    @Query('role') role: string,
+    @Query('role') role: USER_ROLE,
   ) {
     if (!fromLat || !fromLng || !timestamp || !role) {
       throw new BadRequestException(
@@ -113,7 +114,7 @@ export class RideController {
     );
 
     // Always match rides with the OPPOSITE role
-    const normalizedRole = role as USER_ROLE;
+    const normalizedRole = role;
     const oppositeRole =
       normalizedRole === USER_ROLE.RIDER
         ? USER_ROLE.PASSENGER
@@ -121,7 +122,7 @@ export class RideController {
     const rides = await this.prisma.ride.findMany({
       where: {
         role: oppositeRole,
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { gte: minTime, lte: maxTime },
         fromLat: { not: null },
         fromLng: { not: null },
@@ -192,7 +193,7 @@ export class RideController {
     const existingActiveRide = await this.prisma.ride.findFirst({
       where: {
         riderId: body.riderId,
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { gte: fiveMinAgo },
       },
     });
@@ -219,7 +220,7 @@ export class RideController {
         role: body.role,
         riderId: body.riderId,
         timestamp: body.timestamp ? new Date(body.timestamp) : undefined,
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
       },
     });
     this.logger.log({
@@ -238,16 +239,16 @@ export class RideController {
     // Expire rides whose timestamp is in the past and still ACTIVE
     await this.prisma.ride.updateMany({
       where: {
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { lt: now },
       },
-      data: { status: 'EXPIRED' },
+      data: { status: RIDE_STATUS.EXPIRED },
     });
     // Only show active and confirmed rides with timestamp in the future
     const rides = await this.prisma.ride.findMany({
       where: {
         ...(role ? { role } : {}),
-        status: { in: ['ACTIVE', 'CONFIRMED'] },
+        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
         timestamp: { gte: now },
       },
       include: { rider: true },
@@ -263,10 +264,10 @@ export class RideController {
     // Expire rides whose timestamp is in the past and still ACTIVE
     await this.prisma.ride.updateMany({
       where: {
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { lt: now },
       },
-      data: { status: 'EXPIRED' },
+      data: { status: RIDE_STATUS.EXPIRED },
     });
     const id = Number(userId);
     if (!userId || isNaN(id)) {
@@ -343,13 +344,13 @@ export class RideController {
         from: ride.from,
         to: ride.to,
         timestamp: ride.timestamp,
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
       },
     });
     const matchedIds = matchedRides.map((r) => r.id);
     await this.prisma.ride.updateMany({
       where: { id: { in: matchedIds } },
-      data: { status: 'CONFIRMED' },
+      data: { status: RIDE_STATUS.CONFIRMED },
     });
     // Return updated rides
     const updatedRides = await this.prisma.ride.findMany({
@@ -367,7 +368,7 @@ export class RideController {
     // Mark ride as rejected
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
-      data: { status: 'REJECTED' },
+      data: { status: RIDE_STATUS.REJECTED },
     });
     return {
       message: 'Ride rejected. You can now post a new ride.',
@@ -383,7 +384,7 @@ export class RideController {
     // Mark ride as cancelled
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
-      data: { status: 'CANCELLED' },
+      data: { status: RIDE_STATUS.CANCELLED },
     });
     return {
       message: 'Ride cancelled. You can now post a new ride.',

@@ -3,18 +3,20 @@ import {
   Put,
   Post,
   Body,
+  Query,
   Delete,
+  Inject,
   Controller,
   BadRequestException,
   UnauthorizedException,
-  Query,
-  Inject,
 } from '@nestjs/common';
 import axios from 'axios';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
+
+import { USER_ROLE } from './constants/enums';
 
 interface LoginDto {
   email: string;
@@ -25,7 +27,7 @@ interface SignupDto {
   fullname: string;
   email: string;
   password: string;
-  role: string;
+  role: USER_ROLE;
   phone?: string;
   address?: string;
   profilePicture?: string;

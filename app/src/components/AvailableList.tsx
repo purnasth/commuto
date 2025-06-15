@@ -10,7 +10,7 @@ const AvailableList: React.FC<AvailableListProps> = ({ role }) => {
     from: string;
     to: string;
     message: string;
-    role: string;
+    role: USER_ROLE;
   }
 
   const [items, setItems] = useState<Ride[]>([]);

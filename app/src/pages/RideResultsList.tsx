@@ -5,7 +5,7 @@ import { USER_ROLE } from '../constants/enums';
 
 interface RideResultsListProps {
   ridesFound: RideFormData[];
-  role: string;
+  role: USER_ROLE;
   handleConfirm: (ride: RideFormData) => void;
   handleReject: (ride: RideFormData) => void;
 }
