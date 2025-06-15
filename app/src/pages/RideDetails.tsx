@@ -22,7 +22,7 @@ const RideDetails: React.FC = () => {
   };
 
   return (
-    <main>
+    <main className="border border-red-800">
       <h1 className="mb-5 text-center text-xl font-semibold text-teal-500 md:text-2xl">
         Ride Details
       </h1>
@@ -65,8 +65,10 @@ const RideDetails: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowMap(!showMap)}
-            className={`flex items-center gap-2 rounded-full bg-teal-100 dark:bg-teal-800 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-200 ${
-              showMap ? 'text-teal-700 dark:text-teal-300' : 'text-teal-600 dark:text-teal-300'
+            className={`flex items-center gap-2 rounded-full bg-teal-100 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-200 dark:bg-teal-800 ${
+              showMap
+                ? 'text-teal-700 dark:text-teal-300'
+                : 'text-teal-600 dark:text-teal-300'
             }`}
           >
             {showMap ? (
