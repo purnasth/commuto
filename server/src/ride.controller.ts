@@ -286,11 +286,17 @@ export class RideController {
     });
     if (!ride) throw new NotFoundException('Ride not found');
     // Find all rides that match this ride (same from, to, timestamp, and status ACTIVE)
+
+    // ISSUE #51: Inconsistency problem
+
     const matchedRides = await this.prisma.ride.findMany({
       where: {
         from: ride.from,
         to: ride.to,
-        timestamp: ride.timestamp,
+        timestamp: {
+          gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
+          lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
+        },
         status: 'ACTIVE',
       },
     });
