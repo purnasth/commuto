@@ -6,20 +6,38 @@ import {
   // Navigate,
 } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
+
 import useTheme from './hooks/useTheme';
-import Home from './pages/Home';
 import RouterToTop from './utils/RouterToTop';
+
 import Navbar from './layouts/Navbar';
 import Footer from './layouts/Footer';
-import AboutPage from './pages/AboutPage';
-import Error404 from './pages/Error404';
-import Login from './layouts/Login';
-import RideDetails from './pages/RideDetails';
-import FAQPage from './pages/FAQPage';
-import RoleBasedPage from './pages/RoleBasedPage';
-import UserProfile from './pages/UserProfile';
+
+import Home from './pages/Home';
 import Brand from './pages/Brand';
+import Login from './layouts/Login';
+import FAQPage from './pages/FAQPage';
+import Error404 from './pages/Error404';
+import AboutPage from './pages/AboutPage';
 import LegalPage from './pages/LegalPage';
+import RideDetails from './pages/RideDetails';
+import UserProfile from './pages/UserProfile';
+import RoleBasedPage from './pages/RoleBasedPage';
+import LogsDashboard from './pages/LogsDashboard';
+
+import {
+  ROUTE_404,
+  ROUTE_HOME,
+  ROUTE_HELP,
+  ROUTE_ROLE,
+  ROUTE_ABOUT,
+  ROUTE_LOGIN,
+  ROUTE_BRAND,
+  ROUTE_LEGAL,
+  ROUTE_PROFILE,
+  ROUTE_RIDE_DETAILS,
+  ROUTE_LOGS_DASHBOARD,
+} from './constants/routes';
 
 const App: React.FC = () => {
   const theme = useTheme();
@@ -30,16 +48,17 @@ const App: React.FC = () => {
         <RouterToTop />
         <Navbar />
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/help" element={<FAQPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/profile" element={<UserProfile />} />
-          <Route path="/ride-details" element={<RideDetails />} />
-          <Route path="/role/:roleId" element={<RoleBasedPage />} />
-          <Route path="/brand" element={<Brand />} />
-          <Route path="/legal/:pageId" element={<LegalPage />} />
-          <Route path="*" element={<Error404 />} />
+          <Route path={ROUTE_HOME} element={<Home />} />
+          <Route path={ROUTE_HELP} element={<FAQPage />} />
+          <Route path={ROUTE_ABOUT} element={<AboutPage />} />
+          <Route path={ROUTE_LOGIN} element={<Login />} />
+          <Route path={ROUTE_PROFILE} element={<UserProfile />} />
+          <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
+          <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
+          <Route path={ROUTE_BRAND} element={<Brand />} />
+          <Route path={ROUTE_LEGAL} element={<LegalPage />} />
+          <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
+          <Route path={ROUTE_404} element={<Error404 />} />
         </Routes>
         <Footer />
       </Router>

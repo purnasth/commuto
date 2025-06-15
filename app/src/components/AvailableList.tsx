@@ -3,13 +3,14 @@ import { AvailableListProps } from '../interfaces/types';
 import { TbCircleDashed } from 'react-icons/tb';
 import { TbMapPin } from 'react-icons/tb';
 import { TbAlarm } from 'react-icons/tb';
+import { USER_ROLE } from '../constants/enums';
 
 const AvailableList: React.FC<AvailableListProps> = ({ role }) => {
   interface Ride {
     from: string;
     to: string;
     message: string;
-    role: string;
+    role: USER_ROLE;
   }
 
   const [items, setItems] = useState<Ride[]>([]);
@@ -25,7 +26,7 @@ const AvailableList: React.FC<AvailableListProps> = ({ role }) => {
   return (
     <div className="mx-auto max-w-xl space-y-4 p-4">
       <h2 className="text-lg font-semibold">
-        Available {role === 'rider' ? 'Rides' : 'Passengers'}
+        Available {role === USER_ROLE.RIDER ? 'Rides' : 'Passengers'}
       </h2>
       {items.length > 0 ? (
         items.map((item, index) => (
@@ -60,7 +61,7 @@ const AvailableList: React.FC<AvailableListProps> = ({ role }) => {
           </div>
         ))
       ) : (
-        <p>No {role === 'rider' ? 'rides' : 'passengers'} available.</p>
+        <p>No {role === USER_ROLE.RIDER ? 'rides' : 'passengers'} available.</p>
       )}
     </div>
   );

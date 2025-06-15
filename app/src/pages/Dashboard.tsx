@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
+import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
 
 interface RideHistory {
   id: number;
   from: string;
   to: string;
   message?: string;
-  role: string;
+  role: USER_ROLE;
   timestamp: string;
-  status: string;
+  status: RIDE_STATUS;
   rider: {
     id: number;
     fullname: string;
@@ -43,16 +44,18 @@ const Dashboard: React.FC = () => {
   const requestedRides = rides.filter((ride) =>
     ride.passengers?.some((p) => p.id === userId),
   );
-  const confirmedRides = rides.filter((ride) => ride.status === 'CONFIRMED');
-  const statusCount = (arr: RideHistory[], status: string) =>
+  const confirmedRides = rides.filter(
+    (ride) => ride.status === RIDE_STATUS.CONFIRMED,
+  );
+  const statusCount = (arr: RideHistory[], status: RIDE_STATUS) =>
     arr.filter((r) => r.status === status).length;
 
   // Determine user role (rider or passenger)
   const userRole =
     postedRides.length > 0
-      ? 'rider'
+      ? USER_ROLE.RIDER
       : requestedRides.length > 0
-        ? 'passenger'
+        ? USER_ROLE.PASSENGER
         : null;
 
   return (
@@ -61,7 +64,7 @@ const Dashboard: React.FC = () => {
         Profile & Dashboard
       </h2>
       <div className="mx-auto mb-8 grid grid-cols-1 gap-8 md:grid-cols-3">
-        {userRole === 'rider' && (
+        {userRole === USER_ROLE.RIDER && (
           <div className="rounded-xl bg-gradient-to-br from-teal-200 to-teal-400 p-6 text-center shadow-lg dark:from-teal-900 dark:to-teal-700">
             <div className="mb-2 text-lg font-semibold text-teal-900 dark:text-teal-200">
               Rides Posted
@@ -70,15 +73,15 @@ const Dashboard: React.FC = () => {
               {postedRides.length}
             </div>
             <div className="mt-2 text-xs text-gray-700 dark:text-gray-300">
-              Active: {statusCount(postedRides, 'ACTIVE')} | Confirmed:{' '}
-              {statusCount(postedRides, 'CONFIRMED')} | Rejected:{' '}
-              {statusCount(postedRides, 'REJECTED')} | Expired:{' '}
-              {statusCount(postedRides, 'EXPIRED')} | Cancelled:{' '}
-              {statusCount(postedRides, 'CANCELLED')}
+              Active: {statusCount(postedRides, RIDE_STATUS.ACTIVE)} |
+              Confirmed: {statusCount(postedRides, RIDE_STATUS.CONFIRMED)} |
+              Rejected: {statusCount(postedRides, RIDE_STATUS.REJECTED)} |
+              Expired: {statusCount(postedRides, RIDE_STATUS.EXPIRED)} |
+              Cancelled: {statusCount(postedRides, RIDE_STATUS.CANCELLED)}
             </div>
           </div>
         )}
-        {userRole === 'passenger' && (
+        {userRole === USER_ROLE.PASSENGER && (
           <div className="rounded-xl bg-gradient-to-br from-teal-200 to-teal-400 p-6 text-center shadow-lg dark:from-teal-900 dark:to-teal-700">
             <div className="mb-2 text-lg font-semibold text-teal-900 dark:text-teal-200">
               Rides Requested
@@ -87,11 +90,11 @@ const Dashboard: React.FC = () => {
               {requestedRides.length}
             </div>
             <div className="mt-2 text-xs text-gray-700 dark:text-gray-300">
-              Active: {statusCount(requestedRides, 'ACTIVE')} | Confirmed:{' '}
-              {statusCount(requestedRides, 'CONFIRMED')} | Rejected:{' '}
-              {statusCount(requestedRides, 'REJECTED')} | Expired:{' '}
-              {statusCount(requestedRides, 'EXPIRED')} | Cancelled:{' '}
-              {statusCount(requestedRides, 'CANCELLED')}
+              Active: {statusCount(requestedRides, RIDE_STATUS.ACTIVE)} |
+              Confirmed: {statusCount(requestedRides, RIDE_STATUS.CONFIRMED)} |
+              Rejected: {statusCount(requestedRides, RIDE_STATUS.REJECTED)} |
+              Expired: {statusCount(requestedRides, RIDE_STATUS.EXPIRED)} |
+              Cancelled: {statusCount(requestedRides, RIDE_STATUS.CANCELLED)}
             </div>
           </div>
         )}
@@ -161,27 +164,27 @@ const Dashboard: React.FC = () => {
                       {new Date(ride.timestamp).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 font-semibold">
-                      {ride.status === 'ACTIVE' && (
+                      {ride.status === RIDE_STATUS.ACTIVE && (
                         <span className="rounded-full bg-blue-200 px-2.5 py-1 font-normal text-blue-600">
                           Active
                         </span>
                       )}
-                      {ride.status === 'CONFIRMED' && (
+                      {ride.status === RIDE_STATUS.CONFIRMED && (
                         <span className="rounded-full bg-green-100 px-2.5 py-1 font-normal text-green-600">
                           Confirmed
                         </span>
                       )}
-                      {ride.status === 'REJECTED' && (
+                      {ride.status === RIDE_STATUS.REJECTED && (
                         <span className="rounded-full bg-red-100 px-2.5 py-1 font-normal text-red-600">
                           Rejected
                         </span>
                       )}
-                      {ride.status === 'EXPIRED' && (
+                      {ride.status === RIDE_STATUS.EXPIRED && (
                         <span className="rounded-full bg-gray-200 px-2.5 py-1 font-normal text-gray-600">
                           Expired
                         </span>
                       )}
-                      {ride.status === 'CANCELLED' && (
+                      {ride.status === RIDE_STATUS.CANCELLED && (
                         <span className="rounded-full bg-amber-100 px-2.5 py-1 font-normal text-amber-600">
                           Cancelled
                         </span>

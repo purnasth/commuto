@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { SideNavProps } from '../interfaces/types';
 // import logo from '../assets/logo.svg';
 import { IoClose } from 'react-icons/io5';
+import { ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
 
 const routeLinks = [
   {
@@ -102,7 +103,7 @@ const SideNav: React.FC<SideNavProps> = ({
             </Link> */}
             {userName ? (
               <Link
-                to="/profile"
+                to={ROUTE_PROFILE}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-teal-100 py-2 pl-4 pr-5 text-sm font-semibold text-teal-600 md:hidden md:text-base"
               >
                 <span className="animate-wave">&#128075;</span>
@@ -110,7 +111,7 @@ const SideNav: React.FC<SideNavProps> = ({
               </Link>
             ) : (
               <Link
-                to="/login"
+                to={ROUTE_LOGIN}
                 className="inline-flex rounded-full bg-teal-300 px-6 py-2 font-semibold dark:text-dark md:hidden"
               >
                 Login

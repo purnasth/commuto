@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import error from '../assets/vector/bhaiya-ji.svg';
+import { ROUTE_HOME } from '../constants/routes';
 
 const BhaiyaJi = () => {
   return (
@@ -15,8 +16,8 @@ const BhaiyaJi = () => {
           No rides found
         </h1>
         <Link
-          to="/"
-          className="rounded-full mt-5 bg-teal-300 px-6 py-2 font-semibold"
+          to={ROUTE_HOME}
+          className="mt-5 rounded-full bg-teal-300 px-6 py-2 font-semibold"
         >
           Go Home
         </Link>

@@ -1,18 +1,21 @@
 import {
-  Controller,
-  Post,
   Get,
   Put,
-  Delete,
+  Post,
   Body,
   Query,
   Param,
-  BadRequestException,
+  Delete,
+  Inject,
+  Controller,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { getNow } from './utils/date.util';
+import { USER_ROLE, RIDE_STATUS } from './constants/enums';
 
 interface RideDto {
   from: string;
@@ -22,14 +25,19 @@ interface RideDto {
   toLat?: number;
   toLng?: number;
   message?: string;
-  role: string;
+  role: USER_ROLE;
   riderId: number; // user id of the poster
   timestamp?: string;
+  status?: RIDE_STATUS;
 }
 
 @Controller('rides')
 export class RideController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(WINSTON_MODULE_NEST_PROVIDER)
+    private readonly logger: WinstonLogger,
+  ) {}
 
   /**
    * Calculates the great-circle distance between two points on Earth using the Haversine formula.
@@ -87,7 +95,7 @@ export class RideController {
     @Query('fromLat') fromLat: string,
     @Query('fromLng') fromLng: string,
     @Query('timestamp') timestamp: string,
-    @Query('role') role: string,
+    @Query('role') role: USER_ROLE,
   ) {
     if (!fromLat || !fromLng || !timestamp || !role) {
       throw new BadRequestException(
@@ -106,11 +114,15 @@ export class RideController {
     );
 
     // Always match rides with the OPPOSITE role
-    const oppositeRole = role === 'rider' ? 'passenger' : 'rider';
+    const normalizedRole = role;
+    const oppositeRole =
+      normalizedRole === USER_ROLE.RIDER
+        ? USER_ROLE.PASSENGER
+        : USER_ROLE.RIDER;
     const rides = await this.prisma.ride.findMany({
       where: {
         role: oppositeRole,
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { gte: minTime, lte: maxTime },
         fromLat: { not: null },
         fromLng: { not: null },
@@ -137,6 +149,15 @@ export class RideController {
 
   @Post()
   async createRide(@Body() body: RideDto) {
+    this.logger.log({
+      level: 'info',
+      message: `Create ride attempt by userId=${body.riderId}, from='${body.from}' to='${body.to}', role='${body.role}'`,
+      tag: 'ride',
+      userId: body.riderId,
+      from: body.from,
+      to: body.to,
+      role: body.role,
+    });
     if (!body.from || !body.to || !body.role || !body.riderId) {
       throw new BadRequestException('Missing required fields');
     }
@@ -145,10 +166,24 @@ export class RideController {
       where: { id: body.riderId },
     });
     if (!user) {
+      this.logger.log({
+        level: 'warn',
+        message: `Ride creation failed: User not found (userId=${body.riderId})`,
+        tag: 'ride',
+        userId: body.riderId,
+      });
       throw new NotFoundException('User not found');
     }
     // Case-insensitive role check
     if (user.role.toLowerCase() !== body.role.toLowerCase()) {
+      this.logger.log({
+        level: 'warn',
+        message: `Ride creation failed: Role mismatch for userId=${body.riderId} (userRole='${user.role}', requestedRole='${body.role}')`,
+        tag: 'ride',
+        userId: body.riderId,
+        userRole: user.role,
+        requestedRole: body.role,
+      });
       throw new BadRequestException(
         `Role mismatch: You're a '${user.role}', not a '${body.role}'.`,
       );
@@ -158,13 +193,18 @@ export class RideController {
     const existingActiveRide = await this.prisma.ride.findFirst({
       where: {
         riderId: body.riderId,
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { gte: fiveMinAgo },
       },
     });
     if (existingActiveRide) {
+      this.logger.log({
+        level: 'warn',
+        message: `Ride creation failed: UserId=${body.riderId} already has an active ride`,
+        tag: 'ride',
+        userId: body.riderId,
+      });
       throw new BadRequestException(
-        // 'You already have an active ride. You can only post a new ride after your previous ride is confirmed, rejected, or 5 minutes have passed.',
         'You already have an active ride and cannot post another at this time.',
       );
     }
@@ -180,8 +220,15 @@ export class RideController {
         role: body.role,
         riderId: body.riderId,
         timestamp: body.timestamp ? new Date(body.timestamp) : undefined,
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
       },
+    });
+    this.logger.log({
+      level: 'info',
+      message: `Ride created by userId=${body.riderId}: ${JSON.stringify(ride)}`,
+      tag: 'ride',
+      userId: body.riderId,
+      rideId: ride.id,
     });
     return { message: 'Ride created', ride };
   }
@@ -192,16 +239,16 @@ export class RideController {
     // Expire rides whose timestamp is in the past and still ACTIVE
     await this.prisma.ride.updateMany({
       where: {
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { lt: now },
       },
-      data: { status: 'EXPIRED' },
+      data: { status: RIDE_STATUS.EXPIRED },
     });
     // Only show active and confirmed rides with timestamp in the future
     const rides = await this.prisma.ride.findMany({
       where: {
         ...(role ? { role } : {}),
-        status: { in: ['ACTIVE', 'CONFIRMED'] },
+        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
         timestamp: { gte: now },
       },
       include: { rider: true },
@@ -217,10 +264,10 @@ export class RideController {
     // Expire rides whose timestamp is in the past and still ACTIVE
     await this.prisma.ride.updateMany({
       where: {
-        status: 'ACTIVE',
+        status: RIDE_STATUS.ACTIVE,
         timestamp: { lt: now },
       },
-      data: { status: 'EXPIRED' },
+      data: { status: RIDE_STATUS.EXPIRED },
     });
     const id = Number(userId);
     if (!userId || isNaN(id)) {
@@ -273,6 +320,12 @@ export class RideController {
 
   @Delete(':id')
   async deleteRide(@Param('id') id: string) {
+    this.logger.log({
+      level: 'warn',
+      message: `Deleting ride with id: ${id}`,
+      tag: 'ride',
+      rideId: id,
+    });
     await this.prisma.ride.delete({ where: { id: Number(id) } });
     return { message: 'Ride deleted' };
   }
@@ -293,17 +346,14 @@ export class RideController {
       where: {
         from: ride.from,
         to: ride.to,
-        timestamp: {
-          gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
-          lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
-        },
-        status: 'ACTIVE',
+        timestamp: ride.timestamp,
+        status: RIDE_STATUS.ACTIVE,
       },
     });
     const matchedIds = matchedRides.map((r) => r.id);
     await this.prisma.ride.updateMany({
       where: { id: { in: matchedIds } },
-      data: { status: 'CONFIRMED' },
+      data: { status: RIDE_STATUS.CONFIRMED },
     });
     // Return updated rides
     const updatedRides = await this.prisma.ride.findMany({
@@ -321,7 +371,7 @@ export class RideController {
     // Mark ride as rejected
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
-      data: { status: 'REJECTED' },
+      data: { status: RIDE_STATUS.REJECTED },
     });
     return {
       message: 'Ride rejected. You can now post a new ride.',
@@ -337,7 +387,7 @@ export class RideController {
     // Mark ride as cancelled
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
-      data: { status: 'CANCELLED' },
+      data: { status: RIDE_STATUS.CANCELLED },
     });
     return {
       message: 'Ride cancelled. You can now post a new ride.',

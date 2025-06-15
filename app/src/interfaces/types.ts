@@ -1,9 +1,11 @@
+import { USER_ROLE } from '../constants/enums';
+
 export interface RideFormData {
   id?: string;
   from: string;
   to: string;
   message: string;
-  role: string;
+  role: USER_ROLE;
   fromLat?: number;
   fromLng?: number;
   toLat?: number;
@@ -14,7 +16,7 @@ export interface RideFormData {
 }
 
 export interface AvailableListProps {
-  role: 'rider' | 'passenger';
+  role: USER_ROLE;
 }
 
 export interface FaqItemProps {
@@ -44,7 +46,7 @@ export interface MessagePopupProps {
 
 export interface RideBarProps {
   fromHome?: boolean;
-  role?: string;
+  role?: USER_ROLE;
 }
 
 export interface SideNavProps {
@@ -68,7 +70,7 @@ export interface UserDetails {
   user_id?: number;
   fullname?: string;
   email?: string;
-  role?: string;
+  role?: USER_ROLE;
   phone?: string;
   address?: string;
   profilePicture?: string;
