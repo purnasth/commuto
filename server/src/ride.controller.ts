@@ -346,7 +346,10 @@ export class RideController {
       where: {
         from: ride.from,
         to: ride.to,
-        timestamp: ride.timestamp,
+        timestamp: {
+          gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
+          lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
+        },
         status: RIDE_STATUS.ACTIVE,
       },
     });
