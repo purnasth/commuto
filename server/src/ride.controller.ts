@@ -16,6 +16,7 @@ import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { getNow } from './utils/date.util';
 import { USER_ROLE, RIDE_STATUS } from './constants/enums';
+import { RideGateway } from './rides/rides.gateway';
 
 interface RideDto {
   from: string;
@@ -37,6 +38,7 @@ export class RideController {
     private prisma: PrismaService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: WinstonLogger,
+    private readonly rideGateway: RideGateway,
   ) {}
 
   /**
@@ -331,42 +333,160 @@ export class RideController {
   }
 
   // Confirm a ride (mark as completed)
+  // @Post(':id/confirm')
+  // async confirmRide(@Param('id') id: string) {
+  //   const ride = await this.prisma.ride.findUnique({
+  //     where: { id: Number(id) },
+  //     include: {
+  //       passengers: true, // Include passengers to get their IDs
+  //     },
+  //   });
+
+  //   if (!ride) {
+  //     throw new NotFoundException('Ride not found');
+  //   }
+
+  //   const matchedRides = await this.prisma.ride.findMany({
+  //     where: {
+  //       from: ride.from,
+  //       to: ride.to,
+  //       timestamp: {
+  //         gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
+  //         lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
+  //       },
+  //       status: RIDE_STATUS.ACTIVE,
+  //     },
+  //     include: {
+  //       passengers: true,
+  //     },
+  //   });
+
+  //   const matchedIds = matchedRides.map((r) => r.id);
+
+  //   await this.prisma.ride.updateMany({
+  //     where: { id: { in: matchedIds } },
+  //     data: { status: RIDE_STATUS.CONFIRMED },
+  //   });
+
+  //   const updatedRides = await this.prisma.ride.findMany({
+  //     where: { id: { in: matchedIds } },
+  //     include: {
+  //       rider: true,
+  //       passengers: true,
+  //     },
+  //   });
+
+  //   for (const confirmedRide of updatedRides) {
+  //     await this.rideGateway.notifyRideConfirmation(confirmedRide);
+
+  //     // Notify all passengers associated with this specific confirmed ride
+  //     for (const passenger of confirmedRide.passengers) {
+  //       await this.rideGateway.notifyRideConfirmationForPassenger(
+  //         confirmedRide,
+  //         passenger.id,
+  //       );
+  //     }
+  //   }
+
+  //   console.log({
+  //     message: 'All matched rides confirmed',
+  //     rides: updatedRides,
+  //   });
+
+  //   return {
+  //     message: 'All matched rides confirmed',
+  //     rides: updatedRides,
+  //   };
+  // }
+
   @Post(':id/confirm')
   async confirmRide(@Param('id') id: string) {
-    // Mark this ride and all matched rides (same timestamp, from, to, and status ACTIVE) as confirmed
-    const ride = await this.prisma.ride.findUnique({
-      where: { id: Number(id) },
+    const rideId = Number(id);
+
+    const baseRide = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: { passengers: true },
     });
-    if (!ride) throw new NotFoundException('Ride not found');
-    // Find all rides that match this ride (same from, to, timestamp, and status ACTIVE)
 
-    // ISSUE #51: Inconsistency problem
+    if (!baseRide) {
+      throw new NotFoundException('Ride not found');
+    }
 
+    const timeWindowMs = 2 * 60 * 1000;
+    const baseTime = new Date(baseRide.timestamp);
     const matchedRides = await this.prisma.ride.findMany({
       where: {
-        from: ride.from,
-        to: ride.to,
+        from: baseRide.from,
+        to: baseRide.to,
         timestamp: {
-          gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
-          lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
+          gte: new Date(baseTime.getTime() - timeWindowMs),
+          lte: new Date(baseTime.getTime() + timeWindowMs),
         },
         status: RIDE_STATUS.ACTIVE,
       },
+      include: {
+        rider: true,
+        passengers: true,
+      },
     });
+
+    if (!matchedRides.length) {
+      return { message: 'No active rides matched to confirm.', rides: [] };
+    }
+
     const matchedIds = matchedRides.map((r) => r.id);
+
     await this.prisma.ride.updateMany({
       where: { id: { in: matchedIds } },
       data: { status: RIDE_STATUS.CONFIRMED },
     });
-    // Return updated rides
-    const updatedRides = await this.prisma.ride.findMany({
-      where: { id: { in: matchedIds } },
-    });
+
+    for (const ride of matchedRides) {
+      this.rideGateway.notifyRideConfirmationForPassenger(ride, ride.rider.id);
+
+      this.rideGateway.notifyRideConfirmation(ride);
+    }
+
     return {
       message: 'All matched rides confirmed',
-      rides: updatedRides,
+      rides: matchedRides,
     };
   }
+  // async confirmRide(@Param('id') id: string) {
+  //   // Mark this ride and all matched rides (same timestamp, from, to, and status ACTIVE) as confirmed
+  //   const ride = await this.prisma.ride.findUnique({
+  //     where: { id: Number(id) },
+  //   });
+  //   if (!ride) throw new NotFoundException('Ride not found');
+  //   // Find all rides that match this ride (same from, to, timestamp, and status ACTIVE)
+
+  //   // ISSUE #51: Inconsistency problem
+
+  //   const matchedRides = await this.prisma.ride.findMany({
+  //     where: {
+  //       from: ride.from,
+  //       to: ride.to,
+  //       timestamp: {
+  //         gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
+  //         lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
+  //       },
+  //       status: RIDE_STATUS.ACTIVE,
+  //     },
+  //   });
+  //   const matchedIds = matchedRides.map((r) => r.id);
+  //   await this.prisma.ride.updateMany({
+  //     where: { id: { in: matchedIds } },
+  //     data: { status: RIDE_STATUS.CONFIRMED },
+  //   });
+  //   // Return updated rides
+  //   const updatedRides = await this.prisma.ride.findMany({
+  //     where: { id: { in: matchedIds } },
+  //   });
+  //   return {
+  //     message: 'All matched rides confirmed',
+  //     rides: updatedRides,
+  //   };
+  // }
 
   // Reject a ride (mark as rejected)
   @Post(':id/reject')
