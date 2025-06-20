@@ -37,7 +37,9 @@ import {
   ROUTE_PROFILE,
   ROUTE_RIDE_DETAILS,
   ROUTE_LOGS_DASHBOARD,
+  ROUTE_SELF_REFLECTION,
 } from './constants/routes';
+import SelfReflection from './pages/SelfReflection';
 
 const App: React.FC = () => {
   const theme = useTheme();
@@ -58,6 +60,7 @@ const App: React.FC = () => {
           <Route path={ROUTE_BRAND} element={<Brand />} />
           <Route path={ROUTE_LEGAL} element={<LegalPage />} />
           <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
+          <Route path={ROUTE_SELF_REFLECTION} element={<SelfReflection />} />
           <Route path={ROUTE_404} element={<Error404 />} />
         </Routes>
         <Footer />

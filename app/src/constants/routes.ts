@@ -8,4 +8,5 @@ export const ROUTE_ROLE = '/role/:roleId';
 export const ROUTE_BRAND = '/brand';
 export const ROUTE_LEGAL = '/legal/:pageId';
 export const ROUTE_LOGS_DASHBOARD = '/logs-dashboard';
+export const ROUTE_SELF_REFLECTION = '/self-reflection';
 export const ROUTE_404 = '*';
