@@ -1,4 +1,4 @@
-import { USER_ROLE } from '../constants/enums';
+import { RIDE_STATUS, USER_ROLE } from '../constants/enums';
 
 export interface RideFormData {
   id?: string;
@@ -67,6 +67,7 @@ export interface LoginFormData {
 }
 
 export interface UserDetails {
+  id?: number;
   user_id?: number;
   fullname?: string;
   email?: string;
@@ -75,4 +76,30 @@ export interface UserDetails {
   address?: string;
   profilePicture?: string;
   ratings?: number;
+}
+
+export interface ReflectionStats {
+  postedCount: number;
+  confirmedCount: number;
+  karmaPoints: number;
+  distanceTravelled: number;
+  co2Reduced: number;
+  peopleImpacted: number;
+}
+
+export interface RideHistory {
+  id: number;
+  from: string;
+  to: string;
+  message?: string;
+  role: USER_ROLE;
+  timestamp: string;
+  status: RIDE_STATUS;
+  rider: {
+    id: number;
+    fullname: string;
+    email: string;
+  };
+  passengers: { id: number; fullname: string; email: string }[];
+  distance?: number;
 }

@@ -1,202 +1,175 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
-import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
+import {
+  TbUser,
+  TbAlarm,
+  TbRoute,
+  TbRepeat,
+  TbMapPin,
+  TbMessage,
+  TbStatusChange,
+} from 'react-icons/tb';
+import { MdOutlineShareLocation } from 'react-icons/md';
 
-interface RideHistory {
-  id: number;
-  from: string;
-  to: string;
-  message?: string;
-  role: USER_ROLE;
-  timestamp: string;
-  status: RIDE_STATUS;
-  rider: {
-    id: number;
-    fullname: string;
-    email: string;
-  };
-  passengers: { id: number; fullname: string; email: string }[];
+import { RIDE_STATUS } from '../constants/enums';
+import { RideHistory } from '../interfaces/types';
+
+import {
+  truncateText,
+  formatFullDate,
+  formatDayMonthWithWeekday,
+} from '../utils/functions';
+
+import Tooltip from '../components/ui/Tooltip';
+import NoRideFound from '../components/ui/NoRideFound';
+
+interface DashboardProps {
+  rides: RideHistory[];
 }
 
-// TODO: add the status for the cancel.
-
-const Dashboard: React.FC = () => {
-  const [rides, setRides] = useState<RideHistory[]>([]);
-  const [userId, setUserId] = useState<number | null>(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      navigate('/login');
-      return;
-    }
-    const user = JSON.parse(userStr);
-    setUserId(user.id);
-    apiFetch<{ rides: RideHistory[] }>(
-      `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${user.id}`,
-    ).then((res) => setRides(res.rides));
-  }, [navigate]);
-
-  // Calculate stats
-  const postedRides = rides.filter((ride) => ride.rider?.id === userId);
-  const requestedRides = rides.filter((ride) =>
-    ride.passengers?.some((p) => p.id === userId),
-  );
-  const confirmedRides = rides.filter(
-    (ride) => ride.status === RIDE_STATUS.CONFIRMED,
-  );
-  const statusCount = (arr: RideHistory[], status: RIDE_STATUS) =>
-    arr.filter((r) => r.status === status).length;
-
-  // Determine user role (rider or passenger)
-  const userRole =
-    postedRides.length > 0
-      ? USER_ROLE.RIDER
-      : requestedRides.length > 0
-        ? USER_ROLE.PASSENGER
-        : null;
-
+const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
   return (
-    <div className="col-span-2">
-      <h2 className="mb-8 text-3xl tracking-tight text-teal-700 drop-shadow-sm">
-        Profile & Dashboard
-      </h2>
-      <div className="mx-auto mb-8 grid grid-cols-1 gap-8 md:grid-cols-3">
-        {userRole === USER_ROLE.RIDER && (
-          <div className="rounded-xl bg-gradient-to-br from-teal-200 to-teal-400 p-6 text-center shadow-lg dark:from-teal-900 dark:to-teal-700">
-            <div className="mb-2 text-lg font-semibold text-teal-900 dark:text-teal-200">
-              Rides Posted
-            </div>
-            <div className="text-4xl font-extrabold text-teal-800 dark:text-teal-100">
-              {postedRides.length}
-            </div>
-            <div className="mt-2 text-xs text-gray-700 dark:text-gray-300">
-              Active: {statusCount(postedRides, RIDE_STATUS.ACTIVE)} |
-              Confirmed: {statusCount(postedRides, RIDE_STATUS.CONFIRMED)} |
-              Rejected: {statusCount(postedRides, RIDE_STATUS.REJECTED)} |
-              Expired: {statusCount(postedRides, RIDE_STATUS.EXPIRED)} |
-              Cancelled: {statusCount(postedRides, RIDE_STATUS.CANCELLED)}
-            </div>
-          </div>
-        )}
-        {userRole === USER_ROLE.PASSENGER && (
-          <div className="rounded-xl bg-gradient-to-br from-teal-200 to-teal-400 p-6 text-center shadow-lg dark:from-teal-900 dark:to-teal-700">
-            <div className="mb-2 text-lg font-semibold text-teal-900 dark:text-teal-200">
-              Rides Requested
-            </div>
-            <div className="text-4xl font-extrabold text-teal-800 dark:text-teal-100">
-              {requestedRides.length}
-            </div>
-            <div className="mt-2 text-xs text-gray-700 dark:text-gray-300">
-              Active: {statusCount(requestedRides, RIDE_STATUS.ACTIVE)} |
-              Confirmed: {statusCount(requestedRides, RIDE_STATUS.CONFIRMED)} |
-              Rejected: {statusCount(requestedRides, RIDE_STATUS.REJECTED)} |
-              Expired: {statusCount(requestedRides, RIDE_STATUS.EXPIRED)} |
-              Cancelled: {statusCount(requestedRides, RIDE_STATUS.CANCELLED)}
-            </div>
-          </div>
-        )}
-        <div className="rounded-xl bg-gradient-to-br from-green-200 to-green-400 p-6 text-center shadow-lg dark:from-green-900 dark:to-green-700">
-          <div className="mb-2 text-lg font-semibold text-green-900 dark:text-green-200">
-            Confirmed Rides
-          </div>
-          <div className="text-4xl font-extrabold text-green-800 dark:text-green-100">
-            {confirmedRides.length}
-          </div>
-        </div>
-        <div className="rounded-xl bg-gradient-to-br from-gray-100 to-gray-300 p-6 text-center shadow-lg dark:from-gray-800 dark:to-gray-700">
-          <div className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-200">
-            Total Rides
-          </div>
-          <div className="text-4xl font-extrabold text-gray-800 dark:text-gray-100">
-            {rides.length}
-          </div>
-        </div>
-      </div>
-      <div className="overflow-x-auto rounded-lg bg-white shadow-lg dark:bg-dark">
-        <table className="min-w-full text-sm">
-          <thead className="bg-teal-100 dark:bg-teal-900">
+    <div className="mt-4 overflow-x-auto rounded-3xl border border-teal-300/60 bg-white shadow-lg dark:bg-dark">
+      <table className="w-full text-sm">
+        <thead className="bg-teal-100 dark:bg-teal-900">
+          <tr>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200"></th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbMapPin className="inline-block align-middle text-base" /> From
+            </th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <MdOutlineShareLocation className="inline-block align-middle text-base" />{' '}
+              To
+            </th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbMessage className="inline-block align-middle text-base" />{' '}
+              Message
+            </th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbAlarm className="inline-block align-middle text-base" /> Time
+            </th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbStatusChange className="inline-block align-middle text-base" />{' '}
+              Status
+            </th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbUser className="inline-block align-middle text-base" />{' '}
+              Passengers
+            </th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbRoute className="inline-block align-middle text-base" />{' '}
+              Distance (km)
+            </th>
+            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbRepeat className="inline-block align-middle text-base" />{' '}
+              Action
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rides.length === 0 ? (
             <tr>
-              <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                From
-              </th>
-              <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                To
-              </th>
-              <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                Message
-              </th>
-              <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                Role
-              </th>
-              <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                Time
-              </th>
-              <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                Status
-              </th>
+              <td colSpan={13}>
+                <NoRideFound
+                  title="No rides yet"
+                  message="You haven't posted or requested any rides. Start your journey by posting a new ride or joining one!"
+                />
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rides.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="p-6 text-center text-gray-500 dark:text-gray-400"
+          ) : (
+            rides.map((ride, idx) => {
+              return (
+                <tr
+                  key={ride.id}
+                  className="border-b transition-colors last:border-none hover:bg-teal-50 dark:hover:bg-teal-900"
                 >
-                  No rides found.
-                </td>
-              </tr>
-            ) : (
-              rides.map((ride) => {
-                return (
-                  <tr
-                    key={ride.id}
-                    className="border-b transition-colors last:border-none hover:bg-teal-50 dark:hover:bg-teal-900"
-                  >
-                    <td className="px-4 py-3">{ride.from}</td>
-                    <td className="px-4 py-3">{ride.to}</td>
-                    <td className="px-4 py-3">{ride.message || '-'}</td>
-                    <td className="px-4 py-3 capitalize">{ride.role}</td>
-                    <td className="px-4 py-3">
-                      {new Date(ride.timestamp).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      {ride.status === RIDE_STATUS.ACTIVE && (
-                        <span className="rounded-full bg-blue-200 px-2.5 py-1 font-normal text-blue-600">
-                          Active
-                        </span>
-                      )}
-                      {ride.status === RIDE_STATUS.CONFIRMED && (
-                        <span className="rounded-full bg-green-100 px-2.5 py-1 font-normal text-green-600">
-                          Confirmed
-                        </span>
-                      )}
-                      {ride.status === RIDE_STATUS.REJECTED && (
-                        <span className="rounded-full bg-red-100 px-2.5 py-1 font-normal text-red-600">
-                          Rejected
-                        </span>
-                      )}
-                      {ride.status === RIDE_STATUS.EXPIRED && (
-                        <span className="rounded-full bg-gray-200 px-2.5 py-1 font-normal text-gray-600">
-                          Expired
-                        </span>
-                      )}
-                      {ride.status === RIDE_STATUS.CANCELLED && (
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 font-normal text-amber-600">
-                          Cancelled
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                  <td className="px-4 py-3">{idx + 1}</td>
+                  <td className="px-4 py-3">
+                    <Tooltip content={ride.from}>
+                      {truncateText(ride.from, 24)}
+                    </Tooltip>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Tooltip content={ride.to}>
+                      {truncateText(ride.to, 24)}
+                    </Tooltip>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Tooltip content={ride.message || '-'}>
+                      {truncateText(ride.message || '-', 26)}
+                    </Tooltip>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Tooltip content={formatFullDate(ride.timestamp)}>
+                      {formatDayMonthWithWeekday(ride.timestamp)}
+                    </Tooltip>
+                  </td>
+                  <td className="px-4 py-3">
+                    {ride.status === RIDE_STATUS.ACTIVE && (
+                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-100 px-2.5 py-1 text-xs font-normal text-blue-600 hover:scale-110">
+                        <span className="size-1.5 rounded-full bg-blue-600" />
+                        Active
+                      </span>
+                    )}
+                    {ride.status === RIDE_STATUS.CONFIRMED && (
+                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-green-300 bg-green-100 px-2.5 py-1 text-xs font-normal text-green-600 hover:scale-110">
+                        <span className="size-1.5 rounded-full bg-green-600" />
+                        Confirmed
+                      </span>
+                    )}
+                    {ride.status === RIDE_STATUS.REJECTED && (
+                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2.5 py-1 text-xs font-normal text-red-600 hover:scale-110">
+                        <span className="size-1.5 rounded-full bg-red-600" />
+                        Rejected
+                      </span>
+                    )}
+                    {ride.status === RIDE_STATUS.EXPIRED && (
+                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-100 px-2.5 py-1 text-xs font-normal text-gray-600 hover:scale-110">
+                        <span className="size-1.5 rounded-full bg-gray-600" />
+                        Expired
+                      </span>
+                    )}
+                    {ride.status === RIDE_STATUS.CANCELLED && (
+                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-normal text-amber-600 hover:scale-110">
+                        <span className="size-1.5 rounded-full bg-amber-600" />
+                        Cancelled
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Tooltip
+                      content={
+                        ride.passengers && ride.passengers.length > 0
+                          ? ride.passengers.map((p) => p.fullname).join(', ')
+                          : '-'
+                      }
+                    >
+                      {ride.passengers && ride.passengers.length > 0
+                        ? truncateText(
+                            ride.passengers.map((p) => p.fullname).join(', '),
+                            18,
+                          )
+                        : '-'}
+                    </Tooltip>
+                  </td>
+                  <td className="px-4 py-3">
+                    {ride.distance ? ride.distance.toFixed(1) : '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      className="transition-150 inline-flex items-center gap-1 rounded-full border border-teal-300 bg-gradient-to-tr from-teal-200 via-teal-100 to-teal-400 px-2.5 py-1 text-xs font-normal text-teal-600 hover:scale-110 hover:bg-gradient-to-tl hover:from-teal-400 hover:to-teal-300 dark:border-teal-700 dark:bg-teal-900 dark:text-dark dark:hover:bg-teal-800"
+                      // TODO: Implement repeat ride functionality
+                      onClick={() => {}}
+                    >
+                      <TbRepeat className="inline-block align-middle text-base" />
+                      Repeat
+                    </button>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+        {/* //TODO: add a pagination */}
+      </table>
     </div>
   );
 };

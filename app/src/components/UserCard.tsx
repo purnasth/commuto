@@ -8,21 +8,27 @@ import {
 } from 'react-icons/md';
 
 import { UserDetails } from '../interfaces/types';
+import { getStoredUser } from '../utils/functions';
+import { ROUTE_LOGIN } from '../constants/routes';
 
-const UserCard: React.FC<UserDetails> = () => {
+const UserCard: React.FC = () => {
   const [user, setUser] = useState<UserDetails | null>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = getStoredUser();
+
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      setUser(storedUser);
     }
   }, []);
 
+  // TODO: Use navigation for logout after state management is implemented
+  // Currently, we are using window.location.href to redirect after logout
+  // This is a temporary solution until we have a proper state management system in place
   const handleLogout = () => {
     localStorage.removeItem('user');
     toast.success('Logged out successfully!');
-    window.location.href = '/login';
+    window.location.href = ROUTE_LOGIN;
   };
 
   const { fullname, email, profilePicture, role, address, phone } = user || {};

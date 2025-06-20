@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserDetails } from '../interfaces/types';
+import { getStoredUser } from '../utils/functions';
+import { ROUTE_LOGIN } from '../constants/routes';
 
 import { MdOutlineCall } from 'react-icons/md';
 import { Link } from 'react-router-dom';
@@ -8,23 +10,26 @@ import Dashboard from './Dashboard';
 
 const UserProfile: React.FC<UserDetails> = () => {
   const [user, setUser] = useState<UserDetails | null>(null);
+  const [rides] = useState([]);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = getStoredUser();
+
     if (storedUser) {
-      setUser(JSON.parse(storedUser)); // Retrieve full user object
+      setUser(storedUser);
     }
+    // TODO: Fetch rides for the user and setRides here
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
     toast.success('Logged out successfully!');
-    window.location.href = '/login';
+    window.location.href = ROUTE_LOGIN;
   };
 
   return (
     <main className="flex items-start justify-between gap-8 px-8">
-      <Dashboard />
+      <Dashboard rides={rides} />
 
       <section className="relative col-span-1 w-full max-w-xl overflow-hidden rounded-2xl border shadow-md dark:border-teal-300/20">
         {user && (

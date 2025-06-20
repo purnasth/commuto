@@ -1,12 +1,4 @@
-// export const truncateLocation = (
-//   location: string,
-//   maxLength: number = 50,
-// ): string => {
-//   if (location.length > maxLength) {
-//     return `${location.substring(0, maxLength)}...`;
-//   }
-//   return location;
-// };
+import type { UserDetails } from '../interfaces/types';
 
 /**
  * Truncates a location string to its first three comma-separated parts.
@@ -117,4 +109,45 @@ export function haversineDistance(
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+/**
+ * Truncates a string to a max length, adding ellipsis if needed
+ */
+export function truncateText(text: string, maxLength: number): string {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+}
+
+/**
+ * Format a date as 'h a EEE, MMM dd' (e.g., '11pm Sat, Jun 12')
+ */
+export function formatDayMonthWithWeekday(dateString: string): string {
+  const date = new Date(dateString);
+  // Get hour in 12-hour format, lowercase am/pm, and remove leading zero
+  let hour = date.getHours();
+  const ampm = hour >= 12 ? 'pm' : 'am';
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  // Format: 11pm Sat, Jun 12
+  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+  const month = date.toLocaleDateString(undefined, { month: 'short' });
+  const day = date.toLocaleDateString(undefined, { day: 'numeric' });
+  return `${hour}${ampm} ${weekday}, ${month} ${day}`;
+}
+
+/**
+ * Safely retrieves the user object from localStorage, or null if not found/invalid.
+ * @returns {UserDetails | null}
+ */
+export function getStoredUser(): UserDetails | null {
+  try {
+    const storedUser = localStorage.getItem('user');
+
+    if (!storedUser) return null;
+    return JSON.parse(storedUser);
+  } catch {
+    return null;
+  }
 }
