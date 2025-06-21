@@ -18,48 +18,55 @@ import {
   formatDayMonthWithWeekday,
 } from '../utils/functions';
 
-import Tooltip from '../components/ui/Tooltip';
-import NoRideFound from '../components/ui/NoRideFound';
+import Tooltip from './ui/Tooltip';
+import NoRideFound from './ui/NoRideFound';
+import MobileDashboard from './MobileDashboard';
 
 interface DashboardProps {
   rides: RideHistory[];
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  if (isMobile) {
+    return <MobileDashboard rides={rides} />;
+  }
   return (
     <div className="mt-4 overflow-x-auto rounded-3xl border border-teal-300/60 bg-white shadow-lg dark:bg-dark">
-      <table className="w-full text-sm">
+      <table className="w-full text-xs xl:text-sm">
         <thead className="bg-teal-100 dark:bg-teal-900">
           <tr>
-            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200"></th>
+            <th className="py-3 pl-4 text-left font-semibold text-teal-700 dark:text-teal-200"></th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <TbMapPin className="inline-block align-middle text-base" /> From
+              <TbMapPin className="inline-block align-middle text-sm xl:text-base" />{' '}
+              From
             </th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <MdOutlineShareLocation className="inline-block align-middle text-base" />{' '}
+              <MdOutlineShareLocation className="inline-block align-middle text-sm xl:text-base" />{' '}
               To
             </th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <TbMessage className="inline-block align-middle text-base" />{' '}
+              <TbMessage className="inline-block align-middle text-sm xl:text-base" />{' '}
               Message
             </th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <TbAlarm className="inline-block align-middle text-base" /> Time
+              <TbAlarm className="inline-block align-middle text-sm xl:text-base" />{' '}
+              Time
             </th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <TbStatusChange className="inline-block align-middle text-base" />{' '}
+              <TbStatusChange className="inline-block align-middle text-sm xl:text-base" />{' '}
               Status
             </th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <TbUser className="inline-block align-middle text-base" />{' '}
+              <TbUser className="inline-block align-middle text-sm xl:text-base" />{' '}
               Passengers
             </th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <TbRoute className="inline-block align-middle text-base" />{' '}
+              <TbRoute className="inline-block align-middle text-sm xl:text-base" />{' '}
               Distance (km)
             </th>
-            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-              <TbRepeat className="inline-block align-middle text-base" />{' '}
+            <th className="py-3 pl-4 text-left font-semibold text-teal-700 dark:text-teal-200">
+              <TbRepeat className="inline-block align-middle text-sm xl:text-base" />{' '}
               Action
             </th>
           </tr>
@@ -81,7 +88,7 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                   key={ride.id}
                   className="border-b transition-colors last:border-none hover:bg-teal-50 dark:hover:bg-teal-900"
                 >
-                  <td className="px-4 py-3">{idx + 1}</td>
+                  <td className="py-3 pl-4">{idx + 1}</td>
                   <td className="px-4 py-3">
                     <Tooltip content={ride.from}>
                       {truncateText(ride.from, 24)}
@@ -153,13 +160,13 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                   <td className="px-4 py-3">
                     {ride.distance ? ride.distance.toFixed(1) : '-'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="py-3 pl-4">
                     <button
                       className="transition-150 inline-flex items-center gap-1 rounded-full border border-teal-300 bg-gradient-to-tr from-teal-200 via-teal-100 to-teal-400 px-2.5 py-1 text-xs font-normal text-teal-600 hover:scale-110 hover:bg-gradient-to-tl hover:from-teal-400 hover:to-teal-300 dark:border-teal-700 dark:bg-teal-900 dark:text-dark dark:hover:bg-teal-800"
                       // TODO: Implement repeat ride functionality
                       onClick={() => {}}
                     >
-                      <TbRepeat className="inline-block align-middle text-base" />
+                      <TbRepeat className="inline-block align-middle text-sm xl:text-base" />
                       Repeat
                     </button>
                   </td>

@@ -14,14 +14,14 @@ interface ReflectionDashboardProps {
 
 const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
   return (
-    <div className="grid grid-cols-3 rounded-3xl border border-t-0 shadow-sm">
-      <div className="col-span-1 space-y-4 overflow-hidden rounded-3xl rounded-br-none bg-teal-50 p-4 dark:bg-teal-900">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="relative flex flex-col items-center rounded-xl border border-green-300 bg-gradient-to-br from-green-200 via-green-300 to-green-400 p-6 pb-6 text-center dark:from-green-300 dark:via-green-400 dark:to-green-500">
-            <span className="text-lg font-semibold text-teal-900">
+    <div className="grid grid-cols-1 rounded-3xl border-t-0 shadow-sm md:border md:border-t-0 lg:grid-cols-3">
+      <div className="col-span-1 space-y-3 overflow-hidden rounded-3xl rounded-br-none bg-teal-50 p-3 dark:bg-teal-900 md:space-y-4 md:p-4">
+        <div className="grid grid-cols-2 gap-3 md:gap-4">
+          <div className="relative flex flex-col items-center rounded-xl border border-green-300 bg-gradient-to-br from-green-200 via-green-300 to-green-400 p-4 text-center shadow dark:from-green-300 dark:via-green-400 dark:to-green-500 md:p-6">
+            <span className="text-base font-semibold text-green-900 md:text-lg">
               Completed Ride
             </span>
-            <h3 className="text-5xl font-extrabold text-teal-800 drop-shadow">
+            <h3 className="text-5xl font-extrabold text-green-800 drop-shadow">
               {stats.confirmedCount}
             </h3>
             <TitleBar
@@ -31,8 +31,8 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
             />
           </div>
 
-          <div className="relative flex flex-col items-center rounded-xl border border-teal-300 bg-gradient-to-br from-teal-200 via-teal-300 to-teal-400 p-6 pb-6 text-center shadow-xl dark:from-teal-300 dark:via-teal-400 dark:to-teal-500">
-            <span className="text-lg font-semibold text-teal-900">
+          <div className="relative flex flex-col items-center rounded-xl border border-teal-300 bg-gradient-to-br from-teal-200 via-teal-300 to-teal-400 p-4 text-center shadow dark:from-teal-300 dark:via-teal-400 dark:to-teal-500 md:p-6">
+            <span className="text-base font-semibold text-teal-900 md:text-lg">
               Ride Posted
             </span>
             <h3 className="text-5xl font-extrabold text-teal-800 drop-shadow">
@@ -45,8 +45,8 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
             />
           </div>
         </div>
-        <div className="relative flex flex-col items-center rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-300 to-amber-100 p-6 shadow-lg dark:from-amber-400 dark:via-amber-100 dark:to-amber-200">
-          <div className="relative mb-2 flex h-40 w-80 items-end justify-center">
+        <div className="relative flex flex-col items-center rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-300 to-amber-100 p-4 shadow-lg dark:from-amber-400 dark:via-amber-100 dark:to-amber-200 md:p-6">
+          <div className="relative mb-0 flex h-40 w-80 items-end justify-center md:mb-2">
             <svg
               width="320"
               height="160"
@@ -116,7 +116,7 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
           />
         </div>
       </div>
-      <div className="col-span-1 rounded-3xl rounded-b-none bg-teal-50 dark:bg-teal-900">
+      <div className="col-span-1 rounded-3xl rounded-b-none bg-none dark:bg-teal-900 md:bg-teal-50">
         <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white py-5 dark:bg-dark">
           <div className="flex items-center justify-center gap-1">
             {/* //TODO: implement the real time profile details */}
@@ -139,7 +139,7 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
                           <img
                             src={person.img}
                             alt={person.name}
-                            className="transition-150 inline-block aspect-square size-11 rounded-full border-2 border-white object-cover group-hover:scale-110 group-hover:border dark:border-2 dark:border-teal-700"
+                            className="transition-150 inline-block aspect-square size-9 rounded-full border-2 border-white object-cover group-hover:scale-110 group-hover:border dark:border-2 dark:border-teal-700 md:size-11"
                           />
                         </Tooltip>
                       </div>
@@ -166,7 +166,7 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
                           </div>
                         }
                       >
-                        <span className="transition-150 relative z-auto -ml-2.5 inline-flex aspect-square size-11 items-center justify-center rounded-full border-2 border-white bg-gradient-to-tl from-teal-400 via-teal-200 to-teal-500 font-medium hover:scale-110 hover:bg-gradient-to-tr dark:border-teal-700 dark:bg-gradient-to-tr dark:from-teal-600 dark:via-teal-500 dark:to-teal-400 dark:text-dark">
+                        <span className="transition-150 relative z-auto -ml-2.5 inline-flex aspect-square size-9 items-center justify-center rounded-full border-2 border-white bg-gradient-to-tl from-teal-400 via-teal-200 to-teal-500 text-sm font-medium hover:scale-110 hover:bg-gradient-to-tr dark:border-teal-700 dark:bg-gradient-to-tr dark:from-teal-600 dark:via-teal-500 dark:to-teal-400 dark:text-dark md:size-11 md:text-base">
                           +{others.length}
                         </span>
                       </Tooltip>
@@ -182,12 +182,12 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
             color="teal"
           />
         </div>
-        <div className="m-4 mt-8 h-[31.25rem] scale-[1.06] overflow-hidden rounded-3xl bg-white shadow outline outline-1 outline-teal-300/50 dark:bg-teal-700">
+        <div className="m-0 mt-4 h-auto scale-[1] overflow-hidden rounded-3xl bg-white pb-4 shadow outline outline-1 outline-teal-300/50 dark:bg-teal-700 md:m-4 md:mt-8 md:scale-[1.06] md:pb-4">
           <UserCard />
         </div>
       </div>
-      <div className="col-span-1 rounded-3xl rounded-bl-none bg-teal-50 dark:bg-teal-900">
-        <div className="relative m-4 flex flex-col items-center rounded-3xl border border-green-200 bg-gradient-to-br from-green-200 via-green-100 to-green-300 p-0 shadow-lg dark:from-green-300 dark:via-green-200 dark:to-green-400">
+      <div className="col-span-1 rounded-3xl rounded-bl-none md:bg-teal-50 md:dark:bg-teal-900">
+        <div className="relative mt-4 flex flex-col items-center rounded-3xl border border-green-200 bg-gradient-to-br from-green-200 via-green-100 to-green-300 p-0 shadow-lg dark:from-green-300 dark:via-green-200 dark:to-green-400 md:m-4">
           <svg
             className="absolute left-2 top-2 h-8 w-8 opacity-30"
             viewBox="0 0 24 24"
@@ -254,12 +254,12 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
           <img
             src={tree1}
             alt="Trees"
-            className="pointer-events-none h-72 w-full scale-150 select-none object-contain"
+            className="pointer-events-none h-64 w-full scale-125 select-none object-contain md:h-72 md:scale-150"
             draggable="false"
           />
         </div>
 
-        <div className="relative m-4 flex flex-col items-center rounded-3xl border border-amber-300 bg-gradient-to-br from-yellow-100 via-amber-100 to-yellow-200 p-0 shadow-lg">
+        <div className="relative flex flex-col items-center rounded-3xl border border-amber-300 bg-gradient-to-br from-yellow-100 via-amber-100 to-yellow-200 p-0 shadow-lg md:m-4">
           <svg
             className="absolute left-4 top-3 h-6 w-6 opacity-20"
             viewBox="0 0 24 24"

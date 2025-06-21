@@ -40,7 +40,7 @@ const UserCard: React.FC = () => {
           <div className="pointer-events-none absolute -left-[20%] top-1/3 -z-10 size-48 rounded-full bg-teal-300 blur-[80px]" />
           <div className="pointer-events-none absolute -bottom-32 -right-10 -z-10 size-32 rounded-full bg-teal-300 blur-[50px]" />
 
-          <div className="relative -z-10 m-2.5 flex h-40 items-end justify-between overflow-hidden rounded-2xl border border-teal-300 bg-gradient-to-br from-teal-200 via-teal-300 to-teal-400 dark:from-teal-400 dark:via-teal-500 dark:to-teal-600">
+          <div className="relative -z-10 m-2.5 flex h-28 items-end justify-between overflow-hidden rounded-2xl border border-teal-300 bg-gradient-to-br from-teal-200 via-teal-300 to-teal-400 dark:from-teal-400 dark:via-teal-500 dark:to-teal-600 md:h-40">
             <div className="absolute -right-9 top-6 z-10 flex w-36 rotate-45 transform flex-col items-center justify-center">
               <span className="inline-flex w-full items-center justify-center gap-1 bg-teal-600 py-1 text-center text-sm font-normal text-white dark:bg-teal-700">
                 {role}
@@ -78,31 +78,31 @@ const UserCard: React.FC = () => {
             <img
               src={profilePicture}
               alt={fullname}
-              className="-mt-16 size-14 rounded-full border-8 border-white bg-teal-100 object-contain dark:border-teal-700 sm:size-28"
+              className="-mt-14 size-24 rounded-full border-8 border-white bg-teal-100 object-contain dark:border-teal-700 sm:size-28"
             />
-            <h2 className="inline-flex items-center gap-1 text-base font-semibold text-gray-800 dark:text-white sm:text-2xl">
+            <h2 className="inline-flex items-center gap-1 text-xl font-semibold text-gray-800 dark:text-white sm:text-2xl">
               {fullname}
               <MdVerified className="text-teal-500 dark:text-teal-300" />
             </h2>
-            <h3 className="text-base font-light">{address}</h3>
-            <div className="mt-4 flex items-center gap-2">
+            <h3 className="text-sm font-light md:text-base">{address}</h3>
+            <div className="mt-2 flex items-center gap-2 md:mt-4">
               <Link
                 to={`tel:${user.phone}`}
-                className="flex items-center justify-center gap-1 rounded-full border bg-teal-100 px-2 text-sm text-teal-800 shadow hover:bg-teal-200 dark:border-teal-300"
+                className="flex items-center justify-center gap-1 rounded-full border border-teal-300/50 bg-teal-100 px-2 text-sm text-teal-800 shadow hover:bg-teal-200 dark:border-teal-300"
               >
                 <MdOutlineCall />
                 {phone}
               </Link>
               <Link
                 to={`mailto:${email}`}
-                className="flex items-center justify-center gap-1 rounded-full border bg-teal-100 px-2 text-sm text-teal-800 shadow hover:bg-teal-200 dark:border-teal-300"
+                className="flex items-center justify-center gap-1 rounded-full border border-teal-300/50 bg-teal-100 px-2 text-sm text-teal-800 shadow hover:bg-teal-200 dark:border-teal-300"
               >
                 <MdOutlineMailOutline />
                 {email}
               </Link>
             </div>
 
-            <hr className="my-8 w-[96%] border-gray-200 dark:border-teal-300/20" />
+            <hr className="my-4 w-[96%] border-gray-200 dark:border-teal-300/20 md:my-8" />
 
             <p className="px-4 text-center text-xs text-teal-900 dark:text-white">
               Welcome to your profile, {fullname}! Here you can view your

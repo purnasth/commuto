@@ -6,7 +6,7 @@ import { ROUTE_LOGIN } from '../constants/routes';
 import { MdOutlineCall } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import Dashboard from './Dashboard';
+import Dashboard from '../components/Dashboard';
 
 const UserProfile: React.FC<UserDetails> = () => {
   const [user, setUser] = useState<UserDetails | null>(null);

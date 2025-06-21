@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 import { getStoredUser } from '../utils/functions';
 
-import Dashboard from './Dashboard';
+import Dashboard from '../components/Dashboard';
 import ReflectionDashboard from '../components/ReflectionDashboard';
 import { RIDE_STATUS } from '../constants/enums';
 import { ROUTE_LOGIN } from '../constants/routes';
@@ -55,7 +55,7 @@ const SelfReflection = () => {
 
   return (
     <>
-      <main className="overflow-hidden p-8">
+      <main className="overflow-hidden p-2 md:p-4 xl:p-8">
         <div className="absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px]" />
         <div className="absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
 

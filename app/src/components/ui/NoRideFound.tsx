@@ -23,7 +23,7 @@ const NoRideFound = ({
         <h2 className="pointer-events-none absolute inset-0 hidden size-full -translate-y-12 select-none items-center justify-center text-center text-8xl font-bold uppercase tracking-wider text-teal-950 mix-blend-difference dark:text-teal-700 md:flex">
           {title}
         </h2>
-        <p className="mx-auto mt-4 max-w-md text-center font-light">
+        <p className="mx-auto mt-4 max-w-md text-sm md:text-base text-center font-light">
           {message}
         </p>
       </main>
