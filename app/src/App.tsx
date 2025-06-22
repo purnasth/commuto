@@ -38,6 +38,7 @@ import {
   ROUTE_RIDE_DETAILS,
   ROUTE_LOGS_DASHBOARD,
 } from './constants/routes';
+import { SocketManager } from './components/SocketManager';
 
 const App: React.FC = () => {
   const theme = useTheme();
@@ -45,22 +46,24 @@ const App: React.FC = () => {
   return (
     <>
       <Router>
-        <RouterToTop />
-        <Navbar />
-        <Routes>
-          <Route path={ROUTE_HOME} element={<Home />} />
-          <Route path={ROUTE_HELP} element={<FAQPage />} />
-          <Route path={ROUTE_ABOUT} element={<AboutPage />} />
-          <Route path={ROUTE_LOGIN} element={<Login />} />
-          <Route path={ROUTE_PROFILE} element={<UserProfile />} />
-          <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
-          <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
-          <Route path={ROUTE_BRAND} element={<Brand />} />
-          <Route path={ROUTE_LEGAL} element={<LegalPage />} />
-          <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
-          <Route path={ROUTE_404} element={<Error404 />} />
-        </Routes>
-        <Footer />
+        <SocketManager>
+          <RouterToTop />
+          <Navbar />
+          <Routes>
+            <Route path={ROUTE_HOME} element={<Home />} />
+            <Route path={ROUTE_HELP} element={<FAQPage />} />
+            <Route path={ROUTE_ABOUT} element={<AboutPage />} />
+            <Route path={ROUTE_LOGIN} element={<Login />} />
+            <Route path={ROUTE_PROFILE} element={<UserProfile />} />
+            <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
+            <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
+            <Route path={ROUTE_BRAND} element={<Brand />} />
+            <Route path={ROUTE_LEGAL} element={<LegalPage />} />
+            <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
+            <Route path={ROUTE_404} element={<Error404 />} />
+          </Routes>
+          <Footer />
+        </SocketManager>
       </Router>
 
       <ToastContainer

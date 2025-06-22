@@ -6,7 +6,7 @@ import StickyNavbar from '../layouts/StickyNavbar';
 const Error404 = () => {
   return (
     <>
-      <main className="flex h-auto min-h-[calc(100vh-1.5rem)] flex-col items-center justify-center overflow-x-hidden p-0 lg:min-h-[calc(100vh-5.5rem)]">
+      <main className="flex h-auto min-h-[calc(100vh-1.5rem)] flex-col items-center justify-center overflow-hidden p-0 lg:min-h-[calc(100vh-5.5rem)]">
         <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px]" />
         <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
         <div className="container mb-12 flex size-full max-w-4xl flex-col items-center justify-center gap-2 text-center md:mb-24">

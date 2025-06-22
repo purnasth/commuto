@@ -30,7 +30,7 @@ import useScrollVisibility from '../hooks/useScrollVisibility';
 import { rideFormSchema } from '../schemas/formSchema';
 import { apiFetch } from '../utils/api';
 import CurrentRideStatus from './ui/CurrentRideStatus';
-
+import { io } from 'socket.io-client';
 const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [showMessagePopup, setShowMessagePopup] = useState(false);
@@ -39,6 +39,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [ridesFound, setRidesFound] = useState<RideFormData[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showRideStatusModal, setShowRideStatusModal] = useState(false);
+  const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
+  const [notifications, setNotifications] = useState<string[]>([]);
+  const [user, setUser] = useState<{ id: number } | null>(null);
   const navigate = useNavigate();
   const showRideBar = useScrollVisibility(100);
 
@@ -186,6 +189,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
           rideWithTimestamp.fromLng,
           rideWithTimestamp.timestamp,
         );
+
         setRidesFound(availableRides);
 
         // Save all ride details in lastSearchParams for status modal
@@ -229,7 +233,12 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       }
     }
   };
-
+  useEffect(() => {
+    const savedSearchParams = localStorage.getItem('lastSearchParams');
+    if (savedSearchParams) {
+      setLastSearchParams(JSON.parse(savedSearchParams));
+    }
+  }, []);
   useEffect(() => {
     const savedFormData = localStorage.getItem('rideFormData');
     if (savedFormData) {
@@ -268,6 +277,58 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     // useEffect will update mainAction
   };
 
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      setUser(JSON.parse(userStr));
+    }
+  }, []);
+
+  useEffect(() => {
+    const registerUserOnConnect = () => {
+      if (user?.id) {
+        console.log(`Attempting to register user ${user.id}`);
+        socket.emit('registerUser', user.id.toString());
+      }
+    };
+
+    socket.on('connect', registerUserOnConnect);
+
+    if (socket.connected && user?.id) {
+      registerUserOnConnect();
+    }
+
+    socket.on('rideConfirmed', (payload) => {
+      console.log('Ride confirmed notification received:', payload);
+
+      let notificationMessage = `Ride ${payload.id} from ${payload.from} to ${payload.to} has been confirmed!`;
+
+      if (payload.riderId === user.id) {
+        notificationMessage = `Your ride (${payload.id}) has been confirmed!`;
+      } else {
+        notificationMessage = `A ride you requested/are interested in (${payload.id}) has been confirmed!`;
+      }
+      setNotifications((prev) => [...prev, notificationMessage]);
+
+      // Update the status of the specific ride(s) in your local state
+      setRidesFound((prevRides) =>
+        prevRides.map((ride) =>
+          ride.id === payload.id ? { ...ride, status: payload.status } : ride,
+        ),
+      );
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from WebSocket server');
+    });
+
+    return () => {
+      socket.off('connect', registerUserOnConnect);
+      socket.off('rideConfirmed');
+      socket.off('disconnect');
+    };
+  }, [user, socket]);
+
   const handleConfirm = async (ride: RideFormData) => {
     try {
       await apiFetch(
@@ -279,13 +340,6 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       setRidesFound((prev) => prev.filter((r) => r.id !== ride.id));
       toast.success('Congratulations! Your ride has been confirmed!');
       setShowModal(false);
-      navigate(
-        `/ride-details?from=${encodeURIComponent(ride.from)}&to=${encodeURIComponent(
-          ride.to,
-        )}&message=${encodeURIComponent(ride.message)}&role=${encodeURIComponent(
-          ride.role,
-        )}&timestamp=${encodeURIComponent(ride.timestamp ?? '')}`,
-      );
     } catch {
       toast.error('Failed to confirm ride.');
     }
@@ -302,6 +356,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
           body: JSON.stringify({ userId: user?.id }),
         },
       );
+      localStorage.removeItem('lastSearchParams');
       setRidesFound((prev) => prev.filter((r) => r.id !== ride.id));
       toast.info('Ride has been rejected.');
     } catch {
@@ -331,6 +386,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
           r.status !== RIDE_STATUS.CANCELLED &&
           r.status !== RIDE_STATUS.REJECTED,
       );
+      localStorage.removeItem('lastSearchParams');
+
       if (!cancellableRide) {
         toast.info('No ride to cancel.');
         return;
@@ -387,6 +444,33 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     };
   };
 
+  // ISSUE #50: persist last search params in localStorage
+  useEffect(() => {
+    const savedParams = localStorage.getItem('lastSearchParams');
+    if (savedParams) {
+      const parsed = JSON.parse(savedParams);
+      setLastSearchParams(parsed);
+
+      if (parsed.role && parsed.fromLat && parsed.fromLng && parsed.timestamp) {
+        fetchAvailableRides(
+          parsed.role,
+          parsed.fromLat,
+          parsed.fromLng,
+          parsed.timestamp,
+          false,
+        ).then((rides) => setRidesFound(rides));
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (lastSearchParams) {
+      localStorage.setItem(
+        'lastSearchParams',
+        JSON.stringify(lastSearchParams),
+      );
+    }
+  }, [lastSearchParams]);
   if (isLoading) {
     return (
       <Modal onClose={() => setIsLoading(false)}>
