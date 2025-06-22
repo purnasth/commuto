@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { SocketContext } from '../utils/SocketContext';
+import { useRideEvent } from '../utils/useRideEvent';
 
 const SERVER_URL =
   import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:3001';
 const isDev = import.meta.env.MODE === 'development';
 
 export const SocketManager = ({ children }) => {
-  const [socket, setSocket] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [messages, setMessages] = useState([]);
   const navigate = useNavigate();
+  const [socket, setSocket] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const { triggerRideConfirmed } = useRideEvent();
+  const [isConnected, setIsConnected] = useState(false);
 
   const user = localStorage.getItem('user');
   const userId = user ? JSON.parse(user).id : null;
@@ -88,6 +90,8 @@ export const SocketManager = ({ children }) => {
         localStorage.removeItem('lastSearchParams');
       }
 
+      console.log('[SocketManager] triggerRideConfirmed');
+      triggerRideConfirmed(ride);
       navigate(
         `/ride-details?from=${encodeURIComponent(ride.from)}&to=${encodeURIComponent(
           ride.to,
@@ -95,6 +99,7 @@ export const SocketManager = ({ children }) => {
           ride.role,
         )}&timestamp=${encodeURIComponent(ride.timestamp ?? '')}`,
       );
+
       // toast.info('A ride you were viewing has been confirmed!');
     });
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
 import { formatFullDate } from '../utils/functions';
@@ -11,15 +11,43 @@ const RideDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [showMap, setShowMap] = useState(false);
 
-  const from = searchParams.get('from');
-  const to = searchParams.get('to');
-  const message = searchParams.get('message');
-  const role = searchParams.get('role');
-  const timestamp = searchParams.get('timestamp');
+  // const from = searchParams.get('from');
+  // const to = searchParams.get('to');
+  // const message = searchParams.get('message');
+  // const role = searchParams.get('role');
+  // const timestamp = searchParams.get('timestamp');
+
+  const [rideDetails, setRideDetails] = useState(() => {
+    const savedRide = localStorage.getItem('activeRide');
+    return savedRide ? JSON.parse(savedRide) : {};
+  });
+
+  useEffect(() => {
+    const params = Object.fromEntries(searchParams.entries());
+    setRideDetails(params);
+    localStorage.setItem('activeRide', JSON.stringify(params));
+  }, [searchParams]);
+
+  const from = rideDetails.from;
+  const to = rideDetails.to;
+  const message = rideDetails.message;
+  const role = rideDetails.role;
+  const timestamp = rideDetails.timestamp;
+
+  // const getDirectionsUrl = () => {
+  //   if (!from || !to) return 'https://www.openstreetmap.org';
+  //   return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(from)}%3B${encodeURIComponent(to)}`;
+  // };
 
   const getDirectionsUrl = () => {
-    if (!from || !to) return 'https://www.openstreetmap.org';
-    return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(from)}%3B${encodeURIComponent(to)}`;
+    if (!rideDetails.from || !rideDetails.to)
+      return 'https://www.openstreetmap.org';
+    return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(rideDetails.from)}%3B${encodeURIComponent(rideDetails.to)}`;
+  };
+
+  const handleCompleteRide = () => {
+    console.log('Ride completed:', rideDetails);
+    // localStorage.removeItem('activeRide');
   };
 
   return (
@@ -82,6 +110,14 @@ const RideDetails: React.FC = () => {
               <TbMapSearch className="text-xl" />
             )}
             {showMap ? 'Hide Route' : 'View Route'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCompleteRide}
+            className={`flex items-center gap-2 rounded-full bg-teal-100 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-200 dark:bg-teal-800`}
+          >
+            Complete the ride
           </button>
           {showMap && (
             <>

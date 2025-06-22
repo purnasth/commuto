@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TbMenu2, TbPlus, TbSearch } from 'react-icons/tb';
 
 import logo from '../assets/logo/commuto.svg';
@@ -9,7 +9,13 @@ import SideNav from './SideNav';
 import { useTheme } from '../contexts/ThemeProvider';
 import { getUserGreeting } from '../utils/functions';
 import ThemeToggle from '../components/ui/ThemeToggle';
-import { ROUTE_HOME, ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
+import {
+  ROUTE_HOME,
+  ROUTE_LOGIN,
+  ROUTE_PROFILE,
+  ROUTE_RIDE_DETAILS,
+} from '../constants/routes';
+import { useRideEvent } from '../utils/useRideEvent';
 
 const navLinks = [
   {
@@ -29,6 +35,13 @@ const navLinks = [
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [prevScrollPos, setPrevScrollPos] = useState(0);
+  const [showRideButton, setShowRideButton] = useState(() => {
+    const savedState = localStorage.getItem('showRideButton');
+    return savedState ? JSON.parse(savedState) : false;
+  });
+  const { rideConfirmedData, resetRideConfirmed } = useRideEvent();
+  const navigate = useNavigate();
+
   const [visible, setVisible] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
   const location = useLocation();
@@ -46,13 +59,31 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [prevScrollPos]);
 
-  // Close nav on route change
+  useEffect(() => {
+    localStorage.setItem('showRideButton', JSON.stringify(showRideButton));
+  }, [showRideButton]);
+
   useEffect(() => {
     setIsOpen(false);
     document.body.style.overflow = 'auto';
   }, [location]);
 
-  // Greet user
+  useEffect(() => {
+    if (rideConfirmedData) {
+      console.log('Navbar reacting to ride confirmation', rideConfirmedData);
+
+      handleAfterRideConfirmed();
+
+      resetRideConfirmed();
+    }
+  }, [rideConfirmedData, resetRideConfirmed]);
+
+  const handleAfterRideConfirmed = () => {
+    // You can trigger some function, redirect, show a badge, etc.
+    setShowRideButton(true);
+    console.log('Running navbar logic after ride confirmation');
+  };
+
   useEffect(() => {
     setUserName(getUserGreeting());
   }, []);
@@ -65,6 +96,24 @@ const Navbar = () => {
   const closeNav = () => {
     setIsOpen(false);
     document.body.style.overflow = 'auto';
+  };
+  const handleClick = () => {
+    const activeRide = localStorage.getItem('activeRide');
+
+    if (!activeRide) {
+      console.warn('No active ride found in localStorage');
+      return;
+    }
+
+    const parseData = JSON.parse(activeRide);
+
+    navigate(
+      `/ride-details?from=${encodeURIComponent(parseData.from)}&to=${encodeURIComponent(
+        parseData.to,
+      )}&message=${encodeURIComponent(parseData.message ?? '')}&role=${encodeURIComponent(
+        parseData.role,
+      )}&timestamp=${encodeURIComponent(parseData.timestamp ?? '')}`,
+    );
   };
   return (
     <>
@@ -99,6 +148,39 @@ const Navbar = () => {
               ))}
             </ul>
             <div className="flex items-center gap-6">
+              {showRideButton && (
+                <div className="flex items-center gap-2.5 font-semibold">
+                  {/* <Link
+                    to={ROUTE_RIDE_DETAILS}
+                    className="flex items-center gap-2.5 font-semibold"
+                  > */}
+                  <button onClick={handleClick}>Active</button>
+                  <div
+                    style={{
+                      padding: '5px',
+                      fontSize: '16px',
+                      border: 'none',
+                      borderRadius: '25px',
+                      backgroundColor: '#24c612',
+
+                      animation: 'blink 1s infinite',
+                      color: 'white',
+                      cursor: 'pointer',
+                    }}
+                  ></div>
+
+                  <style>
+                    {`
+                    @keyframes blink {
+                      0% { opacity: 1; }
+                      50% { opacity: 0.5; }
+                      100% { opacity: 1; }
+                    }
+                  `}
+                  </style>
+                  {/* </Link> */}
+                </div>
+              )}
               {userName ? (
                 <Link
                   to={ROUTE_PROFILE}

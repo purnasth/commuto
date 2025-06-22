@@ -431,7 +431,7 @@ export class RideController {
     }
     // Calculate and update distance, co2Saved, peopleImpacted, and award karma points
     for (const ride of matchedRides) {
-      let distance = null;
+      let distance: null | number = null;
       if (
         typeof ride.fromLat === 'number' &&
         typeof ride.fromLng === 'number' &&
@@ -490,41 +490,6 @@ export class RideController {
       rides: updatedRides,
     };
   }
-  // async confirmRide(@Param('id') id: string) {
-  //   // Mark this ride and all matched rides (same timestamp, from, to, and status ACTIVE) as confirmed
-  //   const ride = await this.prisma.ride.findUnique({
-  //     where: { id: Number(id) },
-  //   });
-  //   if (!ride) throw new NotFoundException('Ride not found');
-  //   // Find all rides that match this ride (same from, to, timestamp, and status ACTIVE)
-
-  //   // ISSUE #51: Inconsistency problem
-
-  //   const matchedRides = await this.prisma.ride.findMany({
-  //     where: {
-  //       from: ride.from,
-  //       to: ride.to,
-  //       timestamp: {
-  //         gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
-  //         lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
-  //       },
-  //       status: RIDE_STATUS.ACTIVE,
-  //     },
-  //   });
-  //   const matchedIds = matchedRides.map((r) => r.id);
-  //   await this.prisma.ride.updateMany({
-  //     where: { id: { in: matchedIds } },
-  //     data: { status: RIDE_STATUS.CONFIRMED },
-  //   });
-  //   // Return updated rides
-  //   const updatedRides = await this.prisma.ride.findMany({
-  //     where: { id: { in: matchedIds } },
-  //   });
-  //   return {
-  //     message: 'All matched rides confirmed',
-  //     rides: updatedRides,
-  //   };
-  // }
 
   // Reject a ride (mark as rejected)
   @Post(':id/reject')
