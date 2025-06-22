@@ -1,0 +1,69 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { apiFetch } from '../utils/api';
+import { getStoredUser } from '../utils/functions';
+
+import Dashboard from '../components/Dashboard';
+import ReflectionDashboard from '../components/ReflectionDashboard';
+import { RIDE_STATUS } from '../constants/enums';
+import { ROUTE_LOGIN } from '../constants/routes';
+
+import { RideHistory, ReflectionStats } from '../interfaces/types';
+
+const SelfReflection = () => {
+  const [rides, setRides] = useState<RideHistory[]>([]);
+  const [userId, setUserId] = useState<number | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    if (!storedUser) {
+      navigate(ROUTE_LOGIN);
+      return;
+    }
+    setUserId(storedUser.id ?? null);
+    apiFetch<{ rides: RideHistory[] }>(
+      `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${storedUser.id}`,
+    ).then((res) => setRides(res.rides));
+  }, [navigate]);
+
+  // Calculate stats
+  const postedRides = rides.filter((ride) => ride.rider?.id === userId);
+  const confirmedRides = rides.filter(
+    (ride) => ride.status === RIDE_STATUS.CONFIRMED,
+  );
+
+  // Calculate dynamic stats
+  const stats: ReflectionStats = {
+    postedCount: postedRides.length,
+    confirmedCount: confirmedRides.length,
+    karmaPoints: confirmedRides.length * 20, // Example: 20 points per confirmed ride
+    distanceTravelled: confirmedRides.reduce(
+      (sum, ride) => sum + (ride.distance ?? 10),
+      0,
+    ), // Example: fallback 10km per ride
+    co2Reduced: confirmedRides.reduce(
+      (sum, ride) => sum + (ride.distance ?? 10) * 0.17,
+      0,
+    ), // Example: 0.17kg CO2 per km
+    peopleImpacted: rides.reduce(
+      (sum, ride) => sum + (ride.passengers?.length || 0),
+      0,
+    ),
+  };
+
+  return (
+    <>
+      <main className="overflow-hidden p-2 md:p-4 xl:p-8">
+        <div className="absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px]" />
+        <div className="absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
+
+        <ReflectionDashboard stats={stats} />
+        <Dashboard rides={rides} />
+      </main>
+    </>
+  );
+};
+
+export default SelfReflection;

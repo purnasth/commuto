@@ -1,3 +1,4 @@
+import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -18,6 +19,7 @@ import Modal from './ui/Modal';
 import AgreeInfo from './ui/AgreeInfo';
 import NoRideFound from './ui/NoRideFound';
 import SearchingRide from './ui/SearchingRide';
+import CurrentRideStatus from './ui/CurrentRideStatus';
 
 import MessagePopup from './MessagePopup';
 import LocationPopup from './LocationPopup';
@@ -29,8 +31,7 @@ import useScrollVisibility from '../hooks/useScrollVisibility';
 
 import { rideFormSchema } from '../schemas/formSchema';
 import { apiFetch } from '../utils/api';
-import CurrentRideStatus from './ui/CurrentRideStatus';
-import { io } from 'socket.io-client';
+
 const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [showMessagePopup, setShowMessagePopup] = useState(false);

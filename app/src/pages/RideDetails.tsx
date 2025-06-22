@@ -23,7 +23,7 @@ const RideDetails: React.FC = () => {
   };
 
   return (
-    <main >
+    <main>
       <h1 className="mb-5 text-center text-xl font-semibold text-teal-500 md:text-2xl">
         Ride Details
       </h1>

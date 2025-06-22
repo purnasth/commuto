@@ -1,6 +1,14 @@
 import error from '../../assets/vector/no-rides.svg';
 
-const NoRideFound = () => {
+interface NoRideFoundProps {
+  title?: string;
+  message?: string;
+}
+
+const NoRideFound = ({
+  title = 'No rides found',
+  message = 'No rides found matching your criteria. Try adjusting your search or check back later!',
+}: NoRideFoundProps) => {
   return (
     <>
       <main className="relative flex size-full flex-col items-center justify-center overflow-hidden bg-white p-5 shadow-lg dark:bg-dark">
@@ -13,11 +21,10 @@ const NoRideFound = () => {
           draggable="false"
         />
         <h2 className="pointer-events-none absolute inset-0 hidden size-full -translate-y-12 select-none items-center justify-center text-center text-8xl font-bold uppercase tracking-wider text-teal-950 mix-blend-difference dark:text-teal-700 md:flex">
-          No rides found
+          {title}
         </h2>
-        <p className="mx-auto mt-4 max-w-md text-center font-light">
-          No rides found matching your criteria. Try adjusting your search or
-          check back later!
+        <p className="mx-auto mt-4 max-w-md text-sm md:text-base text-center font-light">
+          {message}
         </p>
       </main>
     </>
