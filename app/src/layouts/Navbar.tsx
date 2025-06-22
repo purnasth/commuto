@@ -9,12 +9,7 @@ import SideNav from './SideNav';
 import { useTheme } from '../contexts/ThemeProvider';
 import { getUserGreeting } from '../utils/functions';
 import ThemeToggle from '../components/ui/ThemeToggle';
-import {
-  ROUTE_HOME,
-  ROUTE_LOGIN,
-  ROUTE_PROFILE,
-  ROUTE_RIDE_DETAILS,
-} from '../constants/routes';
+import { ROUTE_HOME, ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
 import { useRideEvent } from '../utils/useRideEvent';
 
 const navLinks = [
@@ -147,39 +142,17 @@ const Navbar = () => {
                 </li>
               ))}
             </ul>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
               {showRideButton && (
-                <div className="flex items-center gap-2.5 font-semibold">
-                  {/* <Link
-                    to={ROUTE_RIDE_DETAILS}
-                    className="flex items-center gap-2.5 font-semibold"
-                  > */}
-                  <button onClick={handleClick}>Active</button>
-                  <div
-                    style={{
-                      padding: '5px',
-                      fontSize: '16px',
-                      border: 'none',
-                      borderRadius: '25px',
-                      backgroundColor: '#24c612',
-
-                      animation: 'blink 1s infinite',
-                      color: 'white',
-                      cursor: 'pointer',
-                    }}
-                  ></div>
-
-                  <style>
-                    {`
-                    @keyframes blink {
-                      0% { opacity: 1; }
-                      50% { opacity: 0.5; }
-                      100% { opacity: 1; }
-                    }
-                  `}
-                  </style>
-                  {/* </Link> */}
-                </div>
+                <button
+                  type="button"
+                  onClick={handleClick}
+                  aria-label="Active Ride"
+                  className="flex items-center gap-1.5 rounded-full bg-green-100 px-4 py-2 font-medium text-green-700"
+                >
+                  <span className="size-2.5 animate-pulse rounded-full bg-green-600" />
+                  Active
+                </button>
               )}
               {userName ? (
                 <Link

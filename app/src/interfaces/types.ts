@@ -105,3 +105,9 @@ export interface RideHistory {
   co2Saved?: number;
   peopleImpacted?: number;
 }
+
+export interface RedeemableReward {
+  name: string;
+  points: number;
+  description: string;
+}

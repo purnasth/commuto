@@ -151,3 +151,45 @@ export function getStoredUser(): UserDetails | null {
     return null;
   }
 }
+
+/**
+ * Determines if the user has enough karma points to redeem a reward.
+ * @param karmaPoints - The user's current karma points.
+ * @param itemPoints - The required points for the reward.
+ * @returns True if the user can redeem, false otherwise.
+ */
+export function canRedeemReward(
+  karmaPoints: number,
+  itemPoints: number,
+): boolean {
+  return Number(karmaPoints) >= Number(itemPoints);
+}
+
+/**
+ * Calculates the progress ratio towards a reward.
+ * @param karmaPoints - The user's current karma points.
+ * @param itemPoints - The required points for the reward.
+ * @returns A number between 0 and 1 representing progress.
+ */
+export function getRedeemProgress(
+  karmaPoints: number,
+  itemPoints: number,
+): number {
+  if (!itemPoints || itemPoints <= 0) return 0;
+  return Math.max(0, Math.min(Number(karmaPoints) / Number(itemPoints), 1));
+}
+
+/**
+ * Returns the appropriate progress bar color gradient for a reward.
+ * @param progress - The progress ratio (0 to 1).
+ * @param canRedeem - Whether the user can redeem the reward.
+ * @returns Tailwind gradient class string.
+ */
+export function getRedeemProgressBarColor(
+  progress: number,
+  canRedeem: boolean,
+): string {
+  if (canRedeem) return 'from-green-600 to-green-400';
+  if (progress > 0) return 'from-blue-600 to-blue-400';
+  return 'from-gray-600 to-gray-400';
+}

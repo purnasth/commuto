@@ -1,308 +1,178 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { fetchUserKarmaPoints } from '../utils/karma';
-import { getStoredUser } from '../utils/functions';
-import Title from '../components/ui/Title';
+import { Link, useNavigate } from 'react-router-dom';
+import { TbArrowNarrowLeft, TbGift, TbTrophy } from 'react-icons/tb';
+
+import { redeemables } from '../constants/data';
+
 import {
-  FaTshirt,
-  FaMugHot,
-  FaBook,
-  FaGift,
-  FaLaptop,
-  FaTicketAlt,
-  FaUtensils,
-  FaBus,
-  FaBicycle,
-  FaWifi,
-  FaStar,
-  FaUserGraduate,
-  FaGamepad,
-  FaMusic,
-  FaSwimmer,
-  FaSpa,
-  FaChalkboardTeacher,
-  FaParking,
-  FaFilm,
-  FaLeaf,
-  FaCoffee,
-  FaAppleAlt,
-  FaBasketballBall,
-  FaBookOpen,
-  FaClipboardList,
-} from 'react-icons/fa';
-
-const redeemables = [
-  {
-    name: 'College T-Shirt',
-    points: 100,
-    icon: <FaTshirt className="text-xl text-teal-600 md:text-2xl" />,
-    description: 'Official college T-shirt. Show your pride!',
-  },
-  {
-    name: 'College Mug',
-    points: 60,
-    icon: <FaMugHot className="text-xl text-amber-600 md:text-2xl" />,
-    description: 'Reusable mug for your daily coffee or tea.',
-  },
-  {
-    name: 'Library Voucher',
-    points: 40,
-    icon: <FaBook className="text-xl text-sky-600 md:text-2xl" />,
-    description: 'Voucher for late fee waivers or book borrowing.',
-  },
-  {
-    name: 'Canteen Coupon',
-    points: 30,
-    icon: <FaUtensils className="text-xl text-pink-600 md:text-2xl" />,
-    description: 'Free meal or snack at the college canteen.',
-  },
-  {
-    name: 'Lab Access Pass',
-    points: 80,
-    icon: <FaLaptop className="text-xl text-green-600 md:text-2xl" />,
-    description: 'Priority access to computer labs for your projects.',
-  },
-  {
-    name: 'Event Ticket',
-    points: 50,
-    icon: <FaTicketAlt className="text-xl text-amber-500 md:text-2xl" />,
-    description: 'Entry to college fests, concerts, or sports events.',
-  },
-  {
-    name: 'Bus Pass',
-    points: 120,
-    icon: <FaBus className="text-xl text-teal-700 md:text-2xl" />,
-    description: 'Monthly bus pass for easy campus commute.',
-  },
-  {
-    name: 'Bicycle Rental',
-    points: 25,
-    icon: <FaBicycle className="text-xl text-green-700 md:text-2xl" />,
-    description: 'One-day free bicycle rental on campus.',
-  },
-  {
-    name: 'WiFi Booster',
-    points: 35,
-    icon: <FaWifi className="text-xl text-sky-500 md:text-2xl" />,
-    description: 'High-speed WiFi access for a week.',
-  },
-  {
-    name: 'Star Student Badge',
-    points: 200,
-    icon: <FaStar className="text-xl text-yellow-400 md:text-2xl" />,
-    description: 'Special badge for your student profile.',
-  },
-  {
-    name: 'Graduation Photo Print',
-    points: 70,
-    icon: <FaUserGraduate className="text-xl text-teal-500 md:text-2xl" />,
-    description: 'Free print of your graduation photo.',
-  },
-  {
-    name: 'Game Room Pass',
-    points: 45,
-    icon: <FaGamepad className="text-xl text-pink-500 md:text-2xl" />,
-    description: 'One-hour access to the student game room.',
-  },
-  {
-    name: 'Music Night Ticket',
-    points: 55,
-    icon: <FaMusic className="text-xl text-indigo-500 md:text-2xl" />,
-    description: 'Entry to the next campus music night.',
-  },
-  {
-    name: 'Swimming Pool Pass',
-    points: 65,
-    icon: <FaSwimmer className="text-xl text-blue-400 md:text-2xl" />,
-    description: 'One-day access to the college swimming pool.',
-  },
-  {
-    name: 'Wellness Spa Voucher',
-    points: 90,
-    icon: <FaSpa className="text-xl text-green-400 md:text-2xl" />,
-    description: 'Relax with a wellness spa session.',
-  },
-  {
-    name: 'Workshop Entry',
-    points: 35,
-    icon: <FaChalkboardTeacher className="text-xl text-teal-400 md:text-2xl" />,
-    description: 'Attend a skill-building workshop.',
-  },
-  {
-    name: 'Parking Spot',
-    points: 110,
-    icon: <FaParking className="text-xl text-gray-500 md:text-2xl" />,
-    description: 'Reserved parking spot for a week.',
-  },
-  {
-    name: 'Movie Night Ticket',
-    points: 40,
-    icon: <FaFilm className="text-xl text-purple-400 md:text-2xl" />,
-    description: 'Free ticket to campus movie night.',
-  },
-  {
-    name: 'Eco-Friendly Kit',
-    points: 60,
-    icon: <FaLeaf className="text-xl text-green-500 md:text-2xl" />,
-    description: 'Kit with reusable bottle, bag, and utensils.',
-  },
-  {
-    name: 'Coffee Coupon',
-    points: 20,
-    icon: <FaCoffee className="text-xl text-amber-700 md:text-2xl" />,
-    description: 'Free coffee at the campus café.',
-  },
-  {
-    name: 'Fruit Basket',
-    points: 30,
-    icon: <FaAppleAlt className="text-xl text-red-400 md:text-2xl" />,
-    description: 'Fresh fruit basket from the canteen.',
-  },
-  {
-    name: 'Basketball Court Pass',
-    points: 25,
-    icon: <FaBasketballBall className="text-xl text-orange-400 md:text-2xl" />,
-    description: 'One-hour basketball court booking.',
-  },
-  {
-    name: 'Book Club Membership',
-    points: 50,
-    icon: <FaBookOpen className="text-xl text-sky-700 md:text-2xl" />,
-    description: 'Join the campus book club for a semester.',
-  },
-  {
-    name: 'Stationery Pack',
-    points: 15,
-    icon: <FaClipboardList className="text-xl text-teal-300 md:text-2xl" />,
-    description: 'Essential stationery for your studies.',
-  },
-];
-
-const gradientStyles = [
-  'from-amber-200 to-amber-50',
-  'from-teal-200 to-teal-50',
-  'from-sky-200 to-blue-50',
-  'from-pink-200 to-pink-50',
-  'from-green-200 to-green-50',
-  'from-yellow-100 to-yellow-200',
-  'from-purple-100 to-purple-200',
-  'from-red-100 to-red-200',
-  'from-indigo-100 to-indigo-200',
-  'from-emerald-100 to-emerald-200',
-  'from-orange-100 to-orange-200',
-  'from-cyan-100 to-cyan-200',
-  'from-lime-100 to-lime-200',
-  'from-fuchsia-100 to-fuchsia-200',
-  'from-blue-100 to-blue-200',
-  'from-rose-100 to-rose-200',
-  'from-violet-100 to-violet-200',
-  'from-gray-100 to-gray-200',
-  'from-amber-100 to-amber-200',
-  'from-green-100 to-green-200',
-  'from-sky-100 to-sky-200',
-  'from-pink-100 to-pink-200',
-  'from-teal-100 to-teal-200',
-  'from-blue-50 to-blue-100',
-];
-
-const getProgressBarColor = (progress: number, enoughPoints: boolean) => {
-  if (enoughPoints) return 'from-green-400 to-green-300';
-  if (progress > 0) return 'from-teal-400 to-teal-300';
-  return 'from-gray-300 to-gray-200';
-};
+  canRedeemReward,
+  getRedeemProgress,
+  getRedeemProgressBarColor,
+} from '../utils/functions';
+import { getStoredUser } from '../utils/functions';
+import { fetchUserKarmaPoints } from '../utils/karma';
 
 const RedeemPage = () => {
   const navigate = useNavigate();
-  const [karmaPoints, setKarmaPoints] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
+  const [karmaPoints, setKarmaPoints] = useState<number>(40);
 
   useEffect(() => {
     const user = getStoredUser();
     if (user?.id) {
       fetchUserKarmaPoints(user.id).then((points) => {
         setKarmaPoints(points);
-        setLoading(false);
       });
-    } else {
-      setLoading(false);
     }
   }, []);
 
+  const redeemDisplay = redeemables.map((item) => {
+    const canRedeem = canRedeemReward(karmaPoints, item.points);
+    const progress = getRedeemProgress(karmaPoints, item.points);
+    const progressBarColor = getRedeemProgressBarColor(progress, canRedeem);
+    const badgeClass = canRedeem
+      ? 'border-green-600/50 bg-green-100 text-green-700'
+      : 'border-blue-600/50 bg-blue-100 text-blue-700';
+    return { ...item, canRedeem, progress, progressBarColor, badgeClass };
+  });
+
   return (
-    <main className="">
+    <main className="relative overflow-x-hidden">
+      <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-amber-300 opacity-40 blur-[100px]" />
+      <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-amber-300 opacity-80 blur-[200px]" />
       <div className="w-full">
-        <Title
-          title="Redeem Your Karma Points"
-          description="Exchange your hard-earned karma points for exclusive college rewards! The more you contribute, the more you can claim."
-        />
-        <div className="flex items-center justify-between gap-2 p-3">
-          <button
-            className="text-sm font-medium text-teal-600 hover:underline"
-            onClick={() => navigate(-1)}
-          >
-            ← Back to Dashboard
-          </button>
-          <p className="text-sm font-medium text-teal-600">
-            Available:{' '}
-            <span className="text-lg font-bold text-green-600">
-              {karmaPoints}
-            </span>{' '}
-            Karma Points
+        <div className="container mb-12 flex size-full max-w-4xl flex-col items-center justify-center gap-4 text-center md:mb-16">
+          <span className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-100 px-4 py-1 text-xs font-semibold uppercase text-amber-700 sm:text-sm md:text-base">
+            <TbTrophy className="text-lg text-amber-700" />
+            Thank You for Your Contributions!
+          </span>
+
+          <h1 className="mt-4 text-2xl font-bold capitalize leading-snug text-amber-950 md:text-4xl md:leading-snug lg:text-5xl lg:leading-snug">
+            Redeem Your Karma Points
+          </h1>
+
+          <p className="max-w-2xl font-body text-xs text-amber-950 sm:text-sm md:text-base">
+            Exchange your hard-earned karma points for exclusive rewards! The
+            more you contribute, the more you can claim. Thank you for helping
+            others & making a difference!
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-6 px-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {redeemables.map((item, idx) => {
-            const enoughPoints = karmaPoints >= item.points;
-            const progress = Math.min(karmaPoints / item.points, 1);
-            const progressBarColor = getProgressBarColor(
-              progress,
-              enoughPoints,
-            );
-            const cardGradient = gradientStyles[idx % gradientStyles.length];
+        <div className="flex flex-col items-end gap-2 p-3 pt-0 md:flex-row md:justify-between md:gap-0">
+          <button
+            type="button"
+            aria-label="Back to Dashboard"
+            className="hidden rounded-full border border-amber-300 bg-amber-100 px-4 py-1 text-xs font-semibold text-amber-700 shadow hover:bg-amber-200 sm:block md:text-sm"
+            onClick={() => navigate(-1)}
+          >
+            <TbArrowNarrowLeft className="inline-block align-middle" />
+            Dashboard
+          </button>
+          <div className="relative mx-auto flex translate-y-5 flex-col items-center">
+            <div className="relative mb-0 flex h-40 w-80 items-end justify-center md:mb-2">
+              <svg
+                width="320"
+                height="160"
+                viewBox="0 0 320 160"
+                className="absolute left-0 top-0"
+              >
+                <path
+                  d="M40,148 A120,120 0 0,1 280,160"
+                  fill="none"
+                  stroke="#facc15"
+                  strokeWidth="36"
+                  strokeLinecap="round"
+                  opacity="0.3"
+                />
+                <path
+                  d="M40,160 A120,120 0 0,1 240,64"
+                  fill="none"
+                  stroke="#f59e42"
+                  strokeWidth="36"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="text-center">
+                <span className="text-5xl font-extrabold text-amber-600">
+                  {karmaPoints}
+                </span>
+                <p className="font-semibold text-amber-700">Karma Points</p>
+              </div>
+            </div>
+          </div>
+          <Link
+            to="#"
+            className="hidden rounded-full border border-amber-300 bg-amber-100 px-4 py-1 text-xs font-semibold text-amber-700 shadow hover:bg-amber-200 sm:block md:text-sm"
+          >
+            How to earn?
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 px-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
+          {redeemDisplay.map((item) => {
+            const percent = Math.round(item.progress * 100);
             return (
               <div
                 key={item.name}
-                className={`group flex flex-col items-center rounded-2xl border border-teal-100 bg-gradient-to-br ${cardGradient} p-4 shadow-lg transition hover:shadow-xl dark:from-dark dark:to-teal-900 md:p-6`}
-                style={{ minHeight: 270 }}
+                className={`group relative flex flex-col items-start overflow-hidden rounded-2xl border border-amber-300/70 p-5 shadow-sm transition hover:shadow-lg md:p-7`}
               >
-                <div className="mb-2 transition-transform group-hover:scale-110">
-                  {item.icon}
+                <div className="pointer-events-none absolute left-0 -z-10 size-40 -translate-x-1/2 rounded-full bg-amber-300 opacity-30 blur-[50px]" />
+                <div className="pointer-events-none absolute right-0 top-1/2 -z-10 size-80 translate-x-1/2 rounded-full bg-amber-300 opacity-60 blur-[100px]" />
+                {/* Gamified badge */}
+                <div className="flex flex-col items-start gap-2">
+                  <span
+                    className={`inline-flex items-center justify-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${item.badgeClass}`}
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${item.canRedeem ? 'bg-green-600' : 'bg-blue-600'}`}
+                    />
+                    {item.canRedeem ? 'Unlocked' : 'Progress'}
+                  </span>
+                  <div className="mt-2 flex items-center gap-1">
+                    <TbGift className="text-amber-700" />
+                    <h2 className="text-base font-semibold text-amber-700 dark:text-amber-200">
+                      {item.name}
+                    </h2>
+                    <span className="text-xs font-medium text-amber-600">
+                      ({item.points} points)
+                    </span>
+                  </div>
                 </div>
-                <h2 className="mb-1 text-center text-base font-bold text-teal-800 dark:text-teal-200 md:text-lg">
-                  {item.name}
-                </h2>
-                <p className="mb-2 text-center text-xs text-gray-600 dark:text-gray-300 md:text-sm">
+                <p className="mt-1 text-left text-xs text-gray-600 dark:text-gray-300">
                   {item.description}
                 </p>
-                <span className="mb-2 inline-block rounded-full bg-teal-100 px-4 py-1 text-xs font-semibold text-teal-800">
-                  {item.points} Karma Points
-                </span>
-                <div className="mb-2 w-full">
-                  <div className="flex items-center justify-between text-xs font-medium text-teal-700">
-                    <span>
-                      {Math.min(karmaPoints, item.points)}/{item.points}
-                    </span>
-                    <span>
-                      {enoughPoints
-                        ? 'Ready!'
-                        : `${Math.max(item.points - karmaPoints, 0)} left`}
-                    </span>
+                {/* Playful progress bar with 0 and total points */}
+                <div className="mb-2 mt-5 w-full">
+                  <div className="mb-1 flex items-center justify-between text-xs font-medium text-amber-700">
+                    <span className="font-bold">0</span>
+                    <span className="font-bold">{item.points}</span>
                   </div>
-                  <div className="relative mt-1 h-3 w-full rounded-full bg-teal-50">
+                  <div className="relative h-3 w-full rounded-full border border-dark/20 bg-white">
                     <div
-                      className={`absolute left-0 top-0 h-3 rounded-full bg-gradient-to-r ${progressBarColor} transition-all`}
-                      style={{ width: `${progress * 100}%` }}
+                      className={`absolute left-0 top-0 h-2.5 rounded-full bg-gradient-to-r ${item.progressBarColor} transition-all`}
+                      style={{ width: `${percent}%` }}
                     />
+                    {/* Playful marker with current points above */}
+                    <div
+                      className="absolute -top-7 left-0"
+                      style={{ left: `calc(${percent}% - 1rem)` }}
+                    >
+                      <span className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-xs font-bold text-amber-700 shadow-sm">
+                        {Math.floor(item.progress * item.points)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <button
-                  className={`mt-2 rounded-full border border-green-400 bg-green-100 px-6 py-1.5 text-xs font-bold text-green-700 shadow transition hover:bg-green-200 disabled:opacity-50 md:text-sm ${
-                    enoughPoints ? 'hover:bg-green-300' : ''
-                  }`}
-                  disabled={!enoughPoints}
-                >
-                  {enoughPoints ? 'Redeem' : 'Not enough points'}
-                </button>
+                {/* Actionable CTA */}
+                <div className="mt-2 flex w-full items-center justify-end gap-2">
+                  <button
+                    className={`rounded-full border border-dark/20 px-6 py-2 text-sm font-bold shadow transition ${
+                      item.canRedeem
+                        ? 'bg-amber-300 text-amber-900 hover:bg-amber-400'
+                        : 'cursor-not-allowed bg-gray-300 text-gray-800 opacity-80'
+                    }`}
+                    disabled={!item.canRedeem}
+                  >
+                    Redeem now!
+                  </button>
+                </div>
               </div>
             );
           })}
