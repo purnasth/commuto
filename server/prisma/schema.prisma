@@ -32,6 +32,8 @@ model User {
   ratingsReceived Rating[] @relation("ToUser")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  karmaPoints    Int      @default(0) // Total karma points
+  karmaTransactions KarmaTransaction[]
 }
 
 model Ride {
@@ -52,6 +54,9 @@ model Ride {
   ratings     Rating[]
   messages    Message[]
   status      RideStatus    @default(ACTIVE)
+  distance     Float?        // Distance in kilometers, calculated when ride is confirmed
+  co2Saved     Float?        // CO2 saved in kg
+  peopleImpacted Int?        // Number of people impacted (passengers)
 }
 
 enum RideStatus {
@@ -92,5 +97,15 @@ model Message {
   senderId  Int
   ride      Ride?    @relation(fields: [rideId], references: [id])
   rideId    Int?
+  createdAt DateTime @default(now())
+}
+
+model KarmaTransaction {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  points    Int      // points earned or redeemed
+  type      String   // 'earned' or 'redeemed'
+  reason    String?
   createdAt DateTime @default(now())
 }

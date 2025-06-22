@@ -1,6 +1,8 @@
 import { FaAward } from 'react-icons/fa6';
+import { useNavigate } from 'react-router-dom';
 
 import { ReflectionStats } from '../interfaces/types';
+import { ROUTE_REDEEM } from '../constants/routes';
 
 import UserCard from './UserCard';
 import TitleBar from './ui/TitleBar';
@@ -13,6 +15,8 @@ interface ReflectionDashboardProps {
 }
 
 const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
+  const navigate = useNavigate();
+
   return (
     <div className="grid grid-cols-1 rounded-3xl border-t-0 shadow-sm md:border md:border-t-0 lg:grid-cols-3">
       <div className="col-span-1 space-y-3 overflow-hidden rounded-3xl rounded-br-none bg-teal-50 p-3 dark:bg-teal-900 md:space-y-4 md:p-4">
@@ -82,7 +86,10 @@ const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
             more points you collect!
           </p>
 
-          <button className="mt-5 rounded-full border border-dark/20 bg-amber-400 px-8 py-2 font-bold text-amber-900 shadow transition hover:bg-amber-500">
+          <button
+            className="mt-5 rounded-full border border-dark/20 bg-amber-400 px-8 py-2 font-bold text-amber-900 shadow transition hover:bg-amber-500"
+            onClick={() => navigate(ROUTE_REDEEM)}
+          >
             Redeem
           </button>
           <TitleBar

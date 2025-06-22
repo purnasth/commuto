@@ -102,4 +102,6 @@ export interface RideHistory {
   };
   passengers: { id: number; fullname: string; email: string }[];
   distance?: number;
+  co2Saved?: number;
+  peopleImpacted?: number;
 }

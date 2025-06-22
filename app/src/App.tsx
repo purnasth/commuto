@@ -20,6 +20,7 @@ import RoleBasedPage from './pages/RoleBasedPage';
 import LogsDashboard from './pages/LogsDashboard';
 import SelfReflection from './pages/SelfReflection';
 import { SocketManager } from './components/SocketManager';
+import RedeemPage from './pages/RedeemPage';
 
 import {
   ROUTE_404,
@@ -33,6 +34,7 @@ import {
   ROUTE_PROFILE,
   ROUTE_RIDE_DETAILS,
   ROUTE_LOGS_DASHBOARD,
+  ROUTE_REDEEM,
 } from './constants/routes';
 
 const App: React.FC = () => {
@@ -55,6 +57,7 @@ const App: React.FC = () => {
             <Route path={ROUTE_BRAND} element={<Brand />} />
             <Route path={ROUTE_LEGAL} element={<LegalPage />} />
             <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
+            <Route path={ROUTE_REDEEM} element={<RedeemPage />} />
             <Route path={ROUTE_404} element={<Error404 />} />
           </Routes>
           <Footer />
