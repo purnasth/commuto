@@ -18,7 +18,13 @@ export const RideEventProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const triggerRideConfirmed = (data: RideEventData) =>
     setRideConfirmedData(data);
-  const resetRideConfirmed = () => setRideConfirmedData(null);
+  const resetRideConfirmed = () => {
+    setRideConfirmedData(null);
+    console.log('invoked resertRideConfirmed');
+    localStorage.removeItem('activeRide');
+    localStorage.removeItem('rideConfirmedData');
+    localStorage.removeItem('showRideButton');
+  };
 
   return (
     <RideEventContext.Provider

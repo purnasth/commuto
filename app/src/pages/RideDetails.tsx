@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
 import { formatFullDate } from '../utils/functions';
@@ -6,10 +6,13 @@ import { FaWalking } from 'react-icons/fa';
 import { MdOutlineDirectionsBike } from 'react-icons/md';
 import { IoClose } from 'react-icons/io5';
 import { USER_ROLE } from '../constants/enums';
+import { useRideEvent } from '../utils/useRideEvent';
+import { ROUTE_PROFILE } from '../constants/routes';
 
 const RideDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [showMap, setShowMap] = useState(false);
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
 
   // const from = searchParams.get('from');
   // const to = searchParams.get('to');
@@ -45,10 +48,48 @@ const RideDetails: React.FC = () => {
     return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(rideDetails.from)}%3B${encodeURIComponent(rideDetails.to)}`;
   };
 
+  const { resetRideConfirmed } = useRideEvent();
+  const rideChannel = useMemo(() => new BroadcastChannel('rideChannel'), []);
+
+  const rideChannelRef = useRef<BroadcastChannel | null>(null);
+
+  useEffect(() => {
+    rideChannelRef.current = new BroadcastChannel('rideChannel');
+
+    return () => {
+      rideChannelRef.current?.close();
+    };
+  }, []);
+
   const handleCompleteRide = () => {
-    console.log('Ride completed:', rideDetails);
-    // localStorage.removeItem('activeRide');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (rideChannelRef.current) {
+      rideChannelRef.current.postMessage({ type: 'RESET_RIDE', user });
+    } else {
+      console.error('BroadcastChannel is closed');
+    }
+    resetRideConfirmed();
+    if (user.role.toLowerCase() === USER_ROLE.PASSENGER) {
+      setShowFeedbackPopup(true);
+    } else if (user.role.toLowerCase() === USER_ROLE.RIDER) {
+      window.location.href = ROUTE_PROFILE;
+    }
   };
+  useEffect(() => {
+    if (rideChannelRef.current) {
+      rideChannelRef.current.onmessage = (event) => {
+        if (event.data.type === 'RESET_RIDE') {
+          console.log('Ride reset event received:', event.data);
+
+          localStorage.removeItem('activeRide');
+          resetRideConfirmed();
+        }
+      };
+    }
+
+    return () => {};
+  }, [resetRideConfirmed]);
 
   return (
     <main>
@@ -148,8 +189,83 @@ const RideDetails: React.FC = () => {
           )}
         </div>
       </div>
+
+      {showFeedbackPopup && (
+        <FeedbackModal onClose={() => setShowFeedbackPopup(false)} />
+      )}
     </main>
   );
 };
 
 export default RideDetails;
+const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+
+  const handleSubmit = () => {
+    console.log('Feedback submitted:', { rating, comment });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="w-[90%] max-w-md rounded-lg bg-white p-6 shadow-lg">
+        <h2 className="mb-2 text-xl font-semibold text-gray-800">
+          Rate Your Ride
+        </h2>
+        <p className="mb-4 text-sm text-gray-600">
+          How was your experience with this ride?
+        </p>
+
+        <div>
+          <p className="mb-2 text-sm text-gray-600">Select an emoji:</p>
+          <div className="flex gap-2">
+            {['😀', '😊', '😐', '😞', '😠'].map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => setRating(emoji.charCodeAt(0))}
+                className={`text-2xl transition-colors ${
+                  rating === emoji.charCodeAt(0)
+                    ? 'text-yellow-400'
+                    : 'text-gray-300'
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Text Feedback */}
+        <textarea
+          rows={3}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Leave a comment (optional)"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+        />
+
+        {/* Buttons */}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="rounded bg-gray-300 px-4 py-2 text-sm hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={rating === 0}
+            className={`rounded px-4 py-2 text-sm text-white transition-colors ${
+              rating === 0
+                ? 'cursor-not-allowed bg-teal-300'
+                : 'bg-teal-500 hover:bg-teal-600'
+            }`}
+          >
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
