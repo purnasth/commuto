@@ -57,25 +57,6 @@ export class RideController {
    *   c = 2 * atan2(sqrt(a), sqrt(1-a))
    *   return R * c
    */
-  // private haversineDistance(
-  //   lat1: number,
-  //   lon1: number,
-  //   lat2: number,
-  //   lon2: number,
-  // ): number {
-  //   const toRad = (value: number) => (value * Math.PI) / 180;
-  //   const R = 6371; // Radius of Earth in kilometers
-  //   const dLat = toRad(lat2 - lat1);
-  //   const dLon = toRad(lon2 - lon1);
-  //   const a =
-  //     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-  //     Math.cos(toRad(lat1)) *
-  //       Math.cos(toRad(lat2)) *
-  //       Math.sin(dLon / 2) *
-  //       Math.sin(dLon / 2);
-  //   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  //   return R * c;
-  // }
   private haversineDistance(
     lat1: number,
     lon1: number,
@@ -83,21 +64,17 @@ export class RideController {
     lon2: number,
   ): number {
     const toRad = (value: number) => (value * Math.PI) / 180;
-
-    const R = 6371; // Earth's radius in km
-
+    const R = 6371; // Radius of Earth in kilometers
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
-
     const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    const distance = R * c;
-
-    return parseFloat(distance.toFixed(2)); // round to 2 decimal places
+    return R * c;
   }
 
   /**
@@ -113,7 +90,7 @@ export class RideController {
    * @param fromLng Longitude of the user's requested location
    * @param timestamp Requested ride time (ISO string)
    * @param role User's role ("rider" or "passenger")
-  //  * @returns Array of matched rides
+   * @returns Array of matched rides
    */
   @Get('match')
   async matchRides(
@@ -549,7 +526,6 @@ export class RideController {
     }
 
     const co2Saved = distance ? distance * 0.17 : null;
-
     const peopleImpacted = ride.passengers.length;
 
     const updatedRide = await this.prisma.ride.update({
