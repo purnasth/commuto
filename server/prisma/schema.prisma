@@ -64,7 +64,8 @@ enum RideStatus {
   CONFIRMED
   REJECTED
   EXPIRED
-  CANCELLED // Added for ride cancellation
+  CANCELLED 
+  COMPLETED
 }
 
 model RideRequest {

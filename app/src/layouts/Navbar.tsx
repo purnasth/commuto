@@ -11,6 +11,7 @@ import { getUserGreeting } from '../utils/functions';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import { ROUTE_HOME, ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
 import { useRideEvent } from '../utils/useRideEvent';
+import { useSocket } from '../utils/useSocket';
 
 const navLinks = [
   {
@@ -36,6 +37,28 @@ const Navbar = () => {
   });
   const { rideConfirmedData, resetRideConfirmed } = useRideEvent();
   const navigate = useNavigate();
+  const { rideStatus } = useSocket();
+  // const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
+  // useEffect(() => {
+  //   if (socket) {
+  //     socket.on('rideConfirmed', (ride) => {
+  //       console.log('Ride Confirmed:', ride);
+  //       navigate(
+  //         `/ride-details?from=${encodeURIComponent(ride.from)}&to=${encodeURIComponent(
+  //           ride.to,
+  //         )}&message=${encodeURIComponent(ride.message)}&role=${encodeURIComponent(
+  //           ride.role,
+  //         )}&timestamp=${encodeURIComponent(ride.timestamp ?? '')}`,
+  //       );
+  //     });
+
+  //     return () => {
+  //       socket.off('rideConfirmed');
+  //     };
+  //   }
+  // }, []);
+
+  console.log('Navbar rideStatus:', rideStatus);
 
   const [visible, setVisible] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
@@ -143,7 +166,7 @@ const Navbar = () => {
               ))}
             </ul>
             <div className="flex items-center gap-2">
-              {showRideButton && (
+              {rideStatus === 'confirmed' && (
                 <button
                   type="button"
                   onClick={handleClick}

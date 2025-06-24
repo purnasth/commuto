@@ -127,6 +127,29 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  notifyRideCompletion(ride: Ride) {
+    const payload = {
+      id: ride.id,
+      from: ride.from,
+      to: ride.to,
+      message: ride.message,
+      role: ride.role,
+      timestamp: ride.timestamp?.toISOString(),
+      status: ride.status,
+      riderId: ride.riderId,
+      distance: ride.distance,
+      co2Saved: ride.co2Saved,
+      peopleImpacted: ride.peopleImpacted,
+    };
+
+    const riderSocketId = userSocketMap.get(ride.riderId.toString());
+
+    if (riderSocketId) {
+      this.server.to(riderSocketId).emit('rideCompleted', payload);
+      console.log(`'rideCompleted' emitted to rider ${ride.riderId}`);
+    }
+  }
+
   notifyRideConfirmationForPassenger(confirmedRide: Ride, passengerId: number) {
     if (!passengerId) {
       console.warn(

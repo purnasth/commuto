@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
 import { formatFullDate } from '../utils/functions';
 import { FaWalking } from 'react-icons/fa';
@@ -8,12 +8,18 @@ import { IoClose } from 'react-icons/io5';
 import { USER_ROLE } from '../constants/enums';
 import { useRideEvent } from '../utils/useRideEvent';
 import { ROUTE_PROFILE } from '../constants/routes';
+import { useSocket } from '../utils/useSocket';
+import { io } from 'socket.io-client';
+import { apiFetch } from '../utils/api';
+import { RideFormData } from '../interfaces/types';
 
 const RideDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [showMap, setShowMap] = useState(false);
-  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const { showFeedbackPopup, setShowFeedbackPopup } = useSocket();
 
+  const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
+  const [user, setUser] = useState<{ id: number } | null>(null);
   // const from = searchParams.get('from');
   // const to = searchParams.get('to');
   // const message = searchParams.get('message');
@@ -31,6 +37,12 @@ const RideDetails: React.FC = () => {
     localStorage.setItem('activeRide', JSON.stringify(params));
   }, [searchParams]);
 
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      setUser(JSON.parse(userStr));
+    }
+  }, []);
   const from = rideDetails.from;
   const to = rideDetails.to;
   const message = rideDetails.message;
@@ -61,35 +73,82 @@ const RideDetails: React.FC = () => {
     };
   }, []);
 
-  const handleCompleteRide = () => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+  // useEffect(() => {
+  //   const registerUserOnConnect = () => {
+  //     if (user?.id) {
+  //       console.log(`Attempting to register user ${user.id}`);
+  //       socket.emit('registerUser', user.id.toString());
+  //     }
+  //   };
 
-    if (rideChannelRef.current) {
-      rideChannelRef.current.postMessage({ type: 'RESET_RIDE', user });
-    } else {
-      console.error('BroadcastChannel is closed');
-    }
-    resetRideConfirmed();
-    if (user.role.toLowerCase() === USER_ROLE.PASSENGER) {
-      setShowFeedbackPopup(true);
-    } else if (user.role.toLowerCase() === USER_ROLE.RIDER) {
-      window.location.href = ROUTE_PROFILE;
+  //   socket.on('connect', registerUserOnConnect);
+
+  //   if (socket.connected && user?.id) {
+  //     registerUserOnConnect();
+  //   }
+
+  //   socket.on('rideCompleted', (payload) => {
+  //     console.log('Ride completed notification received:', payload);
+
+  //     let notificationMessage = `Ride ${payload.id} from ${payload.from} to ${payload.to} has been confirmed!`;
+  //   });
+
+  //   socket.on('disconnect', () => {
+  //     console.log('Disconnected from WebSocket server');
+  //   });
+
+  //   return () => {
+  //     socket.off('connect', registerUserOnConnect);
+  //     socket.off('rideConfirmed');
+  //     socket.off('disconnect');
+  //   };
+  // }, [socket]);
+
+  const handleCompleteRide = async (ride: RideFormData) => {
+    try {
+      console.log('ride', ride);
+
+      // if (!ride || !ride.id) {
+      //   console.error('Invalid ride data:', ride);
+      //   return;
+      // }
+      await apiFetch(
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/complete`,
+        {
+          method: 'POST',
+        },
+      );
+
+      // Reset ride status in local storage
+      localStorage.removeItem('activeRide');
+      localStorage.setItem('rideStatus', 'completed');
+
+      // setRideStatus('completed');
+
+      // if (rideChannelRef.current) {
+      //   rideChannelRef.current.postMessage({ type: 'RESET_RIDE', user });
+      // } else {
+      //   console.error('BroadcastChannel is closed');
+      // }
+      // resetRideConfirmed();
+    } catch (error) {
+      console.error('Error completing ride:', error);
     }
   };
-  useEffect(() => {
-    if (rideChannelRef.current) {
-      rideChannelRef.current.onmessage = (event) => {
-        if (event.data.type === 'RESET_RIDE') {
-          console.log('Ride reset event received:', event.data);
+  // useEffect(() => {
+  //   if (rideChannelRef.current) {
+  //     rideChannelRef.current.onmessage = (event) => {
+  //       if (event.data.type === 'RESET_RIDE') {
+  //         console.log('Ride reset event received:', event.data);
 
-          localStorage.removeItem('activeRide');
-          resetRideConfirmed();
-        }
-      };
-    }
+  //         localStorage.removeItem('activeRide');
+  //         resetRideConfirmed();
+  //       }
+  //     };
+  //   }
 
-    return () => {};
-  }, [resetRideConfirmed]);
+  //   return () => {};
+  // }, [resetRideConfirmed]);
 
   return (
     <main>
@@ -155,7 +214,10 @@ const RideDetails: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={handleCompleteRide}
+              onClick={() => {
+                handleCompleteRide(rideDetails);
+              }}
+              // onClick={handleCompleteRide}
               className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
             >
               <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
@@ -205,9 +267,11 @@ export default RideDetails;
 const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const navigate = useNavigate();
 
   const handleSubmit = () => {
     console.log('Feedback submitted:', { rating, comment });
+    navigate(ROUTE_PROFILE);
     onClose();
   };
 
