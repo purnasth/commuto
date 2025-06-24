@@ -18,6 +18,8 @@ const SelfReflection = () => {
   const [karmaPoints, setKarmaPoints] = useState<number>(0);
   const navigate = useNavigate();
 
+  console.log('rides dashboard', rides);
+
   useEffect(() => {
     const storedUser = getStoredUser();
     if (!storedUser) {
@@ -27,7 +29,20 @@ const SelfReflection = () => {
     setUserId(storedUser.id ?? null);
     apiFetch<{ rides: RideHistory[] }>(
       `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${storedUser.id}`,
-    ).then((res) => setRides(res.rides));
+    ).then((res) => {
+      setRides(res.rides);
+
+      // set karma points
+      if (res.rides.length === 0) {
+        setKarmaPoints(0);
+      } else {
+        const totalKarma = res.rides.reduce(
+          (sum, ride) => sum + (ride.rider.karmaPoints ?? 0),
+          0,
+        );
+        setKarmaPoints(totalKarma);
+      }
+    });
     fetchUserKarmaPoints(storedUser.id).then(setKarmaPoints);
   }, [navigate]);
 

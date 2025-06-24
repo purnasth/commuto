@@ -17,6 +17,8 @@ interface ReflectionDashboardProps {
 const ReflectionDashboard = ({ stats }: ReflectionDashboardProps) => {
   const navigate = useNavigate();
 
+  console.log('stats', stats);
+
   return (
     <div className="grid grid-cols-1 rounded-3xl border-t-0 shadow-sm md:border md:border-t-0 lg:grid-cols-3">
       <div className="col-span-1 space-y-3 overflow-hidden rounded-3xl rounded-br-none bg-teal-50 p-3 dark:bg-teal-900 md:space-y-4 md:p-4">
