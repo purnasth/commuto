@@ -113,7 +113,7 @@ export class RideController {
    * @param fromLng Longitude of the user's requested location
    * @param timestamp Requested ride time (ISO string)
    * @param role User's role ("rider" or "passenger")
-   * @returns Array of matched rides
+  //  * @returns Array of matched rides
    */
   @Get('match')
   async matchRides(
