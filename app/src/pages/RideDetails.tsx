@@ -136,30 +136,34 @@ const RideDetails: React.FC = () => {
           </div>
         </div>
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => setShowMap(!showMap)}
-            className={`flex items-center gap-2 rounded-full bg-teal-100 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-200 dark:bg-teal-800 ${
-              showMap
-                ? 'text-teal-700 dark:text-teal-300'
-                : 'text-teal-600 dark:text-teal-300'
-            }`}
-          >
-            {showMap ? (
-              <IoClose className="scale-110 text-xl" />
-            ) : (
-              <TbMapSearch className="text-xl" />
-            )}
-            {showMap ? 'Hide Route' : 'View Route'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCompleteRide}
-            className={`flex items-center gap-2 rounded-full bg-teal-100 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-200 dark:bg-teal-800`}
-          >
-            Complete the ride
-          </button>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowMap(!showMap)}
+              className={`flex items-center gap-2 rounded-full bg-teal-200 px-6 py-3 text-sm font-medium transition-colors hover:bg-teal-300 dark:bg-teal-800 ${
+                showMap
+                  ? 'text-teal-700 hover:text-teal-50 dark:text-teal-300'
+                  : 'text-teal-600 hover:text-teal-50 dark:text-teal-300'
+              }`}
+            >
+              {showMap ? (
+                <IoClose className="scale-110 text-xl" />
+              ) : (
+                <TbMapSearch className="text-xl" />
+              )}
+              {showMap ? 'Hide Route' : 'View Route'}
+            </button>
+            <button
+              type="button"
+              onClick={handleCompleteRide}
+              className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
+            >
+              <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
+              <span className="relative z-10 font-medium tracking-wide">
+                Complete the ride
+              </span>
+            </button>
+          </div>
           {showMap && (
             <>
               <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-gray-200">
