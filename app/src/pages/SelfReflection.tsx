@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { apiFetch } from '../utils/api';
 import { getStoredUser } from '../utils/functions';
+import { fetchUserKarmaPoints } from '../utils/karma';
 
 import Dashboard from '../components/Dashboard';
 import ReflectionDashboard from '../components/ReflectionDashboard';
@@ -14,7 +15,10 @@ import { RideHistory, ReflectionStats } from '../interfaces/types';
 const SelfReflection = () => {
   const [rides, setRides] = useState<RideHistory[]>([]);
   const [userId, setUserId] = useState<number | null>(null);
+  const [karmaPoints, setKarmaPoints] = useState<number>(0);
   const navigate = useNavigate();
+
+  console.log('rides dashboard', rides);
 
   useEffect(() => {
     const storedUser = getStoredUser();
@@ -25,7 +29,21 @@ const SelfReflection = () => {
     setUserId(storedUser.id ?? null);
     apiFetch<{ rides: RideHistory[] }>(
       `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${storedUser.id}`,
-    ).then((res) => setRides(res.rides));
+    ).then((res) => {
+      setRides(res.rides);
+
+      // set karma points
+      if (res.rides.length === 0) {
+        setKarmaPoints(0);
+      } else {
+        const totalKarma = res.rides.reduce(
+          (sum, ride) => sum + (ride.rider.karmaPoints ?? 0),
+          0,
+        );
+        setKarmaPoints(totalKarma);
+      }
+    });
+    fetchUserKarmaPoints(storedUser.id).then(setKarmaPoints);
   }, [navigate]);
 
   // Calculate stats
@@ -38,16 +56,16 @@ const SelfReflection = () => {
   const stats: ReflectionStats = {
     postedCount: postedRides.length,
     confirmedCount: confirmedRides.length,
-    karmaPoints: confirmedRides.length * 20, // Example: 20 points per confirmed ride
+    karmaPoints: karmaPoints,
     distanceTravelled: confirmedRides.reduce(
-      (sum, ride) => sum + (ride.distance ?? 10),
+      (sum, ride) => sum + (ride.distance ?? 0),
       0,
-    ), // Example: fallback 10km per ride
+    ),
     co2Reduced: confirmedRides.reduce(
-      (sum, ride) => sum + (ride.distance ?? 10) * 0.17,
+      (sum, ride) => sum + (ride.distance ?? 0) * 0.17,
       0,
-    ), // Example: 0.17kg CO2 per km
-    peopleImpacted: rides.reduce(
+    ),
+    peopleImpacted: confirmedRides.reduce(
       (sum, ride) => sum + (ride.passengers?.length || 0),
       0,
     ),

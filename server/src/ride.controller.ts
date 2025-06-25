@@ -333,106 +333,33 @@ export class RideController {
   }
 
   // Confirm a ride (mark as completed)
-  // @Post(':id/confirm')
-  // async confirmRide(@Param('id') id: string) {
-  //   const ride = await this.prisma.ride.findUnique({
-  //     where: { id: Number(id) },
-  //     include: {
-  //       passengers: true, // Include passengers to get their IDs
-  //     },
-  //   });
-
-  //   if (!ride) {
-  //     throw new NotFoundException('Ride not found');
-  //   }
-
-  //   const matchedRides = await this.prisma.ride.findMany({
-  //     where: {
-  //       from: ride.from,
-  //       to: ride.to,
-  //       timestamp: {
-  //         gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
-  //         lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
-  //       },
-  //       status: RIDE_STATUS.ACTIVE,
-  //     },
-  //     include: {
-  //       passengers: true,
-  //     },
-  //   });
-
-  //   const matchedIds = matchedRides.map((r) => r.id);
-
-  //   await this.prisma.ride.updateMany({
-  //     where: { id: { in: matchedIds } },
-  //     data: { status: RIDE_STATUS.CONFIRMED },
-  //   });
-
-  //   const updatedRides = await this.prisma.ride.findMany({
-  //     where: { id: { in: matchedIds } },
-  //     include: {
-  //       rider: true,
-  //       passengers: true,
-  //     },
-  //   });
-
-  //   for (const confirmedRide of updatedRides) {
-  //     await this.rideGateway.notifyRideConfirmation(confirmedRide);
-
-  //     // Notify all passengers associated with this specific confirmed ride
-  //     for (const passenger of confirmedRide.passengers) {
-  //       await this.rideGateway.notifyRideConfirmationForPassenger(
-  //         confirmedRide,
-  //         passenger.id,
-  //       );
-  //     }
-  //   }
-
-  //   console.log({
-  //     message: 'All matched rides confirmed',
-  //     rides: updatedRides,
-  //   });
-
-  //   return {
-  //     message: 'All matched rides confirmed',
-  //     rides: updatedRides,
-  //   };
-  // }
-
   @Post(':id/confirm')
   async confirmRide(@Param('id') id: string) {
-    const rideId = Number(id);
-
-    const baseRide = await this.prisma.ride.findUnique({
-      where: { id: rideId },
-      include: { passengers: true },
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: Number(id) },
+      include: {
+        passengers: true, // Include passengers to get their IDs
+      },
     });
 
-    if (!baseRide) {
+    if (!ride) {
       throw new NotFoundException('Ride not found');
     }
 
-    const timeWindowMs = 2 * 60 * 1000;
-    const baseTime = new Date(baseRide.timestamp);
     const matchedRides = await this.prisma.ride.findMany({
       where: {
-        from: baseRide.from,
-        to: baseRide.to,
+        from: ride.from,
+        to: ride.to,
         timestamp: {
-          gte: new Date(baseTime.getTime() - timeWindowMs),
-          lte: new Date(baseTime.getTime() + timeWindowMs),
+          gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
+          lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
         },
         status: RIDE_STATUS.ACTIVE,
       },
       include: {
-        rider: true,
         passengers: true,
       },
     });
-
-    if (!matchedRides.length) {
-      return { message: 'No active rides matched to confirm.', rides: [] };
-    }
 
     const matchedIds = matchedRides.map((r) => r.id);
 
@@ -441,52 +368,205 @@ export class RideController {
       data: { status: RIDE_STATUS.CONFIRMED },
     });
 
-    for (const ride of matchedRides) {
-      this.rideGateway.notifyRideConfirmationForPassenger(ride, ride.rider.id);
+    const updatedRides = await this.prisma.ride.findMany({
+      where: { id: { in: matchedIds } },
+      include: {
+        rider: true,
+        passengers: true,
+      },
+    });
 
-      this.rideGateway.notifyRideConfirmation(ride);
+    for (const confirmedRide of updatedRides) {
+      this.rideGateway.notifyRideConfirmation(confirmedRide);
+
+      // Notify all passengers associated with this specific confirmed ride
+      for (const passenger of confirmedRide.passengers) {
+        this.rideGateway.notifyRideConfirmationForPassenger(
+          confirmedRide,
+          passenger.id,
+        );
+      }
     }
+
+    console.log({
+      message: 'All matched rides confirmed',
+      rides: updatedRides,
+    });
 
     return {
       message: 'All matched rides confirmed',
-      rides: matchedRides,
+      rides: updatedRides,
     };
   }
+
+  // @Post(':id/confirm')
   // async confirmRide(@Param('id') id: string) {
-  //   // Mark this ride and all matched rides (same timestamp, from, to, and status ACTIVE) as confirmed
-  //   const ride = await this.prisma.ride.findUnique({
-  //     where: { id: Number(id) },
+  //   const rideId = Number(id);
+  //   const baseRide = await this.prisma.ride.findUnique({
+  //     where: { id: rideId },
+  //     include: { passengers: true, rider: true },
   //   });
-  //   if (!ride) throw new NotFoundException('Ride not found');
-  //   // Find all rides that match this ride (same from, to, timestamp, and status ACTIVE)
-
-  //   // ISSUE #51: Inconsistency problem
-
+  //   if (!baseRide) {
+  //     throw new NotFoundException('Ride not found');
+  //   }
+  //   const timeWindowMs = 2 * 60 * 1000;
+  //   const baseTime = new Date(baseRide.timestamp);
   //   const matchedRides = await this.prisma.ride.findMany({
   //     where: {
-  //       from: ride.from,
-  //       to: ride.to,
+  //       from: baseRide.from,
+  //       to: baseRide.to,
   //       timestamp: {
-  //         gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
-  //         lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
+  //         gte: new Date(baseTime.getTime() - timeWindowMs),
+  //         lte: new Date(baseTime.getTime() + timeWindowMs),
   //       },
   //       status: RIDE_STATUS.ACTIVE,
   //     },
+  //     include: {
+  //       rider: true,
+  //       passengers: true,
+  //     },
   //   });
-  //   const matchedIds = matchedRides.map((r) => r.id);
-  //   await this.prisma.ride.updateMany({
-  //     where: { id: { in: matchedIds } },
-  //     data: { status: RIDE_STATUS.CONFIRMED },
-  //   });
+  //   if (!matchedRides.length) {
+  //     return { message: 'No active rides matched to confirm.', rides: [] };
+  //   }
+  //   // Calculate and update distance, co2Saved, peopleImpacted, and award karma points
+  //   for (const ride of matchedRides) {
+  //     let distance: null | number = null;
+  //     if (
+  //       typeof ride.fromLat === 'number' &&
+  //       typeof ride.fromLng === 'number' &&
+  //       typeof ride.toLat === 'number' &&
+  //       typeof ride.toLng === 'number'
+  //     ) {
+  //       distance = this.haversineDistance(
+  //         ride.fromLat,
+  //         ride.fromLng,
+  //         ride.toLat,
+  //         ride.toLng,
+  //       );
+  //     }
+  //     const co2Saved = distance ? distance * 0.17 : null; // 0.17kg per km
+  //     const peopleImpacted = ride.passengers ? ride.passengers.length : 0;
+  //     // Update ride
+  //     await this.prisma.ride.update({
+  //       where: { id: ride.id },
+  //       data: {
+  //         status: RIDE_STATUS.CONFIRMED,
+  //         distance,
+  //         co2Saved,
+  //         peopleImpacted,
+  //       },
+  //     });
+  //     // Award karma points to the rider
+  //     const karmaPoints = 20;
+  //     await this.prisma.user.update({
+  //       where: { id: ride.rider.id },
+  //       data: {
+  //         karmaPoints: { increment: karmaPoints },
+  //       },
+  //     });
+  //     // Create a KarmaTransaction record
+  //     await this.prisma.karmaTransaction.create({
+  //       data: {
+  //         userId: ride.rider.id,
+  //         points: karmaPoints,
+  //         type: 'earned',
+  //         reason: 'Ride completed',
+  //       },
+  //     });
+  //   }
+  //   // Notify clients
+  //   for (const ride of matchedRides) {
+  //     this.rideGateway.notifyRideConfirmationForPassenger(ride, ride.rider.id);
+  //     this.rideGateway.notifyRideConfirmation(ride);
+  //   }
   //   // Return updated rides
   //   const updatedRides = await this.prisma.ride.findMany({
-  //     where: { id: { in: matchedIds } },
+  //     where: { id: { in: matchedRides.map((r) => r.id) } },
+  //     include: { rider: true, passengers: true },
   //   });
   //   return {
   //     message: 'All matched rides confirmed',
   //     rides: updatedRides,
   //   };
   // }
+
+  @Post(':id/complete')
+  async completeRide(@Param('id') id: string) {
+    const rideId = Number(id);
+
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: { passengers: true, rider: true },
+    });
+
+    if (!ride) {
+      throw new NotFoundException('Ride not found');
+    }
+
+    if (ride.status !== RIDE_STATUS.CONFIRMED) {
+      throw new BadRequestException(
+        'Ride is not confirmed or already completed',
+      );
+    }
+
+    let distance: number | null = null;
+    if (
+      typeof ride.fromLat === 'number' &&
+      typeof ride.fromLng === 'number' &&
+      typeof ride.toLat === 'number' &&
+      typeof ride.toLng === 'number'
+    ) {
+      distance = this.haversineDistance(
+        ride.fromLat,
+        ride.fromLng,
+        ride.toLat,
+        ride.toLng,
+      );
+    }
+
+    const co2Saved = distance ? distance * 0.17 : null;
+    const peopleImpacted = ride.passengers.length;
+
+    const updatedRide = await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        status: RIDE_STATUS.COMPLETED,
+        distance,
+        co2Saved,
+        peopleImpacted,
+      },
+      include: {
+        passengers: true,
+        rider: true,
+      },
+    });
+
+    // Award karma points to the rider
+    const karmaPoints = 20;
+    await this.prisma.user.update({
+      where: { id: ride.rider.id },
+      data: {
+        karmaPoints: { increment: karmaPoints },
+      },
+    });
+
+    await this.prisma.karmaTransaction.create({
+      data: {
+        userId: ride.rider.id,
+        points: karmaPoints,
+        type: 'earned',
+        reason: 'Ride completed',
+      },
+    });
+
+    this.rideGateway.notifyRideCompletion(updatedRide);
+
+    return {
+      message: 'Ride completed and users notified.',
+      ride: updatedRide,
+    };
+  }
 
   // Reject a ride (mark as rejected)
   @Post(':id/reject')

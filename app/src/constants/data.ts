@@ -3,6 +3,8 @@ import { getCurrentYear } from '../utils/functions';
 import rider from '../assets/vector/hero-rider.svg';
 import passenger from '../assets/vector/passenger.svg';
 
+import type { RedeemableReward } from '../interfaces/types';
+
 export const mockLocations = [
   // Educational Institutions
   {
@@ -1096,5 +1098,128 @@ export const findRideFormFields: Array<{
     label: "I'm a",
     type: 'select',
     options: ['Rider', 'Passenger'],
+  },
+];
+
+export const redeemables: RedeemableReward[] = [
+  {
+    name: 'College T-Shirt',
+    points: 100,
+    description: 'Official college T-shirt. Show your pride!',
+  },
+  {
+    name: 'College Mug',
+    points: 60,
+    description: 'Reusable mug for your daily coffee or tea.',
+  },
+  {
+    name: 'Library Voucher',
+    points: 40,
+    description: 'Voucher for late fee waivers or book borrowing.',
+  },
+  {
+    name: 'Canteen Coupon',
+    points: 30,
+    description: 'Free meal or snack at the college canteen.',
+  },
+  {
+    name: 'Lab Access Pass',
+    points: 80,
+    description: 'Priority access to computer labs for your projects.',
+  },
+  {
+    name: 'Event Ticket',
+    points: 50,
+    description: 'Entry to college fests, concerts, or sports events.',
+  },
+  {
+    name: 'Bus Pass',
+    points: 120,
+    description: 'Monthly bus pass for easy campus commute.',
+  },
+  {
+    name: 'Bicycle Rental',
+    points: 25,
+    description: 'One-day free bicycle rental on campus.',
+  },
+  {
+    name: 'WiFi Booster',
+    points: 35,
+    description: 'High-speed WiFi access for a week.',
+  },
+  {
+    name: 'Star Student Badge',
+    points: 200,
+    description: 'Special badge for your student profile.',
+  },
+  {
+    name: 'Graduation Photo Print',
+    points: 70,
+    description: 'Free print of your graduation photo.',
+  },
+  {
+    name: 'Game Room Pass',
+    points: 45,
+    description: 'One-hour access to the student game room.',
+  },
+  {
+    name: 'Music Night Ticket',
+    points: 55,
+    description: 'Entry to the next campus music night.',
+  },
+  {
+    name: 'Swimming Pool Pass',
+    points: 65,
+    description: 'One-day access to the college swimming pool.',
+  },
+  {
+    name: 'Wellness Spa Voucher',
+    points: 90,
+    description: 'Relax with a wellness spa session.',
+  },
+  {
+    name: 'Workshop Entry',
+    points: 35,
+    description: 'Attend a skill-building workshop.',
+  },
+  {
+    name: 'Parking Spot',
+    points: 110,
+    description: 'Reserved parking spot for a week.',
+  },
+  {
+    name: 'Movie Night Ticket',
+    points: 40,
+    description: 'Free ticket to campus movie night.',
+  },
+  {
+    name: 'Eco-Friendly Kit',
+    points: 60,
+    description: 'Kit with reusable bottle, bag, and utensils.',
+  },
+  {
+    name: 'Coffee Coupon',
+    points: 20,
+    description: 'Free coffee at the campus café.',
+  },
+  {
+    name: 'Fruit Basket',
+    points: 30,
+    description: 'Fresh fruit basket from the canteen.',
+  },
+  {
+    name: 'Basketball Court Pass',
+    points: 25,
+    description: 'One-hour basketball court booking.',
+  },
+  {
+    name: 'Book Club Membership',
+    points: 50,
+    description: 'Join the campus book club for a semester.',
+  },
+  {
+    name: 'Stationery Pack',
+    points: 15,
+    description: 'Essential stationery for your studies.',
   },
 ];

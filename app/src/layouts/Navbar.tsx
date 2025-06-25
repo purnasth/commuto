@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TbMenu2, TbPlus, TbSearch } from 'react-icons/tb';
 
 import logo from '../assets/logo/commuto.svg';
@@ -10,6 +10,8 @@ import { useTheme } from '../contexts/ThemeProvider';
 import { getUserGreeting } from '../utils/functions';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import { ROUTE_HOME, ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
+import { useRideEvent } from '../utils/useRideEvent';
+import { useSocket } from '../utils/useSocket';
 
 const navLinks = [
   {
@@ -29,6 +31,35 @@ const navLinks = [
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [prevScrollPos, setPrevScrollPos] = useState(0);
+  const [showRideButton, setShowRideButton] = useState(() => {
+    const savedState = localStorage.getItem('showRideButton');
+    return savedState ? JSON.parse(savedState) : false;
+  });
+  const { rideConfirmedData, resetRideConfirmed } = useRideEvent();
+  const navigate = useNavigate();
+  const { rideStatus } = useSocket();
+  // const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
+  // useEffect(() => {
+  //   if (socket) {
+  //     socket.on('rideConfirmed', (ride) => {
+  //       console.log('Ride Confirmed:', ride);
+  //       navigate(
+  //         `/ride-details?from=${encodeURIComponent(ride.from)}&to=${encodeURIComponent(
+  //           ride.to,
+  //         )}&message=${encodeURIComponent(ride.message)}&role=${encodeURIComponent(
+  //           ride.role,
+  //         )}&timestamp=${encodeURIComponent(ride.timestamp ?? '')}`,
+  //       );
+  //     });
+
+  //     return () => {
+  //       socket.off('rideConfirmed');
+  //     };
+  //   }
+  // }, []);
+
+  console.log('Navbar rideStatus:', rideStatus);
+
   const [visible, setVisible] = useState(true);
   const [userName, setUserName] = useState<string | null>(null);
   const location = useLocation();
@@ -46,13 +77,31 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [prevScrollPos]);
 
-  // Close nav on route change
+  useEffect(() => {
+    localStorage.setItem('showRideButton', JSON.stringify(showRideButton));
+  }, [showRideButton]);
+
   useEffect(() => {
     setIsOpen(false);
     document.body.style.overflow = 'auto';
   }, [location]);
 
-  // Greet user
+  useEffect(() => {
+    if (rideConfirmedData) {
+      console.log('Navbar reacting to ride confirmation', rideConfirmedData);
+
+      handleAfterRideConfirmed();
+
+      resetRideConfirmed();
+    }
+  }, [rideConfirmedData, resetRideConfirmed]);
+
+  const handleAfterRideConfirmed = () => {
+    // You can trigger some function, redirect, show a badge, etc.
+    setShowRideButton(true);
+    console.log('Running navbar logic after ride confirmation');
+  };
+
   useEffect(() => {
     setUserName(getUserGreeting());
   }, []);
@@ -65,6 +114,24 @@ const Navbar = () => {
   const closeNav = () => {
     setIsOpen(false);
     document.body.style.overflow = 'auto';
+  };
+  const handleClick = () => {
+    const activeRide = localStorage.getItem('activeRide');
+
+    if (!activeRide) {
+      console.warn('No active ride found in localStorage');
+      return;
+    }
+
+    const parseData = JSON.parse(activeRide);
+
+    navigate(
+      `/ride-details?from=${encodeURIComponent(parseData.from)}&to=${encodeURIComponent(
+        parseData.to,
+      )}&message=${encodeURIComponent(parseData.message ?? '')}&role=${encodeURIComponent(
+        parseData.role,
+      )}&timestamp=${encodeURIComponent(parseData.timestamp ?? '')}`,
+    );
   };
   return (
     <>
@@ -98,7 +165,18 @@ const Navbar = () => {
                 </li>
               ))}
             </ul>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              {rideStatus === 'confirmed' && (
+                <button
+                  type="button"
+                  onClick={handleClick}
+                  aria-label="Active Ride"
+                  className="flex items-center gap-1.5 rounded-full bg-green-100 px-4 py-2 font-medium text-green-700"
+                >
+                  <span className="size-2.5 animate-pulse rounded-full bg-green-600" />
+                  Active
+                </button>
+              )}
               {userName ? (
                 <Link
                   to={ROUTE_PROFILE}

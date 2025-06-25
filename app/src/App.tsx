@@ -20,6 +20,7 @@ import RoleBasedPage from './pages/RoleBasedPage';
 import LogsDashboard from './pages/LogsDashboard';
 import SelfReflection from './pages/SelfReflection';
 import { SocketManager } from './components/SocketManager';
+import RedeemPage from './pages/RedeemPage';
 
 import {
   ROUTE_404,
@@ -33,7 +34,9 @@ import {
   ROUTE_PROFILE,
   ROUTE_RIDE_DETAILS,
   ROUTE_LOGS_DASHBOARD,
+  ROUTE_REDEEM,
 } from './constants/routes';
+import { RideEventProvider } from './contexts/RideEventContext';
 
 const App: React.FC = () => {
   const theme = useTheme();
@@ -41,24 +44,27 @@ const App: React.FC = () => {
   return (
     <>
       <Router>
-        <SocketManager>
-          <RouterToTop />
-          <Navbar />
-          <Routes>
-            <Route path={ROUTE_HOME} element={<Home />} />
-            <Route path={ROUTE_HELP} element={<FAQPage />} />
-            <Route path={ROUTE_ABOUT} element={<AboutPage />} />
-            <Route path={ROUTE_LOGIN} element={<Login />} />
-            <Route path={ROUTE_PROFILE} element={<SelfReflection />} />
-            <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
-            <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
-            <Route path={ROUTE_BRAND} element={<Brand />} />
-            <Route path={ROUTE_LEGAL} element={<LegalPage />} />
-            <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
-            <Route path={ROUTE_404} element={<Error404 />} />
-          </Routes>
-          <Footer />
-        </SocketManager>
+        <RideEventProvider>
+          <SocketManager>
+            <RouterToTop />
+            <Navbar />
+            <Routes>
+              <Route path={ROUTE_HOME} element={<Home />} />
+              <Route path={ROUTE_HELP} element={<FAQPage />} />
+              <Route path={ROUTE_ABOUT} element={<AboutPage />} />
+              <Route path={ROUTE_LOGIN} element={<Login />} />
+              <Route path={ROUTE_PROFILE} element={<SelfReflection />} />
+              <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
+              <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
+              <Route path={ROUTE_BRAND} element={<Brand />} />
+              <Route path={ROUTE_LEGAL} element={<LegalPage />} />
+              <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
+              <Route path={ROUTE_REDEEM} element={<RedeemPage />} />
+              <Route path={ROUTE_404} element={<Error404 />} />
+            </Routes>
+            <Footer />
+          </SocketManager>
+        </RideEventProvider>
       </Router>
 
       <ToastContainer

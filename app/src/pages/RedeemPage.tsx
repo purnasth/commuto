@@ -1,0 +1,185 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { TbArrowNarrowLeft, TbGift, TbTrophy } from 'react-icons/tb';
+
+import { redeemables } from '../constants/data';
+
+import {
+  canRedeemReward,
+  getRedeemProgress,
+  getRedeemProgressBarColor,
+} from '../utils/functions';
+import { getStoredUser } from '../utils/functions';
+import { fetchUserKarmaPoints } from '../utils/karma';
+
+const RedeemPage = () => {
+  const navigate = useNavigate();
+  const [karmaPoints, setKarmaPoints] = useState<number>(40);
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user?.id) {
+      fetchUserKarmaPoints(user.id).then((points) => {
+        setKarmaPoints(points);
+      });
+    }
+  }, []);
+
+  const redeemDisplay = redeemables.map((item) => {
+    const canRedeem = canRedeemReward(karmaPoints, item.points);
+    const progress = getRedeemProgress(karmaPoints, item.points);
+    const progressBarColor = getRedeemProgressBarColor(progress, canRedeem);
+    const badgeClass = canRedeem
+      ? 'border-green-600/50 bg-green-100 text-green-700'
+      : 'border-blue-600/50 bg-blue-100 text-blue-700';
+    return { ...item, canRedeem, progress, progressBarColor, badgeClass };
+  });
+
+  return (
+    <main className="relative overflow-x-hidden">
+      <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-amber-300 opacity-40 blur-[100px]" />
+      <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-amber-300 opacity-80 blur-[200px]" />
+      <div className="w-full">
+        <div className="container mb-12 flex size-full max-w-4xl flex-col items-center justify-center gap-4 text-center md:mb-16">
+          <span className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-100 px-4 py-1 text-xs font-semibold uppercase text-amber-700 sm:text-sm md:text-base">
+            <TbTrophy className="text-lg text-amber-700" />
+            Thank You for Your Contributions!
+          </span>
+
+          <h1 className="mt-4 text-2xl font-bold capitalize leading-snug text-amber-950 md:text-4xl md:leading-snug lg:text-5xl lg:leading-snug">
+            Redeem Your Karma Points
+          </h1>
+
+          <p className="max-w-2xl font-body text-xs text-amber-950 sm:text-sm md:text-base">
+            Exchange your hard-earned karma points for exclusive rewards! The
+            more you contribute, the more you can claim. Thank you for helping
+            others & making a difference!
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2 p-3 pt-0 md:flex-row md:justify-between md:gap-0">
+          <button
+            type="button"
+            aria-label="Back to Dashboard"
+            className="hidden rounded-full border border-amber-300 bg-amber-100 px-4 py-1 text-xs font-semibold text-amber-700 shadow hover:bg-amber-200 sm:block md:text-sm"
+            onClick={() => navigate(-1)}
+          >
+            <TbArrowNarrowLeft className="inline-block align-middle" />
+            Dashboard
+          </button>
+          <div className="relative mx-auto flex translate-y-5 flex-col items-center">
+            <div className="relative mb-0 flex h-40 w-80 items-end justify-center md:mb-2">
+              <svg
+                width="320"
+                height="160"
+                viewBox="0 0 320 160"
+                className="absolute left-0 top-0"
+              >
+                <path
+                  d="M40,148 A120,120 0 0,1 280,160"
+                  fill="none"
+                  stroke="#facc15"
+                  strokeWidth="36"
+                  strokeLinecap="round"
+                  opacity="0.3"
+                />
+                <path
+                  d="M40,160 A120,120 0 0,1 240,64"
+                  fill="none"
+                  stroke="#f59e42"
+                  strokeWidth="36"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="text-center">
+                <span className="text-5xl font-extrabold text-amber-600">
+                  {karmaPoints}
+                </span>
+                <p className="font-semibold text-amber-700">Karma Points</p>
+              </div>
+            </div>
+          </div>
+          <Link
+            to="#"
+            className="hidden rounded-full border border-amber-300 bg-amber-100 px-4 py-1 text-xs font-semibold text-amber-700 shadow hover:bg-amber-200 sm:block md:text-sm"
+          >
+            How to earn?
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 px-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
+          {redeemDisplay.map((item) => {
+            const percent = Math.round(item.progress * 100);
+            return (
+              <div
+                key={item.name}
+                className={`group relative flex flex-col items-start overflow-hidden rounded-2xl border border-amber-300/70 p-5 shadow-sm transition hover:shadow-lg md:p-7`}
+              >
+                <div className="pointer-events-none absolute left-0 -z-10 size-40 -translate-x-1/2 rounded-full bg-amber-300 opacity-30 blur-[50px]" />
+                <div className="pointer-events-none absolute right-0 top-1/2 -z-10 size-80 translate-x-1/2 rounded-full bg-amber-300 opacity-60 blur-[100px]" />
+                {/* Gamified badge */}
+                <div className="flex flex-col items-start gap-2">
+                  <span
+                    className={`inline-flex items-center justify-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${item.badgeClass}`}
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${item.canRedeem ? 'bg-green-600' : 'bg-blue-600'}`}
+                    />
+                    {item.canRedeem ? 'Unlocked' : 'Progress'}
+                  </span>
+                  <div className="mt-2 flex items-center gap-1">
+                    <TbGift className="text-amber-700" />
+                    <h2 className="text-base font-semibold text-amber-700 dark:text-amber-200">
+                      {item.name}
+                    </h2>
+                    <span className="text-xs font-medium text-amber-600">
+                      ({item.points} points)
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-1 text-left text-xs text-gray-600 dark:text-gray-300">
+                  {item.description}
+                </p>
+                {/* Playful progress bar with 0 and total points */}
+                <div className="mb-2 mt-5 w-full">
+                  <div className="mb-1 flex items-center justify-between text-xs font-medium text-amber-700">
+                    <span className="font-bold">0</span>
+                    <span className="font-bold">{item.points}</span>
+                  </div>
+                  <div className="relative h-3 w-full rounded-full border border-dark/20 bg-white">
+                    <div
+                      className={`absolute left-0 top-0 h-2.5 rounded-full bg-gradient-to-r ${item.progressBarColor} transition-all`}
+                      style={{ width: `${percent}%` }}
+                    />
+                    {/* Playful marker with current points above */}
+                    <div
+                      className="absolute -top-7 left-0"
+                      style={{ left: `calc(${percent}% - 1rem)` }}
+                    >
+                      <span className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-xs font-bold text-amber-700 shadow-sm">
+                        {Math.floor(item.progress * item.points)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {/* Actionable CTA */}
+                <div className="mt-2 flex w-full items-center justify-end gap-2">
+                  <button
+                    className={`rounded-full border border-dark/20 px-6 py-2 text-sm font-bold shadow transition ${
+                      item.canRedeem
+                        ? 'bg-amber-300 text-amber-900 hover:bg-amber-400'
+                        : 'cursor-not-allowed bg-gray-300 text-gray-800 opacity-80'
+                    }`}
+                    disabled={!item.canRedeem}
+                  >
+                    Redeem now!
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </main>
+  );
+};
+
+export default RedeemPage;

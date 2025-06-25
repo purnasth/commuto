@@ -31,6 +31,7 @@ import useScrollVisibility from '../hooks/useScrollVisibility';
 
 import { rideFormSchema } from '../schemas/formSchema';
 import { apiFetch } from '../utils/api';
+import { useRideEvent } from '../utils/useRideEvent';
 
 const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showLocationPopup, setShowLocationPopup] = useState(false);
@@ -330,6 +331,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     };
   }, [user, socket]);
 
+  const { triggerRideConfirmed } = useRideEvent();
+
   const handleConfirm = async (ride: RideFormData) => {
     try {
       await apiFetch(
@@ -339,6 +342,16 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         },
       );
       setRidesFound((prev) => prev.filter((r) => r.id !== ride.id));
+      triggerRideConfirmed({
+        id: ride.id,
+        from: ride.from,
+        to: ride.to,
+        message: ride.message,
+        role: ride.role,
+        timestamp: ride.timestamp,
+        status: 'CONFIRMED',
+        riderId: ride.riderId,
+      });
       toast.success('Congratulations! Your ride has been confirmed!');
       setShowModal(false);
     } catch {

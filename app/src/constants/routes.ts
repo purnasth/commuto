@@ -9,3 +9,4 @@ export const ROUTE_BRAND = '/brand';
 export const ROUTE_LEGAL = '/legal/:pageId';
 export const ROUTE_LOGS_DASHBOARD = '/logs-dashboard';
 export const ROUTE_404 = '*';
+export const ROUTE_REDEEM = '/redeem';
