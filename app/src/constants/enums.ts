@@ -22,8 +22,9 @@ export type UserRoleType = (typeof USER_ROLES)[number];
  */
 export enum RIDE_STATUS {
   ACTIVE = 'ACTIVE',
-  CONFIRMED = 'CONFIRMED',
-  REJECTED = 'REJECTED',
   EXPIRED = 'EXPIRED',
+  REJECTED = 'REJECTED',
+  CONFIRMED = 'CONFIRMED',
   CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
 }

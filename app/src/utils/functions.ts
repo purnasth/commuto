@@ -1,4 +1,5 @@
 import type { UserDetails } from '../interfaces/types';
+import { API_USER_KARMA_POINTS } from '../constants/api';
 
 /**
  * Truncates a location string to its first three comma-separated parts.
@@ -192,4 +193,27 @@ export function getRedeemProgressBarColor(
   if (canRedeem) return 'from-green-600 to-green-400';
   if (progress > 0) return 'from-blue-600 to-blue-400';
   return 'from-gray-600 to-gray-400';
+}
+
+/**
+ * Fetches the karma points for a specific user by their user ID.
+ *
+ * Makes an HTTP GET request to the API endpoint to retrieve the user's karma points.
+ * Returns the number of karma points if available, otherwise returns 0.
+ *
+ * @param userId - The unique identifier of the user whose karma points are to be fetched.
+ * @returns A promise that resolves to the user's karma points as a number.
+ */
+export async function fetchUserKarmaPoints(userId: number): Promise<number> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  const url = `${baseUrl}${API_USER_KARMA_POINTS.replace(':userId', String(userId))}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    return 0;
+  }
+
+  const data = await res.json();
+
+  return typeof data.karmaPoints === 'number' ? data.karmaPoints : 0;
 }

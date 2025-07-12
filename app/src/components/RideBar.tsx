@@ -125,7 +125,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     if (storeParams) setLastSearchParams({ role, fromLat, fromLng, timestamp });
     try {
       const result = await apiFetch<{ rides: RideFormData[] }>(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/match?fromLat=${fromLat}&fromLng=${fromLng}&timestamp=${encodeURIComponent(timestamp)}&role=${role}`,
+        `${import.meta.env.VITE_API_BASE_URL}/rides/match?fromLat=${fromLat}&fromLng=${fromLng}&timestamp=${encodeURIComponent(timestamp)}&role=${role}`, // TODO: Centralize API path if used in multiple places
       );
       return result.rides;
     } catch {
@@ -178,6 +178,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
     try {
       await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/rides`, {
+        // TODO: Centralize API path if used in multiple places
         method: 'POST',
         body: JSON.stringify(rideWithTimestamp),
       });
@@ -336,7 +337,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const handleConfirm = async (ride: RideFormData) => {
     try {
       await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/confirm`,
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/confirm`, // TODO: Centralize API path if used in multiple places
         {
           method: 'POST',
         },
@@ -364,7 +365,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
       await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/reject`,
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/reject`, // TODO: Centralize API path if used in multiple places
         {
           method: 'POST',
           body: JSON.stringify({ userId: user?.id }),
@@ -389,7 +390,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       const user = JSON.parse(userStr);
       // Try to get the user's latest ride that is not already CANCELLED or REJECTED
       const res = await apiFetch<{ rides: RideFormData[] }>(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${user.id}`,
+        `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${user.id}`, // TODO: Centralize API path if used in multiple places
       );
       const rides = res.rides || [];
       // Find the latest ride that is not already CANCELLED or REJECTED
@@ -408,7 +409,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       }
       // Call cancel endpoint
       await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${cancellableRide.id}/cancel`,
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${cancellableRide.id}/cancel`, // TODO: Centralize API path if used in multiple places
         {
           method: 'POST',
           body: JSON.stringify({ userId: user.id }),
