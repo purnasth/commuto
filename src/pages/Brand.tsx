@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import FontBrand from '../components/ui/FontBrand';
 import LogoBrand from '../components/ui/LogoBrand';
 import ColorBrand from '../components/ui/ColorBrand';
+import AboutBrand from '../components/ui/AboutBrand';
 
 interface BrandLink {
   id: number;
@@ -13,23 +14,28 @@ interface BrandLink {
 const brandLinks = [
   {
     id: 1,
+    title: 'Brand',
+    link: 'brand',
+  },
+  {
+    id: 2,
     title: 'Logo',
     link: 'logo',
   },
   {
-    id: 2,
+    id: 3,
     title: 'Font',
     link: 'font',
   },
   {
-    id: 3,
+    id: 4,
     title: 'Color',
     link: 'color',
   },
 ];
 
 const Brand = () => {
-  const [activeSection, setActiveSection] = useState('logo');
+  const [activeSection, setActiveSection] = useState('brand');
 
   useEffect(() => {
     const GAP = 100;
@@ -95,6 +101,7 @@ const Brand = () => {
             </ul>
           </div>
           <div className="col-span-4 mt-10 divide-y-8 xl:mt-0">
+            <AboutBrand />
             <LogoBrand />
             <FontBrand />
             <ColorBrand />

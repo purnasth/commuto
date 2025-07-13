@@ -9,7 +9,7 @@ const LogoBrand = () => {
   const [toggleIcon, setToggleIcon] = useState(true);
 
   return (
-    <section id="logo" className="space-y-10 pb-10 md:space-y-16 md:pb-20">
+    <section id="logo" className="space-y-10 py-10 md:space-y-16 md:py-20">
       <div className="space-y-5 md:space-y-10">
         <p className="text-sm">
           The logo is thoughtfully designed by{' '}

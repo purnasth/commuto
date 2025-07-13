@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ignore main branch files
+app
+server
+commuto.session.sql
