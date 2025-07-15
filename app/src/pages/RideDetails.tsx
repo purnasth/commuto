@@ -113,7 +113,7 @@ const RideDetails: React.FC = () => {
       //   return;
       // }
       await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/complete`,
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/complete`, // TODO: Centralize API path if used in multiple places
         {
           method: 'POST',
         },

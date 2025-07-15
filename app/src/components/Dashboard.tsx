@@ -117,8 +117,8 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                       </span>
                     )}
                     {ride.status === RIDE_STATUS.CONFIRMED && (
-                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-green-300 bg-green-100 px-2.5 py-1 text-xs font-normal text-green-600 hover:scale-110">
-                        <span className="size-1.5 rounded-full bg-green-600" />
+                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-100 px-2.5 py-1 text-xs font-normal text-teal-600 hover:scale-110">
+                        <span className="size-1.5 rounded-full bg-teal-600" />
                         Confirmed
                       </span>
                     )}
@@ -138,6 +138,12 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                       <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-normal text-amber-600 hover:scale-110">
                         <span className="size-1.5 rounded-full bg-amber-600" />
                         Cancelled
+                      </span>
+                    )}
+                    {ride.status === RIDE_STATUS.COMPLETED && (
+                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-green-300 bg-green-100 px-2.5 py-1 text-xs font-normal text-green-600 hover:scale-110">
+                        <span className="size-1.5 rounded-full bg-green-600" />
+                        Completed
                       </span>
                     )}
                   </td>

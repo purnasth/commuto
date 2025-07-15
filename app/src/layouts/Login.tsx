@@ -41,7 +41,7 @@ const Login = () => {
 
     try {
       const result = await apiFetch<{ message: string; user: UserDetails }>(
-        `${import.meta.env.VITE_API_BASE_URL}/auth/login`,
+        `${import.meta.env.VITE_API_BASE_URL}/auth/login`, // TODO: Centralize API path if used in multiple places
         {
           method: 'POST',
           body: JSON.stringify({

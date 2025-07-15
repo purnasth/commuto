@@ -8,6 +8,7 @@ import {
   Delete,
   Inject,
   Controller,
+  ParseIntPipe,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -40,6 +41,31 @@ export class RideController {
     private readonly logger: WinstonLogger,
     private readonly rideGateway: RideGateway,
   ) {}
+
+  @Get('/user/:id/karma-points')
+  /**
+   * Retrieves the karma points for a user by their ID.
+   *
+   * @param id - The ID of the user as a string.
+   * @returns An object containing the user's karma points.
+   * @throws {BadRequestException} If the provided ID is missing or invalid.
+   * @throws {NotFoundException} If the user with the given ID does not exist.
+   *
+   * TODO (refactor priority):
+   *   - Annotate return type with DTO (GetKarmaPointsResponseDto)
+   *   - Add @Throttle() decorator for rate limiting
+   *   - Consider access control/auth guard for this endpoint
+   */
+  async getUserKarmaPoints(@Param('id', ParseIntPipe) userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { karmaPoints: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return { karmaPoints: user.karmaPoints };
+  }
 
   /**
    * Calculates the great-circle distance between two points on Earth using the Haversine formula.
@@ -260,6 +286,11 @@ export class RideController {
   }
 
   // Get all ride history for a user (as rider or passenger)
+  // TODO: Infinite scroll backend checklist:
+  //   1. Add pagination support to /rides/history endpoint (accept page, limit params)
+  //   2. Return total count or hasMore flag in response
+  //   3. Optimize query for large datasets (indexes, limits)
+  //   4. Document API changes for frontend
   @Get('history')
   async getRideHistory(@Query('userId') userId: string) {
     const now = getNow();

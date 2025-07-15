@@ -1,49 +1,62 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { apiFetch } from '../utils/api';
-import { getStoredUser } from '../utils/functions';
-import { fetchUserKarmaPoints } from '../utils/karma';
-
-import Dashboard from '../components/Dashboard';
-import ReflectionDashboard from '../components/ReflectionDashboard';
 import { RIDE_STATUS } from '../constants/enums';
 import { ROUTE_LOGIN } from '../constants/routes';
+import { API_RIDES_HISTORY } from '../constants/api';
 
 import { RideHistory, ReflectionStats } from '../interfaces/types';
 
+import { apiFetch } from '../utils/api';
+import { getStoredUser } from '../utils/functions';
+import { useKarmaPoints } from '../hooks/useKarmaPoints';
+
+import Dashboard from '../components/Dashboard';
+import ReflectionDashboard from '../components/ReflectionDashboard';
+
+// TODO: Implement infinite scroll for ride history (pagination, fetch more on scroll)
+// TODO: Backend checklist for infinite scroll:
+//   1. Add pagination support to /rides/history endpoint (accept page, limit params)
+//   2. Return total count or hasMore flag in response
+//   3. Optimize query for large datasets (indexes, limits)
+//   4. Document API changes for frontend
 const SelfReflection = () => {
   const [rides, setRides] = useState<RideHistory[]>([]);
   const [userId, setUserId] = useState<number | null>(null);
-  const [karmaPoints, setKarmaPoints] = useState<number>(0);
+
+  const { karmaPoints } = useKarmaPoints();
   const navigate = useNavigate();
 
-  console.log('rides dashboard', rides);
-
+  // TODO: Refactor ride history fetching to support pagination and infinite scroll
   useEffect(() => {
+    let cancelled = false;
     const storedUser = getStoredUser();
     if (!storedUser) {
       navigate(ROUTE_LOGIN);
       return;
     }
     setUserId(storedUser.id ?? null);
-    apiFetch<{ rides: RideHistory[] }>(
-      `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${storedUser.id}`,
-    ).then((res) => {
-      setRides(res.rides);
 
-      // set karma points
-      if (res.rides.length === 0) {
-        setKarmaPoints(0);
-      } else {
-        const totalKarma = res.rides.reduce(
-          (sum, ride) => sum + (ride.rider.karmaPoints ?? 0),
-          0,
-        );
-        setKarmaPoints(totalKarma);
+    const fetchWithRetry = async (retries = 3) => {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL;
+      const url = `${baseUrl}${API_RIDES_HISTORY}?userId=${storedUser.id}`;
+
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          const res = await apiFetch<{ rides: RideHistory[] }>(url);
+          if (!cancelled) setRides(res.rides);
+          break;
+        } catch {
+          if (attempt === retries - 1 && !cancelled) setRides([]);
+        }
       }
-    });
-    fetchUserKarmaPoints(storedUser.id).then(setKarmaPoints);
+    };
+
+    fetchWithRetry();
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   // Calculate stats
@@ -56,7 +69,7 @@ const SelfReflection = () => {
   const stats: ReflectionStats = {
     postedCount: postedRides.length,
     confirmedCount: confirmedRides.length,
-    karmaPoints: karmaPoints,
+    karmaPoints: karmaPoints ?? 0,
     distanceTravelled: confirmedRides.reduce(
       (sum, ride) => sum + (ride.distance ?? 0),
       0,
@@ -78,6 +91,7 @@ const SelfReflection = () => {
         <div className="absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
 
         <ReflectionDashboard stats={stats} />
+        {/* TODO: Update Dashboard to support incremental loading (infinite scroll) */}
         <Dashboard rides={rides} />
       </main>
     </>

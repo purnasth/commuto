@@ -99,6 +99,7 @@ export interface RideHistory {
     id: number;
     fullname: string;
     email: string;
+    karmaPoints?: number;
   };
   passengers: { id: number; fullname: string; email: string }[];
   distance?: number;
