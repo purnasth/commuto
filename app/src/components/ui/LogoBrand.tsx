@@ -27,12 +27,12 @@ const LogoBrand = () => {
           essential to ensure strong and cohesive brand recognition.
         </p>
         <div
-          className={`relative flex h-56 w-full items-center justify-center rounded-tr-[2rem] md:h-64 lg:h-96 ${toggleLogo ? 'bg-light' : 'bg-dark'} transition-all duration-100`}
+          className={`relative flex h-56 w-full items-center justify-center md:h-64 lg:h-96 ${toggleLogo ? 'bg-light' : 'bg-dark'} rounded-b-[2rem] transition-all duration-100`}
         >
           <button
             type="button"
             aria-label="Toggle Logo"
-            className={`absolute right-3.5 top-3.5 size-10 rounded-full bg-dark ${!toggleLogo ? 'bg-light' : 'bg-dark'}`}
+            className={`absolute bottom-3.5 right-3.5 size-11 rounded-full bg-dark ${!toggleLogo ? 'bg-light' : 'bg-dark'}`}
             onClick={() => setToggleLogo((prev) => !prev)}
             aria-pressed={toggleLogo}
           ></button>
@@ -51,12 +51,12 @@ const LogoBrand = () => {
           maintaining brand consistency.
         </p>
         <div
-          className={`relative flex h-56 w-full items-center justify-center rounded-tr-[2rem] bg-[radial-gradient(circle,_#2dd4bf_10%,_transparent_10%),_radial-gradient(circle,_#ffffff00_0%,_transparent_10%)] bg-[length:15px_15px] bg-[position:0_0,10px_10px] px-0 py-0 md:md:h-64 lg:h-96 ${toggleIcon ? 'bg-light' : 'bg-teal-900'} transition-all duration-100`}
+          className={`relative flex h-56 w-full items-center justify-center rounded-b-[2rem] bg-[radial-gradient(circle,_#2dd4bf_10%,_transparent_10%),_radial-gradient(circle,_#ffffff00_0%,_transparent_10%)] bg-[length:15px_15px] bg-[position:0_0,10px_10px] px-0 py-0 md:h-64 lg:h-96 ${toggleIcon ? 'bg-light' : 'bg-teal-900'} transition-all duration-100`}
         >
           <button
             type="button"
             aria-label="Toggle Icon"
-            className={`absolute right-3.5 top-3.5 size-10 rounded-full bg-dark ${!toggleIcon ? 'bg-light' : 'bg-dark'}`}
+            className={`absolute bottom-3.5 right-3.5 size-11 rounded-full bg-dark ${!toggleIcon ? 'bg-light' : 'bg-dark'}`}
             onClick={() => setToggleIcon((prev) => !prev)}
             aria-pressed={toggleIcon}
           ></button>

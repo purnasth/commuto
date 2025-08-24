@@ -28,3 +28,5 @@ export enum RIDE_STATUS {
   CANCELLED = 'CANCELLED',
   COMPLETED = 'COMPLETED',
 }
+
+export const KARMA = 'karma';

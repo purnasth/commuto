@@ -1,11 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Confetti from 'react-confetti';
+import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { TbArrowNarrowLeft, TbGift, TbTrophy } from 'react-icons/tb';
 
 import { redeemables } from '../constants/data';
+import GiftCardVoucher from '../components/ui/GiftCardVoucher';
+import type { RedeemableReward, UserDetails } from '../interfaces/types';
 
 import {
+  getStoredUser,
   canRedeemReward,
   getRedeemProgress,
   getRedeemProgressBarColor,
@@ -21,6 +25,33 @@ import { useKarmaPoints } from '../hooks/useKarmaPoints';
 const RedeemPage = () => {
   const navigate = useNavigate();
   const { karmaPoints } = useKarmaPoints();
+
+  // State for voucher popup
+  const [selectedReward, setSelectedReward] = useState<RedeemableReward | null>(
+    null,
+  );
+  const [showVoucher, setShowVoucher] = useState(false);
+  const [user, setUser] = useState<UserDetails | null>(null);
+
+  // const karmaPoints = 200;
+
+  // Get real user data from localStorage
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
+    }
+  }, []);
+
+  const handleRedeemClick = (reward: RedeemableReward) => {
+    setSelectedReward(reward);
+    setShowVoucher(true);
+  };
+
+  const handleCloseVoucher = () => {
+    setShowVoucher(false);
+    setSelectedReward(null);
+  };
 
   const redeemDisplay = useMemo(() => {
     return redeemables.map((item) => {
@@ -78,7 +109,7 @@ const RedeemPage = () => {
               Dashboard
             </button>
             <div className="relative mx-auto flex translate-y-3 flex-col items-center md:translate-y-5">
-              <div className="relative mb-0 flex h-40 w-80 items-end justify-center md:mb-2 md:h-48 md:w-96">
+              <div className="relative mb-0 flex h-40 w-80 items-end justify-center drop-shadow-xl md:mb-2 md:h-48 md:w-96">
                 <svg viewBox="0 0 320 160" className="absolute left-0 top-0">
                   <path
                     d="M40,148 A120,120 0 0,1 280,160"
@@ -172,14 +203,55 @@ const RedeemPage = () => {
                   </div>
 
                   <div className="mt-2 flex w-full items-start justify-between gap-2">
-                    <span
+                    {/* <span
                       className={`inline-flex -translate-y-2 items-center justify-center gap-1 rounded-full border px-1.5 py-px text-xxs font-medium ${item.badgeClass}`}
                     >
                       <span
                         className={`size-1 rounded-full ${item.canRedeem ? 'bg-green-600' : 'bg-blue-600'}`}
                       />
                       {item.canRedeem ? 'Unlocked' : 'Progress'}
-                    </span>
+                    </span> */}
+                    {item.canRedeem ? (
+                      <motion.div
+                        className="flex items-center rounded-full border-[0.5px] border-green-600/50 bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                        animate={{
+                          boxShadow: [
+                            '0 0 0px rgba(34, 197, 94, 0)',
+                            '0 0 10px rgba(34, 197, 94, 0.5)',
+                            '0 0 0px rgba(34, 197, 94, 0)',
+                          ],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                        }}
+                      >
+                        <motion.div
+                          className="mr-1.5 h-1.5 w-1.5 rounded-full bg-green-500"
+                          animate={{
+                            scale: [1, 1.5, 1],
+                          }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                          }}
+                        />
+                        Unlocked!
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        className="rounded-full bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                        animate={{
+                          opacity: [0.7, 1, 0.7],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                        }}
+                      >
+                        In Progress
+                      </motion.div>
+                    )}
                     <button
                       className={`absolute -bottom-px -right-px overflow-hidden rounded-2xl rounded-bl-none rounded-tr-none border border-amber-300/70 px-6 py-3 text-sm font-bold transition dark:border-amber-300/20 ${
                         item.canRedeem
@@ -188,7 +260,7 @@ const RedeemPage = () => {
                       }`}
                       disabled={!item.canRedeem}
                       aria-disabled={!item.canRedeem}
-                      // TODO: Implement redeem functionality
+                      onClick={() => item.canRedeem && handleRedeemClick(item)}
                     >
                       Redeem now!
                     </button>
@@ -199,6 +271,19 @@ const RedeemPage = () => {
           </div>
         </div>
       </main>
+
+      {showVoucher && selectedReward && user && (
+        <GiftCardVoucher
+          reward={selectedReward}
+          userKarmaPoints={karmaPoints}
+          onClose={handleCloseVoucher}
+          userInfo={{
+            name: user.fullname,
+            email: user.email,
+            id: user.id?.toString() || '',
+          }}
+        />
+      )}
     </>
   );
 };

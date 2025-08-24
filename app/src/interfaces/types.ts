@@ -67,11 +67,11 @@ export interface LoginFormData {
 }
 
 export interface UserDetails {
-  id?: number;
+  id: number;
   user_id?: number;
-  fullname?: string;
-  email?: string;
-  role?: USER_ROLE;
+  fullname: string;
+  email: string;
+  role: USER_ROLE;
   phone?: string;
   address?: string;
   profilePicture?: string;
