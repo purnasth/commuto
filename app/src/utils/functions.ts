@@ -1,4 +1,6 @@
 import type { UserDetails } from '../interfaces/types';
+
+import { KARMA } from '../constants/enums';
 import { API_USER_KARMA_POINTS } from '../constants/api';
 
 /**
@@ -217,3 +219,51 @@ export async function fetchUserKarmaPoints(userId: number): Promise<number> {
 
   return typeof data.karmaPoints === 'number' ? data.karmaPoints : 0;
 }
+
+/**
+ * Formats a date in voucher style: "Aug 24, 2025"
+ * @param date - The date to format (Date object, string, or number)
+ * @returns The formatted date string
+ */
+export const formatVoucherDate = (date: string | number | Date): string => {
+  const dateObj = new Date(date);
+  return dateObj.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+/**
+ * Gets the current date as a Date object
+ * @returns The current date
+ */
+export const getCurrentDate = (): Date => {
+  return new Date();
+};
+
+/**
+ * Generates a unique voucher ID
+ * @param rewardName - The name of the reward
+ * @returns A unique voucher ID
+ */
+export const generateVoucherId = (rewardName: string): string => {
+  const timestamp = Date.now();
+  const abbreviation = rewardName
+    .split(' ')
+    .map((word) => word.charAt(0).toLowerCase())
+    .join('');
+  return `${KARMA}-${timestamp}-${abbreviation}`;
+};
+
+/**
+ * Generates an abbreviation from a reward name
+ * @param rewardName - The name of the reward (e.g., "Coffee Shop Coupon")
+ * @returns The abbreviation (e.g., "CSC")
+ */
+export const generateRewardAbbreviation = (rewardName: string): string => {
+  return rewardName
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+};
