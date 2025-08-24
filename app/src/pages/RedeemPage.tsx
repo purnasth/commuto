@@ -24,7 +24,7 @@ import { useKarmaPoints } from '../hooks/useKarmaPoints';
 
 const RedeemPage = () => {
   const navigate = useNavigate();
-  // const { karmaPoints } = useKarmaPoints();
+  const { karmaPoints } = useKarmaPoints();
 
   // State for voucher popup
   const [selectedReward, setSelectedReward] = useState<RedeemableReward | null>(
@@ -33,7 +33,7 @@ const RedeemPage = () => {
   const [showVoucher, setShowVoucher] = useState(false);
   const [user, setUser] = useState<UserDetails | null>(null);
 
-  const karmaPoints = 200;
+  // const karmaPoints = 200;
 
   // Get real user data from localStorage
   useEffect(() => {
@@ -109,7 +109,6 @@ const RedeemPage = () => {
               Dashboard
             </button>
             <div className="relative mx-auto flex translate-y-3 flex-col items-center md:translate-y-5">
-              {/* //TODO: Add a glow dropshadow */}
               <div className="relative mb-0 flex h-40 w-80 items-end justify-center drop-shadow-xl md:mb-2 md:h-48 md:w-96">
                 <svg viewBox="0 0 320 160" className="absolute left-0 top-0">
                   <path
@@ -273,7 +272,6 @@ const RedeemPage = () => {
         </div>
       </main>
 
-      {/* Gift Card Voucher Modal */}
       {showVoucher && selectedReward && user && (
         <GiftCardVoucher
           reward={selectedReward}
