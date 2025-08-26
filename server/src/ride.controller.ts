@@ -18,6 +18,11 @@ import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 import { getNow } from './utils/date.util';
 import { USER_ROLE, RIDE_STATUS } from './constants/enums';
 import { RideGateway } from './rides/rides.gateway';
+import {
+  haversineDistance,
+  MAX_RIDE_PROXIMITY_KM,
+  estimateCO2FromDistance,
+} from './utils/rideStats.util';
 
 interface RideDto {
   from: string;
@@ -65,42 +70,6 @@ export class RideController {
       throw new NotFoundException('User not found');
     }
     return { karmaPoints: user.karmaPoints };
-  }
-
-  /**
-   * Calculates the great-circle distance between two points on Earth using the Haversine formula.
-   * @param lat1 Latitude of the first point
-   * @param lon1 Longitude of the first point
-   * @param lat2 Latitude of the second point
-   * @param lon2 Longitude of the second point
-   * @returns Distance in kilometers between the two points
-   *
-   * Algorithm:
-   *   R = 6371 // Earth radius in km
-   *   dLat = toRadians(lat2 - lat1)
-   *   dLon = toRadians(lon2 - lon1)
-   *   a = sin²(dLat/2) + cos(toRadians(lat1)) * cos(toRadians(lat2)) * sin²(dLon/2)
-   *   c = 2 * atan2(sqrt(a), sqrt(1-a))
-   *   return R * c
-   */
-  private haversineDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number,
-  ): number {
-    const toRad = (value: number) => (value * Math.PI) / 180;
-    const R = 6371; // Radius of Earth in kilometers
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
   }
 
   /**
@@ -158,18 +127,17 @@ export class RideController {
       include: { rider: true, passengers: true },
     });
 
-    // Filter by proximity (within 2km)
     const matchedRides = rides.filter((ride) => {
       if (!Number.isFinite(ride.fromLat) || !Number.isFinite(ride.fromLng)) {
         return false;
       }
-      const dist = this.haversineDistance(
+      const dist = haversineDistance(
         fromLatNum,
         fromLngNum,
         ride.fromLat as number,
         ride.fromLng as number,
       );
-      return dist <= 2;
+      return dist <= MAX_RIDE_PROXIMITY_KM;
     });
 
     return { rides: matchedRides };
@@ -548,7 +516,7 @@ export class RideController {
       typeof ride.toLat === 'number' &&
       typeof ride.toLng === 'number'
     ) {
-      distance = this.haversineDistance(
+      distance = haversineDistance(
         ride.fromLat,
         ride.fromLng,
         ride.toLat,
@@ -556,7 +524,8 @@ export class RideController {
       );
     }
 
-    const co2Saved = distance ? distance * 0.17 : null;
+    const co2Saved =
+      typeof distance === 'number' ? estimateCO2FromDistance(distance) : null;
     const peopleImpacted = ride.passengers.length;
 
     const updatedRide = await this.prisma.ride.update({
