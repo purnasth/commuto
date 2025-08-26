@@ -25,8 +25,8 @@ export const MAX_RIDE_PROXIMITY_KM = 2;
  * DEFRA 2024 average car emission factor (kg CO2 per km)
  */
 export enum EmissionFactor {
-  CAR = 0.17144,
   BIKE = 0.016,
+  CAR = 0.17144,
 }
 
 /**
@@ -61,13 +61,12 @@ export function haversineDistance(
  * Estimates CO₂ emissions for a given distance and vehicle type using DEFRA 2024 factors.
  *
  * @param distanceKm - Distance in kilometers
- * @param vehicle - Vehicle type (EmissionFactor, defaults to CAR)
+ * @param vehicle - Vehicle type (EmissionFactor)
  * @returns Estimated CO₂ emissions in kilograms
  */
 export function estimateCO2FromDistance(
   distanceKm: number,
-  //   vehicle: EmissionFactor = EmissionFactor.CAR,
-  vehicle: EmissionFactor = EmissionFactor.BIKE,
+  vehicle: EmissionFactor = EmissionFactor.BIKE, // Default to bike
 ): number {
   return distanceKm * vehicle;
 }

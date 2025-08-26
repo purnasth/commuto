@@ -8,6 +8,7 @@ import { RideController } from './ride.controller';
 import { WinstonModule } from 'nest-winston';
 import { winstonLoggerConfig } from './logger.config';
 import { RideGateway } from './rides/rides.gateway';
+import { EnvService } from './env.service';
 
 @Module({
   imports: [
@@ -15,6 +16,6 @@ import { RideGateway } from './rides/rides.gateway';
     WinstonModule.forRoot(winstonLoggerConfig),
   ],
   controllers: [AppController, AuthController, RideController],
-  providers: [AppService, PrismaService, RideGateway],
+  providers: [AppService, PrismaService, RideGateway, EnvService],
 })
 export class AppModule {}
