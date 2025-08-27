@@ -204,6 +204,10 @@ export class RideController {
         'You already have an active ride and cannot post another at this time.',
       );
     }
+
+    // Create ride with proper role-based assignment
+    // Note: Due to schema constraints, riderId is required, so we'll use it for the creator
+    // and add passengers separately for passenger role
     const ride = await this.prisma.ride.create({
       data: {
         from: body.from,
@@ -349,6 +353,10 @@ export class RideController {
       where: {
         from: ride.from,
         to: ride.to,
+        // timestamp: {
+        //   gte: new Date(new Date(ride.timestamp).getTime() - 30 * 60 * 1000), // 30 minutes BEFORE
+        //   lte: new Date(new Date(ride.timestamp).getTime() + 30 * 60 * 1000), // 30 minutes AFTER
+        // },
         timestamp: {
           gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
           lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),

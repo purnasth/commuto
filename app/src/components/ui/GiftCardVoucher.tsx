@@ -1,7 +1,7 @@
 import QRCode from 'react-qr-code';
 import React, { useRef } from 'react';
 import Confetti from 'react-confetti';
-import { motion } from 'framer-motion';
+import { toast } from 'react-toastify';
 import { TbDownload } from 'react-icons/tb';
 import { RedeemableReward } from '../../interfaces/types';
 import {
@@ -53,7 +53,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
   const handleDownload = async () => {
     const element = voucherRef.current;
     if (!element) {
-      alert('Voucher not ready for download. Please try again.');
+      toast.error('Voucher not ready for download. Please try again.');
       return;
     }
 
@@ -68,7 +68,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      toast.error('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -82,12 +82,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
           initialVelocityY={20}
           tweenDuration={5000}
         />
-        <motion.div
-          className="relative bg-white shadow-lg text-dark"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-        >
+        <div className="relative inline-block h-full bg-white text-dark shadow-lg">
           <div className="mb-6 flex justify-between gap-2 border-b p-6 pb-4 shadow-sm">
             <h2 className="inline-flex items-center gap-2.5">
               <img
@@ -215,7 +210,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
             <div className="absolute bottom-3 left-3 h-8 w-8 rounded-bl-xl border-b-2 border-l-2 border-amber-500"></div>
             <div className="absolute bottom-3 right-3 h-8 w-8 rounded-br-xl border-b-2 border-r-2 border-amber-500"></div>
           </div>
-        </motion.div>
+        </div>
       </Modal>
     </>
   );

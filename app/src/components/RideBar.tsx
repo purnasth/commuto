@@ -15,10 +15,10 @@ import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
 
 import { RideFormData, RideBarProps } from '../interfaces/types';
 
-import Modal from './ui/Modal';
 import AgreeInfo from './ui/AgreeInfo';
 import NoRideFound from './ui/NoRideFound';
 import SearchingRide from './ui/SearchingRide';
+import FullScreenModal from './ui/FullScreenModal';
 import CurrentRideStatus from './ui/CurrentRideStatus';
 
 import MessagePopup from './MessagePopup';
@@ -488,9 +488,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   }, [lastSearchParams]);
   if (isLoading) {
     return (
-      <Modal onClose={() => setIsLoading(false)}>
+      <FullScreenModal onClose={() => setIsLoading(false)}>
         <SearchingRide />
-      </Modal>
+      </FullScreenModal>
     );
   }
 
@@ -610,7 +610,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       )}
 
       {showModal && (
-        <Modal onClose={handleCloseModal} aria-labelledby="modal-title">
+        <FullScreenModal
+          onClose={handleCloseModal}
+          aria-labelledby="modal-title"
+        >
           {ridesFound.length > 0 ? (
             <RideResultsList
               ridesFound={ridesFound}
@@ -623,12 +626,12 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
               <NoRideFound />
             </>
           )}
-        </Modal>
+        </FullScreenModal>
       )}
 
       {/* Ride Status Modal */}
       {showRideStatusModal && lastSearchParams && (
-        <Modal
+        <FullScreenModal
           onClose={() => setShowRideStatusModal(false)}
           aria-labelledby="ride-status-modal-title"
         >
@@ -643,7 +646,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
               />
             );
           })()}
-        </Modal>
+        </FullScreenModal>
       )}
 
       {/* Show Available Rides button if there are rides and modal is closed */}

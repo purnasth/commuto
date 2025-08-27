@@ -1,5 +1,8 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { TbX } from 'react-icons/tb';
+import { motion } from 'framer-motion';
+
 import useDisableScroll from '../../hooks/useDisableScroll';
 
 interface ModalProps {
@@ -15,15 +18,29 @@ const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
     onClose();
   };
 
-  return (
+  return ReactDOM.createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
+      <motion.div
         className="absolute inset-0 -z-10 size-full bg-black/50 backdrop-blur-sm"
         aria-hidden="true"
         onClick={handleOverlayClick}
-      ></div>
-      {/* <div className="relative rounded-3xl bg-white p-6 shadow-lg"> */}
-      {children}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          duration: 0.5,
+        }}
+      ></motion.div>
+      <motion.div
+        initial={{ scale: 0.7, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.7, opacity: 0 }}
+        transition={{
+          duration: 0.3,
+        }}
+      >
+        {children}
+      </motion.div>
       <button
         type="button"
         onClick={onClose}
@@ -31,8 +48,8 @@ const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
       >
         <TbX className="text-xl" />
       </button>
-      {/* </div> */}
-    </div>
+    </div>,
+    document.body,
   );
 };
 
