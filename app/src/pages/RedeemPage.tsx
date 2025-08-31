@@ -5,7 +5,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { TbArrowNarrowLeft, TbGift, TbTrophy } from 'react-icons/tb';
 
 import { redeemables } from '../constants/data';
+
 import GiftCardVoucher from '../components/ui/GiftCardVoucher';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+
 import type { RedeemableReward, UserDetails } from '../interfaces/types';
 
 import {
@@ -32,6 +35,7 @@ const RedeemPage = () => {
   );
   const [showVoucher, setShowVoucher] = useState(false);
   const [user, setUser] = useState<UserDetails | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // const karmaPoints = 200;
 
@@ -45,7 +49,17 @@ const RedeemPage = () => {
 
   const handleRedeemClick = (reward: RedeemableReward) => {
     setSelectedReward(reward);
+    setShowConfirm(true);
+  };
+
+  const handleConfirmRedeem = () => {
+    setShowConfirm(false);
     setShowVoucher(true);
+  };
+
+  const handleCancelRedeem = () => {
+    setShowConfirm(false);
+    setSelectedReward(null);
   };
 
   const handleCloseVoucher = () => {
@@ -271,6 +285,28 @@ const RedeemPage = () => {
           </div>
         </div>
       </main>
+
+      <ConfirmDialog
+        open={showConfirm && !!selectedReward}
+        title={`Confirm Redemption?`}
+        description={
+          selectedReward && (
+            <p>
+              Redeeming this{' '}
+              <strong className="font-medium">{selectedReward.name}</strong>{' '}
+              will deduct{' '}
+              <strong className="font-medium">
+                {selectedReward.points} karma points
+              </strong>{' '}
+              from your account. Are you sure you want to proceed?
+            </p>
+          )
+        }
+        confirmText="Yes, Redeem"
+        cancelText="Cancel"
+        onConfirm={handleConfirmRedeem}
+        onCancel={handleCancelRedeem}
+      />
 
       {showVoucher && selectedReward && user && (
         <GiftCardVoucher

@@ -1,7 +1,7 @@
 import QRCode from 'react-qr-code';
 import React, { useRef } from 'react';
 import Confetti from 'react-confetti';
-import { motion } from 'framer-motion';
+import { toast } from 'react-toastify';
 import { TbDownload } from 'react-icons/tb';
 import { RedeemableReward } from '../../interfaces/types';
 import {
@@ -53,7 +53,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
   const handleDownload = async () => {
     const element = voucherRef.current;
     if (!element) {
-      alert('Voucher not ready for download. Please try again.');
+      toast.error('Voucher not ready for download. Please try again.');
       return;
     }
 
@@ -68,7 +68,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      toast.error('Failed to generate PDF. Please try again.');
     }
   };
 
@@ -82,14 +82,9 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
           initialVelocityY={20}
           tweenDuration={5000}
         />
-        <motion.div
-          className="relative bg-white shadow-lg"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-        >
+        <div className="relative inline-block h-full bg-white text-dark shadow-lg">
           <div className="mb-6 flex justify-between gap-2 border-b p-6 pb-4 shadow-sm">
-            <h2 className="inline-flex items-center gap-2.5 text-lg font-semibold text-teal-950 dark:text-teal-300 sm:text-3xl">
+            <h2 className="inline-flex items-center gap-2.5">
               <img
                 src={logo}
                 alt="Logo"
@@ -105,10 +100,10 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
               {isGenerating ? 'Generating...' : 'Download'}
             </button>
 
-            <p className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-300 px-2.5 text-sm font-semibold uppercase text-amber-900 dark:text-amber-800">
+            <p className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-300 px-2.5 text-sm font-semibold uppercase">
               Redeemed
             </p>
-            <p className="absolute left-1/2 top-24 z-50 -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-100 px-2.5 text-xxs text-amber-900 dark:text-amber-800">
+            <p className="absolute left-1/2 top-24 z-50 -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-100 px-2.5 text-xxs">
               Keep up the great work and collect more achievements!
             </p>
           </div>
@@ -119,37 +114,35 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
           >
             <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-amber-300 opacity-40 blur-[100px] dark:opacity-60" />
             <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-amber-300 opacity-80 blur-[200px] dark:opacity-80" />
-            <div className="pointer-events-none absolute -left-4 -top-4 h-24 w-24 rounded-full bg-amber-300/30 blur-xl" />
-            <div className="pointer-events-none absolute -bottom-4 -right-4 h-32 w-32 rounded-full bg-orange-300/30 blur-xl" />
+            <div className="pointer-events-none absolute -left-4 -top-4 z-0 h-24 w-24 rounded-full bg-amber-300/30 blur-xl" />
+            <div className="pointer-events-none absolute -bottom-4 -right-4 z-0 h-32 w-32 rounded-full bg-orange-300/30 blur-xl" />
 
-            <motion.div
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-center"
-            >
+            <div className="text-center">
               {/* <h2 className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-100 px-4 py-1 text-xs font-semibold uppercase text-amber-700 sm:text-sm md:text-base">
                 Karma Rewards
               </h2> */}
-              <h3 className="reward-points text-2xl font-bold text-amber-900">
+              <h3 className="reward-points text-2xl font-bold">
                 {reward.name}
               </h3>
               {/* <p className="text-xs leading-relaxed text-amber-800">
                 {reward.description}
               </p> */}
-            </motion.div>
+            </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-4">
+            <div className="z-10 mt-6 grid grid-cols-3 gap-4">
               <div className="col-span-2">
-                <motion.div
-                  initial={{ x: -30, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <span className="absolute left-8 top-8 text-sm font-semibold uppercase text-amber-900 underline dark:text-amber-800">
+                <div>
+                  <span className="absolute right-8 top-8 text-sm font-semibold uppercase underline">
                     {reward.points} karma points
                   </span>
-                  <ul className="space-y-4">
+                  <div className="absolute left-8 top-8">
+                    <img
+                      src={logo}
+                      alt="Logo"
+                      className="h-3 object-contain sm:h-6"
+                    />
+                  </div>
+                  <ul className="mt-2 space-y-4">
                     <li className="flex flex-col">
                       <label htmlFor="issued-to" className="text-sm opacity-70">
                         Issued to:
@@ -185,15 +178,10 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
                       </p>
                     </li>
                   </ul>
-                </motion.div>
+                </div>
               </div>
 
-              <motion.div
-                initial={{ x: 30, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.6 }}
-                className="col-span-1 flex flex-col items-center"
-              >
+              <div className="col-span-1 flex flex-col items-center">
                 <div className="rounded-lg bg-white p-3 shadow">
                   <QRCode
                     value={qrData}
@@ -205,29 +193,24 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
                 <span className="text-center text-xxs">
                   Scan to verify your reward
                 </span>
-              </motion.div>
+              </div>
             </div>
 
             <hr className="my-6 border-amber-300/80" />
 
-            <motion.p
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              className="mt-6 text-xs"
-            >
+            <p className="mt-6 text-xs">
               <strong>Note:</strong> This voucher is valid for one-time use
               only. It must be redeemed according to the terms and conditions
               provided at the time of redemption. Please present this voucher at
               the time of use.
-            </motion.p>
+            </p>
 
             <div className="absolute left-3 top-3 h-8 w-8 rounded-tl-xl border-l-2 border-t-2 border-amber-500"></div>
             <div className="absolute right-3 top-3 h-8 w-8 rounded-tr-xl border-r-2 border-t-2 border-amber-500"></div>
             <div className="absolute bottom-3 left-3 h-8 w-8 rounded-bl-xl border-b-2 border-l-2 border-amber-500"></div>
             <div className="absolute bottom-3 right-3 h-8 w-8 rounded-br-xl border-b-2 border-r-2 border-amber-500"></div>
           </div>
-        </motion.div>
+        </div>
       </Modal>
     </>
   );

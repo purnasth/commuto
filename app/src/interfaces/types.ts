@@ -100,8 +100,14 @@ export interface RideHistory {
     fullname: string;
     email: string;
     karmaPoints?: number;
+    profilePicture?: string;
   };
-  passengers: { id: number; fullname: string; email: string }[];
+  passengers: {
+    id: number;
+    fullname: string;
+    email: string;
+    profilePicture?: string;
+  };
   distance?: number;
   co2Saved?: number;
   peopleImpacted?: number;

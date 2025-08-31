@@ -13,10 +13,11 @@ import {
 import axios from 'axios';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from './prisma.service';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
+import { EnvService } from './env.service';
 import { USER_ROLE } from './constants/enums';
+import { PrismaService } from './prisma.service';
 
 interface LoginDto {
   email: string;
@@ -39,6 +40,7 @@ export class AuthController {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private envService: EnvService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: WinstonLogger,
   ) {}
@@ -51,53 +53,56 @@ export class AuthController {
       tag: 'auth',
       email: body.email,
     });
-    // Verify reCAPTCHA v2
-    const recaptchaSecret = this.configService.get<string>(
-      'RECAPTCHA_SECRET_KEY',
-    );
-    if (!body.recaptchaToken) {
-      this.logger.log({
-        level: 'warn',
-        message: `Login failed for email: ${body.email} - Missing reCAPTCHA token`,
-        tag: 'auth',
-        email: body.email,
-      });
-      throw new BadRequestException('Missing reCAPTCHA token');
-    }
-    const verifyUrl = `https://www.google.com/recaptcha/api/siteverify`;
-    let response: any;
-    try {
-      response = await axios.post(
-        verifyUrl,
-        new URLSearchParams({
-          secret: recaptchaSecret || '',
-          response: body.recaptchaToken,
-        }),
+
+    // Skip reCAPTCHA in development environment
+    if (!this.envService.isDev) {
+      const recaptchaSecret = this.configService.get<string>(
+        'RECAPTCHA_SECRET_KEY',
       );
-    } catch {
-      this.logger.log({
-        level: 'error',
-        message: `Login failed for email: ${body.email} - reCAPTCHA verification request failed`,
-        tag: 'error',
-        email: body.email,
-      });
-      throw new UnauthorizedException('Failed to verify reCAPTCHA');
-    }
-    // Safely extract response.data
-    let data: Record<string, any> | undefined = undefined;
-    if (response && typeof response === 'object' && 'data' in response) {
-      data = (response as { data: Record<string, any> }).data;
-    }
-    if (!data || !data.success) {
-      this.logger.log({
-        level: 'error',
-        message: `Login failed for email: ${body.email} - reCAPTCHA verification failed: ${JSON.stringify(
-          data,
-        )}`,
-        tag: 'error',
-        email: body.email,
-      });
-      throw new UnauthorizedException('reCAPTCHA verification failed');
+      if (!body.recaptchaToken) {
+        this.logger.log({
+          level: 'warn',
+          message: `Login failed for email: ${body.email} - Missing reCAPTCHA token`,
+          tag: 'auth',
+          email: body.email,
+        });
+        throw new BadRequestException('Missing reCAPTCHA token');
+      }
+      const verifyUrl = `https://www.google.com/recaptcha/api/siteverify`;
+      let response: any;
+      try {
+        response = await axios.post(
+          verifyUrl,
+          new URLSearchParams({
+            secret: recaptchaSecret || '',
+            response: body.recaptchaToken,
+          }),
+        );
+      } catch {
+        this.logger.log({
+          level: 'error',
+          message: `Login failed for email: ${body.email} - reCAPTCHA verification request failed`,
+          tag: 'error',
+          email: body.email,
+        });
+        throw new UnauthorizedException('Failed to verify reCAPTCHA');
+      }
+      // Safely extract response.data
+      let data: Record<string, any> | undefined = undefined;
+      if (response && typeof response === 'object' && 'data' in response) {
+        data = (response as { data: Record<string, any> }).data;
+      }
+      if (!data || !data.success) {
+        this.logger.log({
+          level: 'error',
+          message: `Login failed for email: ${body.email} - reCAPTCHA verification failed: ${JSON.stringify(
+            data,
+          )}`,
+          tag: 'error',
+          email: body.email,
+        });
+        throw new UnauthorizedException('reCAPTCHA verification failed');
+      }
     }
 
     const user = await this.prisma.user.findUnique({
@@ -110,7 +115,7 @@ export class AuthController {
         tag: 'error',
         email: body.email,
       });
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('User not found');
     }
     const isPasswordValid = await bcrypt.compare(body.password, user.password);
     if (!isPasswordValid) {
@@ -120,7 +125,7 @@ export class AuthController {
         tag: 'error',
         email: body.email,
       });
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Invalid password');
     }
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(

@@ -59,27 +59,26 @@ const SelfReflection = () => {
     };
   }, [navigate]);
 
-  // Calculate stats
-  const postedRides = rides.filter((ride) => ride.rider?.id === userId);
-  const confirmedRides = rides.filter(
-    (ride) => ride.status === RIDE_STATUS.CONFIRMED,
+  const postedRides = rides.filter(({ rider }) => rider?.id === userId);
+  const completedRides = rides.filter(
+    ({ status }) => status === RIDE_STATUS.COMPLETED,
   );
 
-  // Calculate dynamic stats
   const stats: ReflectionStats = {
     postedCount: postedRides.length,
-    confirmedCount: confirmedRides.length,
+    confirmedCount: completedRides.length,
     karmaPoints: karmaPoints ?? 0,
-    distanceTravelled: confirmedRides.reduce(
+    distanceTravelled: completedRides.reduce(
       (sum, ride) => sum + (ride.distance ?? 0),
       0,
     ),
-    co2Reduced: confirmedRides.reduce(
-      (sum, ride) => sum + (ride.distance ?? 0) * 0.17,
+    co2Reduced: completedRides.reduce(
+      (sum, ride) => sum + (ride.co2Saved ?? 0),
       0,
     ),
-    peopleImpacted: confirmedRides.reduce(
-      (sum, ride) => sum + (ride.passengers?.length || 0),
+    peopleImpacted: completedRides.reduce(
+      (sum, ride) =>
+        sum + (Array.isArray(ride.passengers) ? ride.passengers.length : 0),
       0,
     ),
   };

@@ -10,9 +10,11 @@ import {
 import { UserDetails } from '../interfaces/types';
 import { getStoredUser } from '../utils/functions';
 import { ROUTE_LOGIN } from '../constants/routes';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 const UserCard: React.FC = () => {
   const [user, setUser] = useState<UserDetails | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     const storedUser = getStoredUser();
@@ -25,10 +27,20 @@ const UserCard: React.FC = () => {
   // TODO: Use navigation for logout after state management is implemented
   // Currently, we are using window.location.href to redirect after logout
   // This is a temporary solution until we have a proper state management system in place
+
   const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleConfirmLogout = () => {
+    setShowLogoutConfirm(false);
     localStorage.removeItem('user');
     toast.success('Logged out successfully!');
     window.location.href = ROUTE_LOGIN;
+  };
+
+  const handleCancelLogout = () => {
+    setShowLogoutConfirm(false);
   };
 
   const { fullname, email, profilePicture, role, address, phone } = user || {};
@@ -120,6 +132,16 @@ const UserCard: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Confirm Logout?"
+        description="Are you sure you want to logout? You will need to login again to access your account."
+        confirmText="Logout"
+        cancelText="Cancel"
+        onConfirm={handleConfirmLogout}
+        onCancel={handleCancelLogout}
+      />
     </>
   );
 };

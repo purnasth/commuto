@@ -24,7 +24,8 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
         id="modal-title"
         className="pb-4 text-lg font-medium text-teal-500 dark:text-teal-300 md:text-xl"
       >
-        Available {role === USER_ROLE.RIDER ? 'Passengers' : 'Rides'}
+        Available {role === USER_ROLE.RIDER ? 'Passengers' : 'Rides'}{' '}
+        {ridesFound.length === 0 ? '' : `(${ridesFound.length})`}
       </h3>
       <ul className="max-h-[90vh] space-y-3 overflow-y-auto md:max-h-[89vh]">
         {ridesFound.map((ride, index) => (
