@@ -35,6 +35,7 @@ export enum EmissionFactor {
  * @param lon1 Longitude of the first point (degrees)
  * @param lat2 Latitude of the second point (degrees)
  * @param lon2 Longitude of the second point (degrees)
+ *
  * @returns Distance in kilometers between the two points
  */
 export function haversineDistance(
@@ -58,11 +59,16 @@ export function haversineDistance(
 }
 
 /**
+ *
+ * Tier 1 Emission Factor Method
+ * Emissions = Activity Data × Emission Factor
+ *
  * Estimates CO₂ emissions for a given distance and vehicle type using DEFRA 2024 factors.
  *
  * @param distanceKm - Distance in kilometers
  * @param vehicle - Vehicle type (EmissionFactor)
  * @returns Estimated CO₂ emissions in kilograms
+ *
  */
 export function estimateCO2FromDistance(
   distanceKm: number,

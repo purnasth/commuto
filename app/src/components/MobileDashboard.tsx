@@ -1,3 +1,5 @@
+// TODO: equivalent compatibility with Dashboard.tsx
+
 import React from 'react';
 import {
   TbUser,

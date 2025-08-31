@@ -77,7 +77,8 @@ const SelfReflection = () => {
       0,
     ),
     peopleImpacted: completedRides.reduce(
-      (sum, ride) => sum + (ride.passengers?.length || 0),
+      (sum, ride) =>
+        sum + (Array.isArray(ride.passengers) ? ride.passengers.length : 0),
       0,
     ),
   };

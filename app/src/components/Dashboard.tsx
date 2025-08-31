@@ -9,16 +9,18 @@ import {
 } from 'react-icons/tb';
 import { MdOutlineShareLocation } from 'react-icons/md';
 
-import { RIDE_STATUS } from '../constants/enums';
+import { RIDE_STATUS, USER_ROLE } from '../constants/enums';
 import { RideHistory } from '../interfaces/types';
 
 import {
   truncateText,
+  getStoredUser,
   formatFullDate,
   formatDayMonthWithWeekday,
 } from '../utils/functions';
 
 import Tooltip from './ui/Tooltip';
+import UserDisplay from './ui/UserDisplay';
 import NoRideFound from './ui/NoRideFound';
 import MobileDashboard from './MobileDashboard';
 
@@ -28,9 +30,28 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  const currentUser = getStoredUser();
+
   if (isMobile) {
     return <MobileDashboard rides={rides} />;
   }
+
+  const getUserToDisplay = (ride: RideHistory) => {
+    if (currentUser?.role.toLowerCase() === USER_ROLE.RIDER) {
+      return ride.passengers || null;
+    } else if (currentUser?.role.toLowerCase() === USER_ROLE.PASSENGER) {
+      return ride.rider;
+    }
+    return null;
+  };
+
+  const getUsersColumnLabel = () => {
+    if (currentUser?.role.toLowerCase() === USER_ROLE.RIDER) {
+      return USER_ROLE.PASSENGER;
+    } else if (currentUser?.role.toLowerCase() === USER_ROLE.PASSENGER) {
+      return USER_ROLE.RIDER;
+    }
+  };
   return (
     <div className="mt-4 overflow-x-auto rounded-3xl border border-teal-300/60 bg-white shadow-lg dark:bg-dark">
       <table className="w-full text-xs xl:text-sm">
@@ -57,9 +78,9 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
               <TbStatusChange className="inline-block align-middle text-sm xl:text-base" />{' '}
               Status
             </th>
-            <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
+            <th className="px-4 py-3 text-left font-semibold capitalize text-teal-700 dark:text-teal-200">
               <TbUser className="inline-block align-middle text-sm xl:text-base" />{' '}
-              Passengers
+              {getUsersColumnLabel()}
             </th>
             <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
               <TbRoute className="inline-block align-middle text-sm xl:text-base" />{' '}
@@ -148,20 +169,11 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <Tooltip
-                      content={
-                        ride.passengers && ride.passengers.length > 0
-                          ? ride.passengers.map((p) => p.fullname).join(', ')
-                          : '-'
-                      }
-                    >
-                      {ride.passengers && ride.passengers.length > 0
-                        ? truncateText(
-                            ride.passengers.map((p) => p.fullname).join(', '),
-                            18,
-                          )
-                        : '-'}
-                    </Tooltip>
+                    <UserDisplay
+                      user={getUserToDisplay(ride)}
+                      showProfilePicture={true}
+                      className="max-w-40 text-xs"
+                    />
                   </td>
                   <td className="px-4 py-3">
                     {ride.distance ? ride.distance.toFixed(1) : '-'}
