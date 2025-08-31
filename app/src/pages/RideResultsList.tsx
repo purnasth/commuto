@@ -1,7 +1,15 @@
 import React from 'react';
 import { TbCircleDashed, TbMapPin, TbAlarm } from 'react-icons/tb';
-import { RideFormData } from '../interfaces/types';
+import {
+  RideFormData as BaseRideFormData,
+  UserDetails,
+} from '../interfaces/types';
 import { USER_ROLE } from '../constants/enums';
+
+type RideFormData = BaseRideFormData & {
+  rider: UserDetails;
+  passengers: UserDetails[];
+};
 
 interface RideResultsListProps {
   ridesFound: RideFormData[];
@@ -27,12 +35,49 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
         Available {role === USER_ROLE.RIDER ? 'Passengers' : 'Rides'}{' '}
         {ridesFound.length === 0 ? '' : `(${ridesFound.length})`}
       </h3>
-      <ul className="max-h-[90vh] space-y-3 overflow-y-auto md:max-h-[89vh]">
+
+      <div className="max-h-[90vh] space-y-3 overflow-y-auto md:max-h-[89vh]">
         {ridesFound.map((ride, index) => (
-          <li
+          <div
             key={index}
             className="space-y-3 rounded-xl border bg-teal-100/60 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-teal-300/50 dark:bg-teal-950"
           >
+            <div className="flex items-center gap-3 border-b border-teal-200/50 pb-2.5 dark:border-teal-700/30">
+              {(() => {
+                let userToShow: UserDetails;
+                if (ride.role === USER_ROLE.RIDER) {
+                  userToShow = ride.rider as UserDetails;
+                } else {
+                  userToShow = (
+                    ride.passengers && ride.passengers.length > 0
+                      ? ride.passengers[0]
+                      : ride.rider
+                  ) as UserDetails;
+                }
+                return (
+                  <>
+                    <div className="flex size-10 items-center justify-center rounded-full bg-teal-200 dark:bg-teal-800">
+                      {userToShow.profilePicture ? (
+                        <img
+                          src={userToShow.profilePicture}
+                          alt={userToShow.fullname}
+                          className="size-10 rounded-full border object-cover shadow-sm"
+                        />
+                      ) : (
+                        <TbCircleDashed className="text-xl text-teal-600 dark:text-teal-300" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-dark dark:text-light">
+                        {userToShow.fullname}
+                      </p>
+                      <p className="text-xs opacity-70">{userToShow.email}</p>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
             <div className="flex items-center gap-2">
               <div className="flex flex-col items-center">
                 <TbCircleDashed className="text-base text-teal-500" />
@@ -78,9 +123,9 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
                 Reject
               </button>
             </div>
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   </main>
 );
