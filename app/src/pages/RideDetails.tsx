@@ -213,19 +213,40 @@ const RideDetails: React.FC = () => {
                 )}
                 {showMap ? 'Hide Route' : 'View Route'}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleCompleteRide(rideDetails);
-                }}
-                // onClick={handleCompleteRide}
-                className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
-              >
-                <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
-                <span className="relative z-10 font-medium tracking-wide">
-                  Complete the ride
-                </span>
-              </button>
+
+              {/*  TEMP: both of the actors get the feedback form which is not expected fix this letter but okay for now: and 
+            TODO: also integrate this with backend.
+             */}
+              {user?.id &&
+              rideDetails.riderId &&
+              Number(user.id) === Number(rideDetails.riderId) ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleCompleteRide(rideDetails);
+                    window.location.href = ROUTE_PROFILE;
+                  }}
+                  className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
+                >
+                  <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
+                  <span className="relative z-10 font-medium tracking-wide">
+                    Complete the ride
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFeedbackPopup(true);
+                  }}
+                  className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
+                >
+                  <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
+                  <span className="relative z-10 font-medium tracking-wide">
+                    Complete the ride
+                  </span>
+                </button>
+              )}
             </div>
             {showMap && (
               <>
@@ -258,7 +279,11 @@ const RideDetails: React.FC = () => {
         </div>
       </main>
       {showFeedbackPopup && (
-        <FeedbackModal onClose={() => setShowFeedbackPopup(false)} />
+        <FeedbackModal
+          onClose={() => setShowFeedbackPopup(false)}
+          handleCompleteRide={handleCompleteRide}
+          rideDetails={rideDetails}
+        />
       )}
     </>
   );
@@ -266,15 +291,26 @@ const RideDetails: React.FC = () => {
 
 export default RideDetails;
 
-const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
+interface FeedbackModalProps {
+  onClose: () => void;
+  handleCompleteRide: (ride: RideFormData) => Promise<void>;
+  rideDetails: RideFormData;
+}
+
+const FeedbackModal = ({
+  onClose,
+  handleCompleteRide,
+  rideDetails,
+}: FeedbackModalProps) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     console.log('Feedback submitted:', { rating, comment });
-    navigate(ROUTE_PROFILE);
+    await handleCompleteRide(rideDetails);
     onClose();
+    window.location.href = ROUTE_PROFILE;
   };
 
   return (
@@ -299,10 +335,10 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
                 <button
                   key={emoji}
                   onClick={() => setRating(emoji.charCodeAt(0))}
-                  className={`flex aspect-square size-10 items-center justify-center rounded-full border-2 text-2xl transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 ${
+                  className={`flex aspect-square size-9 items-center justify-center rounded-full border text-2xl transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 ${
                     isSelected
-                      ? 'border-yellow-400 bg-yellow-50 text-yellow-400 shadow-lg'
-                      : 'border-transparent bg-transparent text-gray-300'
+                      ? 'border-teal-400/50 bg-teal-50 text-teal-400 shadow-lg'
+                      : 'border-amber-400/50 bg-amber-50 text-amber-400'
                   }`}
                   aria-label={`Rate ${emoji}`}
                 >
@@ -318,7 +354,7 @@ const FeedbackModal = ({ onClose }: { onClose: () => void }) => {
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Leave a comment (optional)"
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className="w-full rounded px-3 py-2 text-sm text-dark outline outline-teal-300/50 focus:outline-teal-300/80"
         />
 
         <div className="mt-6 flex justify-end gap-3">
