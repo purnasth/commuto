@@ -340,9 +340,7 @@ export class RideController {
   async confirmRide(@Param('id') id: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: Number(id) },
-      include: {
-        passengers: true, // Include passengers to get their IDs
-      },
+      include: { rider: true, passengers: true },
     });
 
     if (!ride) {
@@ -363,10 +361,12 @@ export class RideController {
         },
         status: RIDE_STATUS.ACTIVE,
       },
-      include: {
-        passengers: true,
-      },
+      include: { rider: true, passengers: true },
     });
+
+    if (!matchedRides.length) {
+      return { message: 'No matched rides found', rides: [] };
+    }
 
     const matchedIds = matchedRides.map((r) => r.id);
 
@@ -377,11 +377,45 @@ export class RideController {
 
     const updatedRides = await this.prisma.ride.findMany({
       where: { id: { in: matchedIds } },
-      include: {
-        rider: true,
-        passengers: true,
-      },
+      include: { rider: true, passengers: true },
     });
+
+    for (const matches of updatedRides) {
+      if (matches.role === 'passenger') {
+        const rider = matchedRides.find((r) => r.role === 'rider');
+        console.log({ rider, matches });
+        if (rider) {
+          matches.passengers = rider.rider ? [rider.rider] : [];
+          await this.prisma.ride.update({
+            where: { id: matches.id },
+            data: {
+              passengers: {
+                set: [],
+                connect: rider.rider ? { id: rider.rider.id } : undefined,
+              },
+            },
+          });
+        }
+      } else if (matches.role === 'rider') {
+        const passenger = matchedRides.find((r) => r.role === 'passenger');
+        console.log({ passenger, matches });
+
+        if (passenger) {
+          matches.passengers = passenger.rider ? [passenger.rider] : [];
+          await this.prisma.ride.update({
+            where: { id: matches.id },
+            data: {
+              passengers: {
+                set: [],
+                connect: passenger.rider
+                  ? { id: passenger.rider.id }
+                  : undefined, // Connect the matched rider as passenger
+              },
+            },
+          });
+        }
+      }
+    }
 
     for (const confirmedRide of updatedRides) {
       this.rideGateway.notifyRideConfirmation(confirmedRide);
@@ -395,108 +429,11 @@ export class RideController {
       }
     }
 
-    console.log({
-      message: 'All matched rides confirmed',
-      rides: updatedRides,
-    });
-
     return {
       message: 'All matched rides confirmed',
       rides: updatedRides,
     };
   }
-
-  // @Post(':id/confirm')
-  // async confirmRide(@Param('id') id: string) {
-  //   const rideId = Number(id);
-  //   const baseRide = await this.prisma.ride.findUnique({
-  //     where: { id: rideId },
-  //     include: { passengers: true, rider: true },
-  //   });
-  //   if (!baseRide) {
-  //     throw new NotFoundException('Ride not found');
-  //   }
-  //   const timeWindowMs = 2 * 60 * 1000;
-  //   const baseTime = new Date(baseRide.timestamp);
-  //   const matchedRides = await this.prisma.ride.findMany({
-  //     where: {
-  //       from: baseRide.from,
-  //       to: baseRide.to,
-  //       timestamp: {
-  //         gte: new Date(baseTime.getTime() - timeWindowMs),
-  //         lte: new Date(baseTime.getTime() + timeWindowMs),
-  //       },
-  //       status: RIDE_STATUS.ACTIVE,
-  //     },
-  //     include: {
-  //       rider: true,
-  //       passengers: true,
-  //     },
-  //   });
-  //   if (!matchedRides.length) {
-  //     return { message: 'No active rides matched to confirm.', rides: [] };
-  //   }
-  //   // Calculate and update distance, co2Saved, peopleImpacted, and award karma points
-  //   for (const ride of matchedRides) {
-  //     let distance: null | number = null;
-  //     if (
-  //       typeof ride.fromLat === 'number' &&
-  //       typeof ride.fromLng === 'number' &&
-  //       typeof ride.toLat === 'number' &&
-  //       typeof ride.toLng === 'number'
-  //     ) {
-  //       distance = this.haversineDistance(
-  //         ride.fromLat,
-  //         ride.fromLng,
-  //         ride.toLat,
-  //         ride.toLng,
-  //       );
-  //     }
-  //     const co2Saved = distance ? distance * 0.17 : null; // 0.17kg per km
-  //     const peopleImpacted = ride.passengers ? ride.passengers.length : 0;
-  //     // Update ride
-  //     await this.prisma.ride.update({
-  //       where: { id: ride.id },
-  //       data: {
-  //         status: RIDE_STATUS.CONFIRMED,
-  //         distance,
-  //         co2Saved,
-  //         peopleImpacted,
-  //       },
-  //     });
-  //     // Award karma points to the rider
-  //     const karmaPoints = 20;
-  //     await this.prisma.user.update({
-  //       where: { id: ride.rider.id },
-  //       data: {
-  //         karmaPoints: { increment: karmaPoints },
-  //       },
-  //     });
-  //     // Create a KarmaTransaction record
-  //     await this.prisma.karmaTransaction.create({
-  //       data: {
-  //         userId: ride.rider.id,
-  //         points: karmaPoints,
-  //         type: 'earned',
-  //         reason: 'Ride completed',
-  //       },
-  //     });
-  //   }
-  //   // Notify clients
-  //   for (const ride of matchedRides) {
-  //     this.rideGateway.notifyRideConfirmationForPassenger(ride, ride.rider.id);
-  //     this.rideGateway.notifyRideConfirmation(ride);
-  //   }
-  //   // Return updated rides
-  //   const updatedRides = await this.prisma.ride.findMany({
-  //     where: { id: { in: matchedRides.map((r) => r.id) } },
-  //     include: { rider: true, passengers: true },
-  //   });
-  //   return {
-  //     message: 'All matched rides confirmed',
-  //     rides: updatedRides,
-  //   };
-  // }
 
   @Post(':id/complete')
   async completeRide(@Param('id') id: string) {
@@ -552,6 +489,9 @@ export class RideController {
 
     // Award karma points to the rider
     const karmaPoints = 20;
+    if (!ride.rider || !ride.rider.id) {
+      throw new NotFoundException('Rider not found for this ride');
+    }
     await this.prisma.user.update({
       where: { id: ride.rider.id },
       data: {

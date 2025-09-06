@@ -142,7 +142,9 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
       peopleImpacted: ride.peopleImpacted,
     };
 
-    const riderSocketId = userSocketMap.get(ride.riderId.toString());
+    const riderSocketId = ride.riderId
+      ? userSocketMap.get(ride.riderId.toString())
+      : undefined;
 
     if (riderSocketId) {
       this.server.to(riderSocketId).emit('rideCompleted', payload);

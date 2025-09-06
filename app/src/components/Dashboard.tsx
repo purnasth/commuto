@@ -37,11 +37,16 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
   }
 
   const getUserToDisplay = (ride: RideHistory) => {
-    if (currentUser?.role.toLowerCase() === USER_ROLE.RIDER) {
-      return ride.passengers || null;
-    } else if (currentUser?.role.toLowerCase() === USER_ROLE.PASSENGER) {
-      return ride.rider;
+    const userRole = currentUser?.role.toLowerCase();
+
+    if (userRole === USER_ROLE.RIDER) {
+      return ride.passengers || [];
     }
+
+    if (userRole === USER_ROLE.PASSENGER) {
+      return ride.passengers;
+    }
+
     return null;
   };
 
@@ -104,6 +109,8 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
             </tr>
           ) : (
             rides.map((ride, idx) => {
+              const data = getUserToDisplay(ride);
+
               return (
                 <tr
                   key={ride.id}
@@ -170,7 +177,9 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                   </td>
                   <td className="px-4 py-3">
                     <UserDisplay
-                      user={getUserToDisplay(ride)}
+                      user={
+                        Array.isArray(data) && data.length > 0 ? data[0] : null
+                      }
                       showProfilePicture={true}
                       className="max-w-40 text-xs"
                     />
