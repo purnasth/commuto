@@ -104,6 +104,40 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
                 </p>
               </div>
             </div>
+
+            {ride.distance !== undefined && (
+              <div className="flex items-center justify-between gap-2 border-t border-teal-200/50 pt-2.5 dark:border-teal-700/30">
+                {ride.distance === 0 ? (
+                  <>
+                    <span className="text-xs text-dark dark:text-light">
+                      {role === USER_ROLE.RIDER
+                        ? "You're at the passenger's location"
+                        : 'Rider is at your location'}
+                    </span>
+                    <span className="text-xs font-semibold text-teal-600 dark:text-teal-400">
+                      ({ride.distance.toFixed(1)} km)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs text-dark dark:text-light">
+                      {role === USER_ROLE.RIDER
+                        ? `Time to reach the location`
+                        : `Rider will reach your location in`}{' '}
+                      ~
+                      <strong className="font-semibold">
+                        {ride.estimatedTimeOfArrival}{' '}
+                        {ride.estimatedTimeOfArrival === 1 ? 'min' : 'mins'}
+                      </strong>
+                    </span>
+                    <span className="text-xs font-semibold text-teal-600 dark:text-teal-400">
+                      ({ride.distance.toFixed(1)} km)
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"

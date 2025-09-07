@@ -195,6 +195,28 @@ const RideDetails: React.FC = () => {
               </p>
             </div>
           </div>
+          {rideDetails.estimatedTimeOfArrival && (
+            <div className="rounded-xl bg-teal-100 p-3 dark:bg-teal-900">
+              <div className="flex items-center gap-2">
+                {role === USER_ROLE.RIDER ? (
+                  <MdOutlineDirectionsBike className="text-lg text-teal-500" />
+                ) : (
+                  <FaWalking className="text-lg text-teal-500" />
+                )}
+                <span className="text-base text-dark dark:text-light">
+                  {role === USER_ROLE.RIDER
+                    ? `Time to reach passenger's location (by bike)`
+                    : `Rider's estimated arrival time (by bike)`}
+                  : ~{rideDetails.estimatedTimeOfArrival} minutes
+                </span>
+                {rideDetails.distance && (
+                  <span className="ml-2 text-sm text-teal-600 dark:text-teal-400">
+                    ({rideDetails.distance.toFixed(1)} km from rider's location)
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button

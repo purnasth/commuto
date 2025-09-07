@@ -48,6 +48,7 @@ model Ride {
   role        String
   timestamp   DateTime      @default(now())
   rider       User          @relation("RiderRides", fields: [riderId], references: [id])
+  estimatedTimeOfArrival Int?   // ETA in minutes
   riderId     Int
   requests    RideRequest[]
   passengers  User[]        @relation("RidePassengers")

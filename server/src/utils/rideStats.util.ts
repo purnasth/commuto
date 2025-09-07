@@ -19,10 +19,23 @@ export const DEG_TO_RAD = Math.PI / 180;
 /**
  * Maximum allowed proximity for ride matching (in km)
  */
-export const MAX_RIDE_PROXIMITY_KM = 2;
+export const MAX_RIDE_PROXIMITY_KM = 3;
 
 /**
  * DEFRA 2024 average car emission factor (kg CO2 per km)
+ */
+
+/**
+ * Speed constants for transport (km/h)
+ *
+ * https://smarter-usa.org/wp-content/uploads/2019/01/1-Motorcycle-Speeds-at-Urban-Intersections.pdf
+ */
+export enum TransportSpeed {
+  BIKE = 38.28,
+}
+
+/**
+ * Emission factors for different modes of transport (kg CO2 per km)
  */
 export enum EmissionFactor {
   BIKE = 0.016,
@@ -75,4 +88,25 @@ export function estimateCO2FromDistance(
   vehicle: EmissionFactor = EmissionFactor.BIKE, // Default to bike
 ): number {
   return distanceKm * vehicle;
+}
+
+/**
+ * Calculates the estimated time of arrival (ETA) based on distance and transport mode.
+ *
+ * @param distanceKm - Distance to travel in kilometers
+ * @param role - User role (rider or passenger) to determine transport mode
+ * @returns Estimated time of arrival in minutes, rounded to nearest minute
+ *
+ * @example
+ * const eta = calculateETA(5, USER_ROLE.RIDER); // Returns ETA for a 5km bike ride
+ */
+export function calculateETA(distanceKm: number): number {
+  // Always use bike speed since rider will be on bike
+  const speed = TransportSpeed.BIKE;
+
+  // Convert distance and speed to consistent units (km and hours)
+  const timeInHours = distanceKm / speed;
+
+  // Convert to minutes and round to nearest minute
+  return Math.round(timeInHours * 60);
 }
