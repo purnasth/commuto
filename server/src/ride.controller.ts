@@ -19,6 +19,7 @@ import { getNow } from './utils/date.util';
 import { USER_ROLE, RIDE_STATUS } from './constants/enums';
 import { RideGateway } from './rides/rides.gateway';
 import {
+  calculateETA,
   haversineDistance,
   MAX_RIDE_PROXIMITY_KM,
   estimateCO2FromDistance,
@@ -131,13 +132,25 @@ export class RideController {
       if (!Number.isFinite(ride.fromLat) || !Number.isFinite(ride.fromLng)) {
         return false;
       }
+      // Calculate distance between the current user's "From" location and the matched ride's "From" location
       const dist = haversineDistance(
         fromLatNum,
         fromLngNum,
         ride.fromLat as number,
         ride.fromLng as number,
       );
-      return dist <= MAX_RIDE_PROXIMITY_KM;
+
+      if (dist <= MAX_RIDE_PROXIMITY_KM) {
+        // Calculate ETA based on the mode of transport of the current user
+        const estimatedTimeOfArrival = calculateETA(dist);
+
+        ride.estimatedTimeOfArrival = estimatedTimeOfArrival;
+        ride.distance = dist;
+
+        return true;
+      }
+
+      return false;
     });
 
     return { rides: matchedRides };

@@ -350,6 +350,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         message: ride.message,
         role: ride.role,
         timestamp: ride.timestamp,
+        // TODO: use enum here for the status i.e. RIDE_STATUS.CONFIRMED
         status: 'CONFIRMED',
         riderId: ride.riderId,
       });
