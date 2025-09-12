@@ -362,23 +362,58 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
-    const matchedRides = await this.prisma.ride.findMany({
+    // Get all active rides within the time window and check proximity
+    const activeRides = await this.prisma.ride.findMany({
       where: {
-        from: ride.from,
-        to: ride.to,
-        // timestamp: {
-        //   gte: new Date(new Date(ride.timestamp).getTime() - 30 * 60 * 1000), // 30 minutes BEFORE
-        //   lte: new Date(new Date(ride.timestamp).getTime() + 30 * 60 * 1000), // 30 minutes AFTER
-        // },
         timestamp: {
           gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
           lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
         },
         status: RIDE_STATUS.ACTIVE,
+        // Ensure we have location data
+        fromLat: { not: null },
+        fromLng: { not: null },
+        toLat: { not: null },
+        toLng: { not: null },
       },
       include: {
         passengers: true,
       },
+    });
+
+    // Filter rides based on proximity using Haversine distance
+    const matchedRides = activeRides.filter((matchedRide) => {
+      if (
+        !ride.fromLat ||
+        !ride.fromLng ||
+        !matchedRide.fromLat ||
+        !matchedRide.fromLng ||
+        !ride.toLat ||
+        !ride.toLng ||
+        !matchedRide.toLat ||
+        !matchedRide.toLng
+      ) {
+        return false;
+      }
+
+      const fromDistance = haversineDistance(
+        ride.fromLat,
+        ride.fromLng,
+        matchedRide.fromLat,
+        matchedRide.fromLng,
+      );
+
+      const toDistance = haversineDistance(
+        ride.toLat,
+        ride.toLng,
+        matchedRide.toLat,
+        matchedRide.toLng,
+      );
+
+      return (
+        fromDistance <= MAX_RIDE_PROXIMITY_KM &&
+        toDistance <= MAX_RIDE_PROXIMITY_KM
+      );
     });
 
     const matchedIds = matchedRides.map((r) => r.id);
