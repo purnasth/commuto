@@ -96,6 +96,15 @@ export class RideController {
     @Query('role') role: USER_ROLE,
   ) {
     if (!fromLat || !fromLng || !timestamp || !role) {
+      this.logger.log({
+        level: 'warn',
+        message: `Match rides failed: Missing required query params`,
+        tag: 'ride',
+        fromLat,
+        fromLng,
+        timestamp,
+        role,
+      });
       throw new BadRequestException(
         'fromLat, fromLng, timestamp, and role are required',
       );
@@ -126,6 +135,17 @@ export class RideController {
         fromLng: { not: null },
       },
       include: { rider: true, passengers: true },
+    });
+
+    this.logger.log({
+      level: 'info',
+      message: `Matching rides for role=${role}, location=(${fromLat},${fromLng}), time=${timestamp}`,
+      tag: 'ride',
+      role,
+      fromLat,
+      fromLng,
+      timestamp,
+      matchedCount: rides.length,
     });
 
     const matchedRides = rides.filter((ride) => {
@@ -257,6 +277,13 @@ export class RideController {
       },
       data: { status: RIDE_STATUS.EXPIRED },
     });
+
+    this.logger.log({
+      level: 'info',
+      message: `Expired past active rides`,
+      tag: 'ride',
+      timestamp: now,
+    });
     // Only show active and confirmed rides with timestamp in the future
     const rides = await this.prisma.ride.findMany({
       where: {
@@ -266,6 +293,14 @@ export class RideController {
       },
       include: { rider: true },
       orderBy: { timestamp: 'desc' },
+    });
+
+    this.logger.log({
+      level: 'info',
+      message: `Fetched rides`,
+      tag: 'ride',
+      role,
+      rideCount: rides.length,
     });
     return { rides };
   }
@@ -287,8 +322,22 @@ export class RideController {
       },
       data: { status: RIDE_STATUS.EXPIRED },
     });
+
+    this.logger.log({
+      level: 'info',
+      message: `Expired past active rides for history fetch`,
+      tag: 'ride',
+      timestamp: now,
+      userId,
+    });
     const id = Number(userId);
     if (!userId || isNaN(id)) {
+      this.logger.log({
+        level: 'warn',
+        message: `Ride history fetch failed: Invalid userId`,
+        tag: 'ride',
+        userId,
+      });
       throw new BadRequestException('Valid userId is required');
     }
     const rides = await this.prisma.ride.findMany({
@@ -304,6 +353,14 @@ export class RideController {
       },
       orderBy: { timestamp: 'desc' },
     });
+
+    this.logger.log({
+      level: 'info',
+      message: `Fetched ride history`,
+      tag: 'ride',
+      userId,
+      rideCount: rides.length,
+    });
     return { rides };
   }
 
@@ -311,6 +368,12 @@ export class RideController {
   async getRide(@Param('id') id: string) {
     const rideId = Number(id);
     if (!id || isNaN(rideId)) {
+      this.logger.log({
+        level: 'warn',
+        message: `Get ride failed: Invalid ride id`,
+        tag: 'ride',
+        rideId: id,
+      });
       throw new BadRequestException('Valid ride id is required');
     }
     const ride = await this.prisma.ride.findUnique({
@@ -324,6 +387,12 @@ export class RideController {
       },
     });
     if (!ride) throw new NotFoundException('Ride not found');
+    this.logger.log({
+      level: 'info',
+      message: `Fetched ride details`,
+      tag: 'ride',
+      rideId,
+    });
     return { ride };
   }
 
@@ -332,6 +401,13 @@ export class RideController {
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
       data: updates,
+    });
+    this.logger.log({
+      level: 'info',
+      message: `Ride updated`,
+      tag: 'ride',
+      rideId: id,
+      updates,
     });
     return { message: 'Ride updated', ride };
   }
@@ -345,6 +421,12 @@ export class RideController {
       rideId: id,
     });
     await this.prisma.ride.delete({ where: { id: Number(id) } });
+    this.logger.log({
+      level: 'info',
+      message: `Ride deleted`,
+      tag: 'ride',
+      rideId: id,
+    });
     return { message: 'Ride deleted' };
   }
 
@@ -359,6 +441,12 @@ export class RideController {
     });
 
     if (!ride) {
+      this.logger.log({
+        level: 'warn',
+        message: `Confirm ride failed: Ride not found`,
+        tag: 'ride',
+        rideId: id,
+      });
       throw new NotFoundException('Ride not found');
     }
 
@@ -379,6 +467,13 @@ export class RideController {
       include: {
         passengers: true,
       },
+    });
+
+    this.logger.log({
+      level: 'info',
+      message: `Confirming ride, found ${activeRides.length} active rides in time window`,
+      tag: 'ride',
+      rideId: id,
     });
 
     // Filter rides based on proximity using Haversine distance
@@ -421,6 +516,13 @@ export class RideController {
     await this.prisma.ride.updateMany({
       where: { id: { in: matchedIds } },
       data: { status: RIDE_STATUS.CONFIRMED },
+    });
+
+    this.logger.log({
+      level: 'info',
+      message: `Confirmed matched rides`,
+      tag: 'ride',
+      rideIds: matchedIds,
     });
 
     const updatedRides = await this.prisma.ride.findMany({
@@ -556,10 +658,23 @@ export class RideController {
     });
 
     if (!ride) {
+      this.logger.log({
+        level: 'warn',
+        message: `Complete ride failed: Ride not found`,
+        tag: 'ride',
+        rideId,
+      });
       throw new NotFoundException('Ride not found');
     }
 
     if (ride.status !== RIDE_STATUS.CONFIRMED) {
+      this.logger.log({
+        level: 'warn',
+        message: `Complete ride failed: Ride not confirmed or already completed`,
+        tag: 'ride',
+        rideId,
+        status: ride.status,
+      });
       throw new BadRequestException(
         'Ride is not confirmed or already completed',
       );
@@ -598,6 +713,16 @@ export class RideController {
       },
     });
 
+    this.logger.log({
+      level: 'info',
+      message: `Ride completed`,
+      tag: 'ride',
+      rideId,
+      distance,
+      co2Saved,
+      peopleImpacted,
+    });
+
     // Award karma points to the rider
     const karmaPoints = 20;
     await this.prisma.user.update({
@@ -632,6 +757,13 @@ export class RideController {
       where: { id: Number(id) },
       data: { status: RIDE_STATUS.REJECTED },
     });
+    this.logger.log({
+      level: 'info',
+      message: `Ride rejected`,
+      tag: 'ride',
+      rideId: id,
+      userId: body.userId,
+    });
     return {
       message: 'Ride rejected. You can now post a new ride.',
       rideId: id,
@@ -647,6 +779,13 @@ export class RideController {
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
       data: { status: RIDE_STATUS.CANCELLED },
+    });
+    this.logger.log({
+      level: 'info',
+      message: `Ride cancelled`,
+      tag: 'ride',
+      rideId: id,
+      userId: body.userId,
     });
     return {
       message: 'Ride cancelled. You can now post a new ride.',
