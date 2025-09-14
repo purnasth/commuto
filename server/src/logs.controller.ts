@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as process from 'process';
 
 interface LogEntry {
   from?: string;
@@ -15,50 +16,38 @@ interface LogEntry {
   expirationTime?: string;
 }
 
+// TODO: Protect log endpoints with authentication and authorization guards (e.g., only allow admins)
 @Controller('logs')
 export class LogsController {
   @Get('today')
-  getTodayLogs(): LogEntry[] {
+  async getTodayLogs(): Promise<LogEntry[]> {
     // Get today's date in YYYY-MM-DD format
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    const logFileName = `application-${yyyy}-${mm}-${dd}.log`;
-    const logFile = path.join(__dirname, '../logs', logFileName);
 
-    if (!fs.existsSync(logFile)) {
+    if (!process.env.LOGS_DIR) {
+      // If LOGS_DIR is not set, do not return logs
       return [];
     }
 
-    const lines = fs.readFileSync(logFile, 'utf-8').split('\n').filter(Boolean);
-    const entries: LogEntry[] = lines
-      .map((line) => {
-        try {
-          return JSON.parse(line) as LogEntry;
-        } catch {
-          return undefined;
-        }
-      })
-      .filter((entry): entry is LogEntry => !!entry);
+    const logsDir = path.resolve(__dirname, process.env.LOGS_DIR);
+    const logFileName = `application-${yyyy}-${mm}-${dd}.log`;
+    const logFile = path.join(logsDir, logFileName);
+    // Validate that logFile is inside logsDir
+    if (!logFile.startsWith(logsDir)) {
+      throw new Error('Invalid log file path');
+    }
+    try {
+      await fs.promises.access(logFile, fs.constants.F_OK);
+    } catch {
+      return [];
+    }
 
-    return entries;
-  }
-
-  @Get('all')
-  getAllLogs(): LogEntry[] {
-    const logsDir = path.join(__dirname, '../logs');
-    const files = fs
-      .readdirSync(logsDir)
-      .filter((file) => file.endsWith('.log'));
-    let allEntries: LogEntry[] = [];
-    for (const file of files) {
-      const filePath = path.join(logsDir, file);
-      if (!fs.existsSync(filePath)) continue;
-      const lines = fs
-        .readFileSync(filePath, 'utf-8')
-        .split('\n')
-        .filter(Boolean);
+    try {
+      const data = await fs.promises.readFile(logFile, 'utf-8');
+      const lines = data.split('\n').filter(Boolean);
       const entries: LogEntry[] = lines
         .map((line) => {
           try {
@@ -68,8 +57,60 @@ export class LogsController {
           }
         })
         .filter((entry): entry is LogEntry => !!entry);
-      allEntries = allEntries.concat(entries);
+      return entries;
+    } catch {
+      return [];
     }
+  }
+
+  @Get('all')
+  async getAllLogs(): Promise<LogEntry[]> {
+    if (!process.env.LOGS_DIR) {
+      // If LOGS_DIR is not set, do not return logs
+      return [];
+    }
+
+    const logsDir = path.resolve(__dirname, process.env.LOGS_DIR);
+    let files: string[] = [];
+    try {
+      files = (await fs.promises.readdir(logsDir)).filter((file) =>
+        file.endsWith('.log'),
+      );
+    } catch {
+      return [];
+    }
+
+    const allEntriesArrays: LogEntry[][] = await Promise.all(
+      files.map(async (file) => {
+        const filePath = path.join(logsDir, file);
+        // Validate that filePath is inside logsDir
+        if (!filePath.startsWith(logsDir)) {
+          return [];
+        }
+        try {
+          await fs.promises.access(filePath, fs.constants.F_OK);
+          const data = await fs.promises.readFile(filePath, 'utf-8');
+          const lines = data.split('\n').filter(Boolean);
+          const entries: LogEntry[] = lines
+            .map((line) => {
+              try {
+                return JSON.parse(line) as LogEntry;
+              } catch {
+                return undefined;
+              }
+            })
+            .filter((entry): entry is LogEntry => !!entry);
+          return entries;
+        } catch {
+          // skip unreadable files
+          return [];
+        }
+      }),
+    );
+
+    const allEntries: LogEntry[] = ([] as LogEntry[]).concat(
+      ...allEntriesArrays,
+    );
     return allEntries;
   }
 }

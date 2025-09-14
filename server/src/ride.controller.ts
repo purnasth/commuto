@@ -450,7 +450,8 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
-    // Get all active rides within the time window and check proximity
+    // TODO: Add pagination or limit to this query to prevent performance issues as ride count grows
+    // Get all active rides within the time window for proximity filtering
     const activeRides = await this.prisma.ride.findMany({
       where: {
         timestamp: {
