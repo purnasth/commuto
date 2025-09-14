@@ -30,3 +30,15 @@ export enum RIDE_STATUS {
 }
 
 export const KARMA = 'karma';
+
+/**
+ * LocalStorage key for storing ride form data.
+ * Use this constant throughout the app to avoid magic strings and typos.
+ *
+ * Example usage:
+ *   localStorage.setItem(LS_RIDE_FORM_DATA_KEY, JSON.stringify(data));
+ *   const data = localStorage.getItem(LS_RIDE_FORM_DATA_KEY);
+ *
+ * TODO: Refactor all usages of the string 'rideFormData' in the codebase to use this centralized key (LS_RIDE_FORM_DATA_KEY) for consistency and maintainability.
+ */
+export const LS_RIDE_FORM_DATA_KEY = 'rideFormData';
