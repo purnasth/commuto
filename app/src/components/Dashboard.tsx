@@ -1,3 +1,7 @@
+import React from 'react';
+import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
+
 import {
   TbUser,
   TbAlarm,
@@ -9,7 +13,13 @@ import {
 } from 'react-icons/tb';
 import { MdOutlineShareLocation } from 'react-icons/md';
 
-import { RIDE_STATUS, USER_ROLE } from '../constants/enums';
+import {
+  USER_ROLE,
+  RIDE_STATUS,
+  LS_RIDE_FORM_DATA_KEY,
+} from '../constants/enums';
+import { ROUTE_HOME, ROUTE_ROLE } from '../constants/routes';
+
 import { RideHistory } from '../interfaces/types';
 
 import {
@@ -28,7 +38,17 @@ interface DashboardProps {
   rides: RideHistory[];
 }
 
+// Utility to get route for a given role
+const getRoleRoute = (role: string | undefined) => {
+  if (!role) {
+    return ROUTE_HOME;
+  }
+
+  return ROUTE_ROLE.replace(':roleId', role.toLowerCase());
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
+  const navigate = useNavigate();
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
   const currentUser = getStoredUser();
 
@@ -52,6 +72,36 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
       return USER_ROLE.RIDER;
     }
   };
+
+  const handleRepeatRide = (ride: RideHistory) => {
+    if (!currentUser || !currentUser.role) {
+      console.error('User information is missing or incomplete.');
+      toast.error('User information is missing. Please log in again.');
+
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        LS_RIDE_FORM_DATA_KEY,
+        JSON.stringify({
+          from: ride.from,
+          to: ride.to,
+          message: ride.message || '',
+          role: currentUser.role,
+        }),
+      );
+    } catch (err) {
+      console.error('Failed to save ride data to localStorage:', err);
+      toast.error(
+        'Could not save ride data. Please check your browser storage settings.',
+      );
+      return;
+    }
+
+    navigate(getRoleRoute(currentUser.role));
+  };
+
   return (
     <div className="mt-4 overflow-x-auto rounded-3xl border border-teal-300/60 bg-white shadow-lg dark:bg-dark">
       <table className="w-full text-xs xl:text-sm">
@@ -181,8 +231,7 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                   <td className="py-3 pl-4">
                     <button
                       className="transition-150 inline-flex items-center gap-1 rounded-full border border-teal-300 bg-gradient-to-tr from-teal-200 via-teal-100 to-teal-400 px-2.5 py-1 text-xs font-normal text-teal-600 hover:scale-110 hover:bg-gradient-to-tl hover:from-teal-400 hover:to-teal-300 dark:border-teal-700 dark:bg-teal-900 dark:text-dark dark:hover:bg-teal-800"
-                      // TODO: Implement repeat ride functionality
-                      onClick={() => {}}
+                      onClick={() => handleRepeatRide(ride)}
                     >
                       <TbRepeat className="inline-block align-middle text-sm xl:text-base" />
                       Repeat
