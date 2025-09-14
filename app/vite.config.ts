@@ -59,4 +59,10 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    proxy: {
+      // Only proxy /logs and its subpaths, not /logs-dashboard
+      '^/logs($|/)': 'http://localhost:3000',
+    },
+  },
 });
