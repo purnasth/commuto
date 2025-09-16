@@ -1,6 +1,8 @@
-// TODO: equivalent compatibility with Dashboard.tsx
-
+// TODO: make common utils for Dashboard and MobileDashboard to avoid code duplication
 import React from 'react';
+import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
+
 import {
   TbUser,
   TbAlarm,
@@ -13,17 +15,134 @@ import {
 
 import Tooltip from './ui/Tooltip';
 import NoRideFound from './ui/NoRideFound';
+import UserDisplay from './ui/UserDisplay';
 
-import { RIDE_STATUS } from '../constants/enums';
+import {
+  USER_ROLE,
+  RIDE_STATUS,
+  LS_RIDE_FORM_DATA_KEY,
+} from '../constants/enums';
+import { ROUTE_HOME, ROUTE_ROLE } from '../constants/routes';
+
 import { RideHistory } from '../interfaces/types';
 
-import { truncateText, formatFullDate } from '../utils/functions';
+import {
+  truncateText,
+  getStoredUser,
+  formatFullDate,
+} from '../utils/functions';
 
 interface MobileDashboardProps {
   rides: RideHistory[];
 }
 
+// Utility to get route for a given role
+const getRoleRoute = (role: string | undefined) => {
+  if (!role) {
+    return ROUTE_HOME;
+  }
+
+  return ROUTE_ROLE.replace(':roleId', role.toLowerCase());
+};
+
 const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
+  const navigate = useNavigate();
+  const currentUser = getStoredUser();
+
+  /**
+   * Determines which user to display based on the current user's role in the ride.
+   * For riders: shows the passenger who matched with them
+   * For passengers: shows the rider who matched with them
+   */
+  const getUserToDisplay = (ride: RideHistory) => {
+    if (!currentUser) return null;
+
+    const currentUserId = currentUser.id;
+
+    // If current user is the rider, show the passenger
+    if (
+      ride.riderId === currentUserId &&
+      ride.passengers &&
+      ride.passengers.length > 0
+    ) {
+      return ride.passengers[0];
+    }
+
+    // If current user is the passenger, show the rider
+    if (ride.passengerId === currentUserId && ride.rider) {
+      return ride.rider;
+    }
+
+    // If current user is the creator but neither rider nor passenger (edge case),
+    // show the opposite role based on the ride's role
+    if (ride.createdBy === currentUserId) {
+      if (
+        ride.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase() &&
+        ride.passengers &&
+        ride.passengers.length > 0
+      ) {
+        return ride.passengers[0];
+      } else if (
+        ride.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase() &&
+        ride.rider
+      ) {
+        return ride.rider;
+      }
+    }
+
+    return null;
+  };
+
+  /**
+   * Determines the label for the user section based on what type of users will be displayed.
+   */
+  const getUsersLabel = () => {
+    if (!currentUser) return 'Match';
+
+    if (currentUser.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
+      return USER_ROLE.PASSENGER;
+    } else if (
+      currentUser.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase()
+    ) {
+      return USER_ROLE.RIDER;
+    }
+
+    return 'Match';
+  };
+
+  const handleRepeatRide = (ride: RideHistory) => {
+    if (!currentUser || !currentUser.role) {
+      console.error('User information is missing or incomplete.');
+      toast.error('User information is missing. Please log in again.');
+      return;
+    }
+
+    const userRole = currentUser.role as USER_ROLE;
+
+    const rideData = {
+      from: ride.from,
+      to: ride.to,
+      fromLat: ride.fromLat,
+      fromLng: ride.fromLng,
+      toLat: ride.toLat,
+      toLng: ride.toLng,
+      message: ride.message || '',
+      role: userRole,
+    };
+
+    try {
+      localStorage.setItem(LS_RIDE_FORM_DATA_KEY, JSON.stringify(rideData));
+    } catch (err) {
+      console.error('Failed to save ride data to localStorage:', err);
+      toast.error(
+        'Could not save ride data. Please check your browser storage settings.',
+      );
+      return;
+    }
+
+    navigate(getRoleRoute(userRole));
+  };
+
   return (
     <div className="mt-6 overflow-hidden rounded-3xl border border-teal-300">
       <h2 className="border-b bg-teal-50 p-3 text-center">Ride History</h2>
@@ -47,8 +166,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
                 </span>
                 <button
                   className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-gradient-to-tr from-teal-200 via-teal-100 to-teal-400 px-3 py-1 text-xs font-normal text-teal-700 shadow transition-all hover:scale-105 hover:bg-gradient-to-tl hover:from-teal-400 hover:to-teal-300 dark:border-teal-700 dark:bg-teal-900 dark:text-dark dark:hover:bg-teal-800"
-                  // TODO: Implement repeat ride functionality
-                  onClick={() => {}}
+                  onClick={() => handleRepeatRide(ride)}
                 >
                   <TbRepeat className="inline-block align-middle text-xs" />
                   Repeat
@@ -105,8 +223,8 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
                     </span>
                   )}
                   {ride.status === RIDE_STATUS.CONFIRMED && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-green-300 bg-green-100 px-2 py-0.5 text-xs font-normal text-green-600">
-                      <span className="size-1.5 rounded-full bg-green-600" />
+                    <span className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-100 px-2 py-0.5 text-xs font-normal text-teal-600">
+                      <span className="size-1.5 rounded-full bg-teal-600" />
                       Confirmed
                     </span>
                   )}
@@ -128,35 +246,33 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
                       Cancelled
                     </span>
                   )}
+                  {ride.status === RIDE_STATUS.COMPLETED && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-green-300 bg-green-100 px-2 py-0.5 text-xs font-normal text-green-600">
+                      <span className="size-1.5 rounded-full bg-green-600" />
+                      Completed
+                    </span>
+                  )}
                 </span>
               </div>
-              {/* Passengers */}
+              {/* User Display (Rider/Passenger based on current user) */}
               <div className="mt-1 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TbUser className="text-xs text-teal-400" />
-                  <span className="text-xs font-semibold text-teal-700 dark:text-teal-200">
-                    Passengers:
+                  <span className="text-xs font-semibold capitalize text-teal-700 dark:text-teal-200">
+                    {getUsersLabel()}:
                   </span>
                 </div>
-                <Tooltip
-                  content={
-                    ride.passengers && ride.passengers.length > 0
-                      ? ride.passengers[0].fullname
-                      : '-'
-                  }
-                >
-                  <span className="flex items-end gap-1 truncate text-xs text-gray-800 dark:text-gray-100">
-                    {ride.passengers && ride.passengers.length > 0
-                      ? ride.passengers[0].fullname
-                      : '-'}
-                  </span>
-                </Tooltip>
+                <UserDisplay
+                  user={getUserToDisplay(ride)}
+                  showProfilePicture={true}
+                  className="text-xs"
+                />
               </div>
               {/* Distance */}
               <div className="mt-1 flex items-center gap-2">
                 <TbRoute className="text-xs text-teal-400" />
                 <span className="text-xs font-semibold text-teal-700 dark:text-teal-200">
-                  Distance:
+                  Distance (km):
                 </span>
                 <span className="ml-auto text-xs text-gray-800 dark:text-gray-100">
                   {ride.distance ? ride.distance.toFixed(1) : '-'}

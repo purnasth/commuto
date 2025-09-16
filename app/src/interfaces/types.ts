@@ -100,16 +100,29 @@ export interface RideHistory {
   to: string;
   message?: string;
   role: USER_ROLE;
+  fromLat?: number;
+  fromLng?: number;
+  toLat?: number;
+  toLng?: number;
   timestamp: string;
   status: RIDE_STATUS;
-  rider: {
+  riderId?: number;
+  passengerId?: number;
+  createdBy: number;
+  rider?: {
     id: number;
     fullname: string;
     email: string;
     karmaPoints?: number;
     profilePicture?: string;
   };
-  passengers: {
+  passengers?: {
+    id: number;
+    fullname: string;
+    email: string;
+    profilePicture?: string;
+  }[];
+  createdByUser?: {
     id: number;
     fullname: string;
     email: string;

@@ -74,7 +74,17 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   }, [role, setValue]);
 
   // Use the custom hook for pre-filling form data
-  useRideForm(setValue);
+  const savedCoords = useRideForm(setValue);
+
+  // Set coordinates when saved data is loaded
+  useEffect(() => {
+    if (savedCoords.fromCoords) {
+      setFromCoords(savedCoords.fromCoords);
+    }
+    if (savedCoords.toCoords) {
+      setToCoords(savedCoords.toCoords);
+    }
+  }, [savedCoords]);
 
   // Add state for coordinates
   const [fromCoords, setFromCoords] = useState<[number, number] | null>(null);
@@ -161,8 +171,21 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const onSubmit = async (data: RideFormData) => {
     const userStr = localStorage.getItem('user');
     if (!userStr) {
-      localStorage.setItem(LS_RIDE_FORM_DATA_KEY, JSON.stringify(data));
+      // Include coordinates in the stored data for non-logged-in users
+      const dataWithCoordinates = {
+        ...data,
+        fromLat: fromCoords ? fromCoords[1] : undefined,
+        fromLng: fromCoords ? fromCoords[0] : undefined,
+        toLat: toCoords ? toCoords[1] : undefined,
+        toLng: toCoords ? toCoords[0] : undefined,
+      };
+
+      localStorage.setItem(
+        LS_RIDE_FORM_DATA_KEY,
+        JSON.stringify(dataWithCoordinates),
+      );
       localStorage.setItem('redirectAfterLogin', window.location.pathname);
+
       toast.error('Please log in to confirm your ride route.');
       // TODO: Use the route constants here
       navigate('/login');
@@ -241,29 +264,13 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       }
     }
   };
+
   useEffect(() => {
     const savedSearchParams = localStorage.getItem('lastSearchParams');
     if (savedSearchParams) {
       setLastSearchParams(JSON.parse(savedSearchParams));
     }
   }, []);
-  useEffect(() => {
-    const savedFormData = localStorage.getItem(LS_RIDE_FORM_DATA_KEY);
-    if (savedFormData) {
-      const parsedData: Partial<RideFormData> = JSON.parse(savedFormData);
-
-      // Prefill the form fields
-      (Object.keys(parsedData) as (keyof RideFormData)[])
-        .filter((key) => key !== 'timestamp')
-        .forEach((key) => {
-          if (parsedData[key]) {
-            setValue(key, parsedData[key] as string);
-          }
-        });
-
-      localStorage.removeItem(LS_RIDE_FORM_DATA_KEY);
-    }
-  }, [setValue]);
 
   const onError = () => {
     const errorMessages = Object.values(errors)

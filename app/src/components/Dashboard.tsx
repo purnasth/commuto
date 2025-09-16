@@ -56,21 +56,70 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
     return <MobileDashboard rides={rides} />;
   }
 
+  /**
+   * Determines which user to display in the table based on the current user's role in the ride.
+   * For riders: shows the passenger who matched with them
+   * For passengers: shows the rider who matched with them
+   * Since there's only one passenger per ride (bike), we take the first passenger from the array.
+   */
   const getUserToDisplay = (ride: RideHistory) => {
-    if (currentUser?.role.toLowerCase() === USER_ROLE.RIDER) {
-      return ride.passengers || null;
-    } else if (currentUser?.role.toLowerCase() === USER_ROLE.PASSENGER) {
+    if (!currentUser) return null;
+
+    const currentUserId = currentUser.id;
+
+    // If current user is the rider, show the passenger
+    if (
+      ride.riderId === currentUserId &&
+      ride.passengers &&
+      ride.passengers.length > 0
+    ) {
+      return ride.passengers[0]; // Since there's only one passenger per ride
+    }
+
+    // If current user is the passenger, show the rider
+    if (ride.passengerId === currentUserId && ride.rider) {
       return ride.rider;
     }
+
+    // If current user is the creator but neither rider nor passenger (edge case),
+    // show the opposite role based on the ride's role
+    if (ride.createdBy === currentUserId) {
+      if (
+        ride.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase() &&
+        ride.passengers &&
+        ride.passengers.length > 0
+      ) {
+        return ride.passengers[0];
+      } else if (
+        ride.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase() &&
+        ride.rider
+      ) {
+        return ride.rider;
+      }
+    }
+
     return null;
   };
 
+  /**
+   * Determines the column label based on what type of users will be displayed.
+   * If current user is a rider, the column will show passengers.
+   * If current user is a passenger, the column will show riders.
+   */
   const getUsersColumnLabel = () => {
-    if (currentUser?.role.toLowerCase() === USER_ROLE.RIDER) {
+    if (!currentUser) return '';
+
+    // The column should show what type of user will be displayed
+    // If current user is a rider, we'll show passengers, and vice versa
+    if (currentUser.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
       return USER_ROLE.PASSENGER;
-    } else if (currentUser?.role.toLowerCase() === USER_ROLE.PASSENGER) {
+    } else if (
+      currentUser.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase()
+    ) {
       return USER_ROLE.RIDER;
     }
+
+    return 'Match';
   };
 
   const handleRepeatRide = (ride: RideHistory) => {
@@ -83,16 +132,19 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
 
     const userRole = currentUser.role as USER_ROLE;
 
+    const rideData = {
+      from: ride.from,
+      to: ride.to,
+      fromLat: ride.fromLat,
+      fromLng: ride.fromLng,
+      toLat: ride.toLat,
+      toLng: ride.toLng,
+      message: ride.message || '',
+      role: userRole,
+    };
+
     try {
-      localStorage.setItem(
-        LS_RIDE_FORM_DATA_KEY,
-        JSON.stringify({
-          from: ride.from,
-          to: ride.to,
-          message: ride.message || '',
-          role: userRole,
-        }),
-      );
+      localStorage.setItem(LS_RIDE_FORM_DATA_KEY, JSON.stringify(rideData));
     } catch (err) {
       console.error('Failed to save ride data to localStorage:', err);
       toast.error(
