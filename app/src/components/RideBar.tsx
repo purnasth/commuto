@@ -1,21 +1,28 @@
+import React, { useEffect, useState } from 'react';
+
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
-import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom';
 import { yupResolver } from '@hookform/resolvers/yup';
 
-import { TbUser, TbMapPin, TbBrandHipchat } from 'react-icons/tb';
 import { TbMoodTongueWink2 } from 'react-icons/tb';
 import { PiSmileyMeltingBold } from 'react-icons/pi';
+import { TbUser, TbMapPin, TbBrandHipchat } from 'react-icons/tb';
 
-import { findRideFormFields } from '../constants/data';
 import {
   USER_ROLE,
   RIDE_STATUS,
   LS_RIDE_FORM_DATA_KEY,
 } from '../constants/enums';
+import { ROUTE_LOGIN } from '../constants/routes';
+import { findRideFormFields } from '../constants/data';
+
+import { rideFormSchema } from '../schemas/formSchema';
+
+import { apiFetch } from '../utils/api';
+import { useRideEvent } from '../utils/useRideEvent';
 
 import { RideFormData, RideBarProps, UserDetails } from '../interfaces/types';
 
@@ -33,10 +40,6 @@ import RideResultsList from '../pages/RideResultsList';
 import useRideForm from '../hooks/useRideForm';
 import useScrollVisibility from '../hooks/useScrollVisibility';
 
-import { rideFormSchema } from '../schemas/formSchema';
-import { apiFetch } from '../utils/api';
-import { useRideEvent } from '../utils/useRideEvent';
-
 const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [showMessagePopup, setShowMessagePopup] = useState(false);
@@ -46,7 +49,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showModal, setShowModal] = useState(false);
   const [showRideStatusModal, setShowRideStatusModal] = useState(false);
   const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
-  const [notifications, setNotifications] = useState<string[]>([]);
+  const [, setNotifications] = useState<string[]>([]);
   const [user, setUser] = useState<{ id: number } | null>(null);
   const navigate = useNavigate();
   const showRideBar = useScrollVisibility(100);
@@ -187,8 +190,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       localStorage.setItem('redirectAfterLogin', window.location.pathname);
 
       toast.error('Please log in to confirm your ride route.');
-      // TODO: Use the route constants here
-      navigate('/login');
+      navigate(ROUTE_LOGIN);
+
       return;
     }
     const user = JSON.parse(userStr);
@@ -367,9 +370,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         // Find the user's most recent active ride where they are creator, rider, or passenger
         const currentUserRide = userRides.find(
           (r) =>
-            (r.createdBy == user.id ||
-              r.riderId == user.id ||
-              r.passengerId == user.id) &&
+            (r.createdBy === user.id ||
+              r.riderId === user.id ||
+              r.passengerId === user.id) &&
             (r.status === RIDE_STATUS.ACTIVE || r.status === undefined),
         );
 
@@ -403,21 +406,35 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
           riderRideId?: number;
         } = {};
 
-        if (user.role.toLowerCase() === 'rider') {
+        if (user.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
           // Current user is a rider, confirming a passenger's ride
           // The ride being confirmed should have a passengerId set (passenger who created it)
           const passengerUserId = ride.passengerId || ride.createdBy;
+
+          if (!passengerUserId || !ride.id) {
+            toast.error('Invalid passenger or ride ID. Please try again.');
+
+            return;
+          }
+
           confirmPayload = {
-            passengerId: parseInt(passengerUserId?.toString() || '0'),
-            passengerRideId: parseInt(ride.id?.toString() || '0'),
+            passengerId: parseInt(passengerUserId.toString()),
+            passengerRideId: parseInt(ride.id.toString()),
           };
         } else {
           // Current user is a passenger, confirming a rider's ride
           // The ride being confirmed should have a riderId set (rider who created it)
           const riderUserId = ride.riderId || ride.createdBy;
+
+          if (!riderUserId || !ride.id) {
+            toast.error('Invalid rider or ride ID. Please try again.');
+
+            return;
+          }
+
           confirmPayload = {
-            riderId: parseInt(riderUserId?.toString() || '0'),
-            riderRideId: parseInt(ride.id?.toString() || '0'),
+            riderId: parseInt(riderUserId.toString()),
+            riderRideId: parseInt(ride.id.toString()),
           };
         }
 
@@ -437,8 +454,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
           message: ride.message,
           role: ride.role,
           timestamp: ride.timestamp,
-          // TODO: use enum here for the status i.e. RIDE_STATUS.CONFIRMED
-          status: 'CONFIRMED',
+          status: RIDE_STATUS.CONFIRMED,
           riderId: ride.riderId,
         });
         toast.success('Congratulations! Your ride has been confirmed!');

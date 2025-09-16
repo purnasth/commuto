@@ -89,10 +89,7 @@ const CompleteRideButton: React.FC<{
   onComplete: (ride: RideFormData) => Promise<void>;
   onFeedback: () => void;
 }> = ({ user, rideDetails, onComplete, onFeedback }) => {
-  const isRider =
-    user?.id &&
-    rideDetails.riderId &&
-    Number(user.id) === Number(rideDetails.riderId);
+  const isRider = Number(user?.id) === Number(rideDetails.riderId);
 
   const handleClick = async () => {
     if (isRider) {

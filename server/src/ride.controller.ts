@@ -516,25 +516,35 @@ export class RideController {
 
     // Determine the target ride and user IDs based on the current ride's role
     if (currentRide.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
-      // Current ride is by a rider, confirming with a passenger
+      // Current ride is by a rider, confirming a passenger's ride
       if (!body.passengerId || !body.passengerRideId) {
         throw new BadRequestException(
-          'passengerId and passengerRideId are required for rider confirmation',
+          'passengerId and passengerRideId are required for confirming a passenger ride',
+        );
+      }
+      if (currentRide.riderId === null || currentRide.riderId === undefined) {
+        throw new BadRequestException(
+          'Current ride does not have a valid riderId',
         );
       }
       targetRideId = body.passengerRideId;
-      updatedRiderId = currentRide.riderId!;
+      updatedRiderId = currentRide.riderId;
       updatedPassengerId = body.passengerId;
     } else {
-      // Current ride is by a passenger, confirming with a rider
+      // Current ride is by a passenger, confirming a rider's ride
       if (!body.riderId || !body.riderRideId) {
         throw new BadRequestException(
-          'riderId and riderRideId are required for passenger confirmation',
+          'riderId and riderRideId are required for confirming a rider ride',
+        );
+      }
+      if (currentRide.passengerId === null) {
+        throw new BadRequestException(
+          'Current ride does not have a valid passengerId',
         );
       }
       targetRideId = body.riderRideId;
       updatedRiderId = body.riderId;
-      updatedPassengerId = currentRide.passengerId!;
+      updatedPassengerId = currentRide.passengerId;
     }
 
     // Verify the target ride exists
