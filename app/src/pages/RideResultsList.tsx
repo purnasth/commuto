@@ -7,8 +7,9 @@ import {
 import { USER_ROLE } from '../constants/enums';
 
 type RideFormData = BaseRideFormData & {
-  rider: UserDetails;
-  passengers: UserDetails[];
+  createdByUser: UserDetails; // Always required - the person who created the ride
+  rider?: UserDetails; // Optional - only for confirmed rides
+  passengers?: UserDetails[]; // Optional - only for confirmed rides
 };
 
 interface RideResultsListProps {
@@ -44,16 +45,9 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
           >
             <div className="flex items-center gap-3 border-b border-teal-200/50 pb-2.5 dark:border-teal-700/30">
               {(() => {
-                let userToShow: UserDetails;
-                if (ride.role === USER_ROLE.RIDER) {
-                  userToShow = ride.rider as UserDetails;
-                } else {
-                  userToShow = (
-                    ride.passengers && ride.passengers.length > 0
-                      ? ride.passengers[0]
-                      : ride.rider
-                  ) as UserDetails;
-                }
+                // Use createdByUser to show the person who created/posted this ride
+                const userToShow = ride.createdByUser!;
+
                 return (
                   <>
                     <div className="flex size-10 items-center justify-center rounded-full bg-teal-200 dark:bg-teal-800">

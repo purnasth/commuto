@@ -34,9 +34,17 @@ interface RideDto {
   toLng?: number;
   message?: string;
   role: USER_ROLE;
-  riderId: number; // user id of the poster
+  createdBy: number; // user id of the creator
+  estimatedTimeOfArrival?: number;
   timestamp?: string;
   status?: RIDE_STATUS;
+}
+
+interface ConfirmRideDto {
+  passengerId?: number;
+  passengerRideId?: number;
+  riderId?: number;
+  riderRideId?: number;
 }
 
 @Controller('rides')
@@ -134,7 +142,7 @@ export class RideController {
         fromLat: { not: null },
         fromLng: { not: null },
       },
-      include: { rider: true, passengers: true },
+      include: { rider: true, passengers: true, createdByUser: true },
     });
 
     this.logger.log({
@@ -180,26 +188,26 @@ export class RideController {
   async createRide(@Body() body: RideDto) {
     this.logger.log({
       level: 'info',
-      message: `Create ride attempt by userId=${body.riderId}, from='${body.from}' to='${body.to}', role='${body.role}'`,
+      message: `Create ride attempt by userId=${body.createdBy}, from='${body.from}' to='${body.to}', role='${body.role}'`,
       tag: 'ride',
-      userId: body.riderId,
+      userId: body.createdBy,
       from: body.from,
       to: body.to,
       role: body.role,
     });
-    if (!body.from || !body.to || !body.role || !body.riderId) {
+    if (!body.from || !body.to || !body.role || !body.createdBy) {
       throw new BadRequestException('Missing required fields');
     }
     // Fetch user and check role
     const user = await this.prisma.user.findUnique({
-      where: { id: body.riderId },
+      where: { id: body.createdBy },
     });
     if (!user) {
       this.logger.log({
         level: 'warn',
-        message: `Ride creation failed: User not found (userId=${body.riderId})`,
+        message: `Ride creation failed: User not found (userId=${body.createdBy})`,
         tag: 'ride',
-        userId: body.riderId,
+        userId: body.createdBy,
       });
       throw new NotFoundException('User not found');
     }
@@ -207,9 +215,9 @@ export class RideController {
     if (user.role.toLowerCase() !== body.role.toLowerCase()) {
       this.logger.log({
         level: 'warn',
-        message: `Ride creation failed: Role mismatch for userId=${body.riderId} (userRole='${user.role}', requestedRole='${body.role}')`,
+        message: `Ride creation failed: Role mismatch for userId=${body.createdBy} (userRole='${user.role}', requestedRole='${body.role}')`,
         tag: 'ride',
-        userId: body.riderId,
+        userId: body.createdBy,
         userRole: user.role,
         requestedRole: body.role,
       });
@@ -221,7 +229,7 @@ export class RideController {
     const fiveMinAgo = new Date(getNow().getTime() - 5 * 60 * 1000);
     const existingActiveRide = await this.prisma.ride.findFirst({
       where: {
-        riderId: body.riderId,
+        createdBy: body.createdBy,
         status: RIDE_STATUS.ACTIVE,
         timestamp: { gte: fiveMinAgo },
       },
@@ -229,18 +237,28 @@ export class RideController {
     if (existingActiveRide) {
       this.logger.log({
         level: 'warn',
-        message: `Ride creation failed: UserId=${body.riderId} already has an active ride`,
+        message: `Ride creation failed: UserId=${body.createdBy} already has an active ride`,
         tag: 'ride',
-        userId: body.riderId,
+        userId: body.createdBy,
       });
       throw new BadRequestException(
         'You already have an active ride and cannot post another at this time.',
       );
     }
 
+    // Determine riderId and passengerId based on role
+    let riderId: number | null = null;
+    let passengerId: number | null = null;
+
+    if (body.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
+      riderId = body.createdBy;
+      passengerId = null;
+    } else if (body.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase()) {
+      riderId = null;
+      passengerId = body.createdBy;
+    }
+
     // Create ride with proper role-based assignment
-    // Note: Due to schema constraints, riderId is required, so we'll use it for the creator
-    // and add passengers separately for passenger role
     const ride = await this.prisma.ride.create({
       data: {
         from: body.from,
@@ -251,16 +269,23 @@ export class RideController {
         toLng: body.toLng,
         message: body.message,
         role: body.role,
-        riderId: body.riderId,
+        createdBy: body.createdBy,
+        riderId: riderId,
+        passengerId: passengerId,
+        estimatedTimeOfArrival: body.estimatedTimeOfArrival,
         timestamp: body.timestamp ? new Date(body.timestamp) : undefined,
         status: RIDE_STATUS.ACTIVE,
+      },
+      include: {
+        createdByUser: true,
+        rider: true,
       },
     });
     this.logger.log({
       level: 'info',
-      message: `Ride created by userId=${body.riderId}: ${JSON.stringify(ride)}`,
+      message: `Ride created by userId=${body.createdBy}: ${JSON.stringify(ride)}`,
       tag: 'ride',
-      userId: body.riderId,
+      userId: body.createdBy,
       rideId: ride.id,
     });
     return { message: 'Ride created', ride };
@@ -291,7 +316,11 @@ export class RideController {
         status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
         timestamp: { gte: now },
       },
-      include: { rider: true },
+      include: {
+        rider: true,
+        createdByUser: true,
+        passengers: true,
+      },
       orderBy: { timestamp: 'desc' },
     });
 
@@ -314,20 +343,26 @@ export class RideController {
   @Get('history')
   async getRideHistory(@Query('userId') userId: string) {
     const now = getNow();
-    // Expire rides whose timestamp is in the past and still ACTIVE
+    // TODO: store this in a config file or env variable or maybe centralize it using enums or create utils
+    // Add a 5-minute grace period before expiring rides
+    // This prevents rides from being expired immediately after creation
+    const expirationTime = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
+
+    // Expire rides whose timestamp is more than 5 minutes in the past and still ACTIVE
     await this.prisma.ride.updateMany({
       where: {
         status: RIDE_STATUS.ACTIVE,
-        timestamp: { lt: now },
+        timestamp: { lt: expirationTime },
       },
       data: { status: RIDE_STATUS.EXPIRED },
     });
 
     this.logger.log({
       level: 'info',
-      message: `Expired past active rides for history fetch`,
+      message: `Expired rides older than 5 minutes for history fetch`,
       tag: 'ride',
       timestamp: now,
+      expirationTime,
       userId,
     });
     const id = Number(userId);
@@ -342,11 +377,12 @@ export class RideController {
     }
     const rides = await this.prisma.ride.findMany({
       where: {
-        OR: [{ riderId: id }, { passengers: { some: { id: id } } }],
+        OR: [{ riderId: id }, { passengerId: id }, { createdBy: id }],
       },
       include: {
         rider: true,
         passengers: true,
+        createdByUser: true,
         requests: true,
         ratings: true,
         messages: true,
@@ -365,7 +401,7 @@ export class RideController {
   }
 
   @Get(':id')
-  async getRide(@Param('id') id: string) {
+  async getRide(@Param('id') id: string, @Query('userId') userId?: string) {
     const rideId = Number(id);
     if (!id || isNaN(rideId)) {
       this.logger.log({
@@ -381,19 +417,40 @@ export class RideController {
       include: {
         rider: true,
         passengers: true,
+        createdByUser: true,
         requests: true,
         ratings: true,
         messages: true,
       },
     });
     if (!ride) throw new NotFoundException('Ride not found');
+
+    // Determine the role from the current user's perspective
+    let userRole = ride.role; // Default to the original creator's role
+    if (userId) {
+      const currentUserId = Number(userId);
+      if (currentUserId === ride.riderId) {
+        userRole = USER_ROLE.RIDER;
+      } else if (currentUserId === ride.passengerId) {
+        userRole = USER_ROLE.PASSENGER;
+      }
+    }
+
     this.logger.log({
       level: 'info',
       message: `Fetched ride details`,
       tag: 'ride',
       rideId,
+      requestedByUser: userId,
+      userRole,
     });
-    return { ride };
+
+    return {
+      ride: {
+        ...ride,
+        role: userRole, // Override the role based on current user's perspective
+      },
+    };
   }
 
   @Put(':id')
@@ -430,17 +487,20 @@ export class RideController {
     return { message: 'Ride deleted' };
   }
 
-  // Confirm a ride (mark as completed)
+  // Confirm a ride (match rides and mark as confirmed)
   @Post(':id/confirm')
-  async confirmRide(@Param('id') id: string) {
-    const ride = await this.prisma.ride.findUnique({
-      where: { id: Number(id) },
+  async confirmRide(@Param('id') id: string, @Body() body: ConfirmRideDto) {
+    const rideId = Number(id);
+    const currentRide = await this.prisma.ride.findUnique({
+      where: { id: rideId },
       include: {
-        passengers: true, // Include passengers to get their IDs
+        createdByUser: true,
+        rider: true,
+        passengers: true,
       },
     });
 
-    if (!ride) {
+    if (!currentRide) {
       this.logger.log({
         level: 'warn',
         message: `Confirm ride failed: Ride not found`,
@@ -450,109 +510,101 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
-    // TODO: Add pagination or limit to this query to prevent performance issues as ride count grows
-    // Get all active rides within the time window for proximity filtering
-    const activeRides = await this.prisma.ride.findMany({
-      where: {
-        timestamp: {
-          gte: new Date(new Date(ride.timestamp).getTime() - 2 * 60 * 1000),
-          lte: new Date(new Date(ride.timestamp).getTime() + 2 * 60 * 1000),
-        },
-        status: RIDE_STATUS.ACTIVE,
-        // Ensure we have location data
-        fromLat: { not: null },
-        fromLng: { not: null },
-        toLat: { not: null },
-        toLng: { not: null },
-      },
-      include: {
-        passengers: true,
-      },
-    });
+    let targetRideId: number;
+    let updatedRiderId: number;
+    let updatedPassengerId: number;
 
-    this.logger.log({
-      level: 'info',
-      message: `Confirming ride, found ${activeRides.length} active rides in time window`,
-      tag: 'ride',
-      rideId: id,
-    });
-
-    // Filter rides based on proximity using Haversine distance
-    const matchedRides = activeRides.filter((matchedRide) => {
-      if (
-        !ride.fromLat ||
-        !ride.fromLng ||
-        !matchedRide.fromLat ||
-        !matchedRide.fromLng ||
-        !ride.toLat ||
-        !ride.toLng ||
-        !matchedRide.toLat ||
-        !matchedRide.toLng
-      ) {
-        return false;
+    // Determine the target ride and user IDs based on the current ride's role
+    if (currentRide.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
+      // Current ride is by a rider, confirming with a passenger
+      if (!body.passengerId || !body.passengerRideId) {
+        throw new BadRequestException(
+          'passengerId and passengerRideId are required for rider confirmation',
+        );
       }
+      targetRideId = body.passengerRideId;
+      updatedRiderId = currentRide.riderId!;
+      updatedPassengerId = body.passengerId;
+    } else {
+      // Current ride is by a passenger, confirming with a rider
+      if (!body.riderId || !body.riderRideId) {
+        throw new BadRequestException(
+          'riderId and riderRideId are required for passenger confirmation',
+        );
+      }
+      targetRideId = body.riderRideId;
+      updatedRiderId = body.riderId;
+      updatedPassengerId = currentRide.passengerId!;
+    }
 
-      const fromDistance = haversineDistance(
-        ride.fromLat,
-        ride.fromLng,
-        matchedRide.fromLat,
-        matchedRide.fromLng,
-      );
-
-      const toDistance = haversineDistance(
-        ride.toLat,
-        ride.toLng,
-        matchedRide.toLat,
-        matchedRide.toLng,
-      );
-
-      return (
-        fromDistance <= MAX_RIDE_PROXIMITY_KM &&
-        toDistance <= MAX_RIDE_PROXIMITY_KM
-      );
+    // Verify the target ride exists
+    const targetRide = await this.prisma.ride.findUnique({
+      where: { id: targetRideId },
+      include: {
+        createdByUser: true,
+        rider: true,
+      },
     });
 
-    const matchedIds = matchedRides.map((r) => r.id);
+    if (!targetRide) {
+      throw new NotFoundException('Target ride not found');
+    }
 
+    // Update both rides with confirmed status and proper rider/passenger assignments
     await this.prisma.ride.updateMany({
-      where: { id: { in: matchedIds } },
-      data: { status: RIDE_STATUS.CONFIRMED },
+      where: { id: { in: [rideId, targetRideId] } },
+      data: {
+        status: RIDE_STATUS.CONFIRMED,
+        riderId: updatedRiderId,
+        passengerId: updatedPassengerId,
+      },
+    });
+
+    // Now connect the passenger to both rides in the many-to-many relationship
+    await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        passengers: {
+          connect: { id: updatedPassengerId },
+        },
+      },
+    });
+
+    await this.prisma.ride.update({
+      where: { id: targetRideId },
+      data: {
+        passengers: {
+          connect: { id: updatedPassengerId },
+        },
+      },
     });
 
     this.logger.log({
       level: 'info',
       message: `Confirmed matched rides`,
       tag: 'ride',
-      rideIds: matchedIds,
+      rideIds: [rideId, targetRideId],
+      riderId: updatedRiderId,
+      passengerId: updatedPassengerId,
     });
 
+    // Fetch the updated rides
     const updatedRides = await this.prisma.ride.findMany({
-      where: { id: { in: matchedIds } },
+      where: { id: { in: [rideId, targetRideId] } },
       include: {
+        createdByUser: true,
         rider: true,
         passengers: true,
       },
     });
 
+    // Notify clients about the confirmation
     for (const confirmedRide of updatedRides) {
       this.rideGateway.notifyRideConfirmation(confirmedRide);
-
-      // Notify all passengers associated with this specific confirmed ride
-      for (const passenger of confirmedRide.passengers) {
-        this.rideGateway.notifyRideConfirmationForPassenger(
-          confirmedRide,
-          passenger.id,
-        );
-      }
     }
 
-    console.log({
-      message: 'All matched rides confirmed',
-      rides: updatedRides,
-    });
-
     return {
-      message: 'All matched rides confirmed',
+      message: 'Rides confirmed successfully',
       rides: updatedRides,
     };
   }
@@ -655,7 +707,7 @@ export class RideController {
 
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: { passengers: true, rider: true },
+      include: { passengers: true, rider: true, createdByUser: true },
     });
 
     if (!ride) {
@@ -711,6 +763,7 @@ export class RideController {
       include: {
         passengers: true,
         rider: true,
+        createdByUser: true,
       },
     });
 
@@ -724,23 +777,26 @@ export class RideController {
       peopleImpacted,
     });
 
-    // Award karma points to the rider
-    const karmaPoints = 20;
-    await this.prisma.user.update({
-      where: { id: ride.rider.id },
-      data: {
-        karmaPoints: { increment: karmaPoints },
-      },
-    });
+    // Award karma points to the rider if they exist
+    if (ride.rider) {
+      // TODO: create a constant for karma points and centralize it
+      const karmaPoints = 20;
+      await this.prisma.user.update({
+        where: { id: ride.rider.id },
+        data: {
+          karmaPoints: { increment: karmaPoints },
+        },
+      });
 
-    await this.prisma.karmaTransaction.create({
-      data: {
-        userId: ride.rider.id,
-        points: karmaPoints,
-        type: 'earned',
-        reason: 'Ride completed',
-      },
-    });
+      await this.prisma.karmaTransaction.create({
+        data: {
+          userId: ride.rider.id,
+          points: karmaPoints,
+          type: 'earned',
+          reason: 'Ride completed',
+        },
+      });
+    }
 
     this.rideGateway.notifyRideCompletion(updatedRide);
 

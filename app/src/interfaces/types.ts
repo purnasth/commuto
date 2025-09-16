@@ -13,8 +13,13 @@ export interface RideFormData {
   timestamp?: string;
   status?: string;
   riderId?: string;
+  passengerId?: string;
+  createdBy?: string;
   estimatedTimeOfArrival?: number;
   distance?: number;
+  rider?: UserDetails;
+  passengers?: UserDetails[];
+  createdByUser?: UserDetails;
 }
 
 export interface AvailableListProps {
