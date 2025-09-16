@@ -81,6 +81,8 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
       return;
     }
 
+    const userRole = currentUser.role as USER_ROLE;
+
     try {
       localStorage.setItem(
         LS_RIDE_FORM_DATA_KEY,
@@ -88,7 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
           from: ride.from,
           to: ride.to,
           message: ride.message || '',
-          role: currentUser.role,
+          role: userRole,
         }),
       );
     } catch (err) {
@@ -99,7 +101,7 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
       return;
     }
 
-    navigate(getRoleRoute(currentUser.role));
+    navigate(getRoleRoute(userRole));
   };
 
   return (

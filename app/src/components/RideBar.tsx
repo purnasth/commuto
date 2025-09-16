@@ -11,7 +11,11 @@ import { TbMoodTongueWink2 } from 'react-icons/tb';
 import { PiSmileyMeltingBold } from 'react-icons/pi';
 
 import { findRideFormFields } from '../constants/data';
-import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
+import {
+  USER_ROLE,
+  RIDE_STATUS,
+  LS_RIDE_FORM_DATA_KEY,
+} from '../constants/enums';
 
 import { RideFormData, RideBarProps, UserDetails } from '../interfaces/types';
 
@@ -157,7 +161,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const onSubmit = async (data: RideFormData) => {
     const userStr = localStorage.getItem('user');
     if (!userStr) {
-      localStorage.setItem('rideFormData', JSON.stringify(data));
+      localStorage.setItem(LS_RIDE_FORM_DATA_KEY, JSON.stringify(data));
       localStorage.setItem('redirectAfterLogin', window.location.pathname);
       toast.error('Please log in to confirm your ride route.');
       // TODO: Use the route constants here
@@ -244,7 +248,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     }
   }, []);
   useEffect(() => {
-    const savedFormData = localStorage.getItem('rideFormData');
+    const savedFormData = localStorage.getItem(LS_RIDE_FORM_DATA_KEY);
     if (savedFormData) {
       const parsedData: Partial<RideFormData> = JSON.parse(savedFormData);
 
@@ -257,7 +261,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
           }
         });
 
-      localStorage.removeItem('rideFormData');
+      localStorage.removeItem(LS_RIDE_FORM_DATA_KEY);
     }
   }, [setValue]);
 
