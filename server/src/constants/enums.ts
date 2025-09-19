@@ -28,3 +28,13 @@ export enum RIDE_STATUS {
   CANCELLED = 'CANCELLED',
   COMPLETED = 'COMPLETED',
 }
+
+/**
+ * Time window (in minutes) for ride matching (how far apart rides can be matched)
+ */
+export const RIDE_MATCH_WINDOW_MINUTES = 5;
+
+/**
+ * Expiration window (in minutes) for how long a ride remains ACTIVE after its scheduled time
+ */
+export const RIDE_EXPIRATION_GRACE_MINUTES = 5;

@@ -13,17 +13,23 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { RideGateway } from './rides/rides.gateway';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
-import { getNow } from './utils/date.util';
+import {
+  RIDE_MATCH_WINDOW_MINUTES,
+  RIDE_EXPIRATION_GRACE_MINUTES,
+} from './constants/enums';
 import { USER_ROLE, RIDE_STATUS } from './constants/enums';
-import { RideGateway } from './rides/rides.gateway';
+
 import {
   calculateETA,
   haversineDistance,
   MAX_RIDE_PROXIMITY_KM,
   estimateCO2FromDistance,
 } from './utils/rideStats.util';
+import { getNow } from './utils/date.util';
+import { getTimeWindow } from './utils/timeWindow.util';
 
 interface RideDto {
   from: string;
@@ -119,13 +125,11 @@ export class RideController {
     }
     const fromLatNum = Number(fromLat);
     const fromLngNum = Number(fromLng);
-    const timeWindowMinutes = 30; // +/- 30 minutes
-    const requestedTime = new Date(timestamp);
-    const minTime = new Date(
-      requestedTime.getTime() - timeWindowMinutes * 60000,
-    );
-    const maxTime = new Date(
-      requestedTime.getTime() + timeWindowMinutes * 60000,
+
+    // Use global constant and utility for time window
+    const { min: minTime, max: maxTime } = getTimeWindow(
+      timestamp,
+      RIDE_MATCH_WINDOW_MINUTES,
     );
 
     // Always match rides with the OPPOSITE role
@@ -343,12 +347,12 @@ export class RideController {
   @Get('history')
   async getRideHistory(@Query('userId') userId: string) {
     const now = getNow();
-    // TODO: store this in a config file or env variable or maybe centralize it using enums or create utils
-    // Add a 5-minute grace period before expiring rides
-    // This prevents rides from being expired immediately after creation
-    const expirationTime = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
+    // Use global constant for expiration grace period
+    const expirationTime = new Date(
+      now.getTime() - RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000, // Convert minutes to milliseconds: minutes * 60 (seconds) * 1000 (ms)
+    );
 
-    // Expire rides whose timestamp is more than 5 minutes in the past and still ACTIVE
+    // Expire rides whose timestamp is more than grace period in the past and still ACTIVE
     await this.prisma.ride.updateMany({
       where: {
         status: RIDE_STATUS.ACTIVE,
@@ -359,7 +363,7 @@ export class RideController {
 
     this.logger.log({
       level: 'info',
-      message: `Expired rides older than 5 minutes for history fetch`,
+      message: `Expired rides older than grace period for history fetch`,
       tag: 'ride',
       timestamp: now,
       expirationTime,
