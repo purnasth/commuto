@@ -62,6 +62,7 @@ model Ride {
   distance     Float?        // Distance in kilometers, calculated when ride is confirmed
   co2Saved     Float?        // CO2 saved in kg
   peopleImpacted Int?        // Number of people impacted (passengers)
+  matchGroupId String?       // UUID to group matched rides together
 }
 
 enum RideStatus {

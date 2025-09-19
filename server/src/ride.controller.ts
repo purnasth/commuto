@@ -12,6 +12,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from './prisma.service';
 import { RideGateway } from './rides/rides.gateway';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
@@ -394,14 +395,35 @@ export class RideController {
       orderBy: { timestamp: 'desc' },
     });
 
+    // Group rides by matchGroupId to prevent duplicates
+    // TODO (Performance): Optimize by handling deduplication at database level using
+    // GROUP BY or DISTINCT ON to reduce memory usage and improve performance for large datasets
+    // instead of filtering in memory. This becomes critical with 1000+ rides.
+    const uniqueRides: typeof rides = [];
+    const seenMatchGroups = new Set();
+
+    for (const ride of rides) {
+      if (ride.matchGroupId) {
+        // If this ride has a matchGroupId and we haven't seen it yet
+        if (!seenMatchGroups.has(ride.matchGroupId)) {
+          seenMatchGroups.add(ride.matchGroupId);
+          uniqueRides.push(ride);
+        }
+      } else {
+        // If no matchGroupId, include the ride (not a matched ride)
+        uniqueRides.push(ride);
+      }
+    }
+
     this.logger.log({
       level: 'info',
       message: `Fetched ride history`,
       tag: 'ride',
       userId,
-      rideCount: rides.length,
+      rideCount: uniqueRides.length,
+      originalRideCount: rides.length,
     });
-    return { rides };
+    return { rides: uniqueRides };
   }
 
   @Get(':id')
@@ -564,6 +586,9 @@ export class RideController {
       throw new NotFoundException('Target ride not found');
     }
 
+    // Generate a unique match group ID for these paired rides
+    const matchGroupId = randomUUID();
+
     // Update both rides with confirmed status and proper rider/passenger assignments
     await this.prisma.ride.updateMany({
       where: { id: { in: [rideId, targetRideId] } },
@@ -571,6 +596,7 @@ export class RideController {
         status: RIDE_STATUS.CONFIRMED,
         riderId: updatedRiderId,
         passengerId: updatedPassengerId,
+        matchGroupId: matchGroupId,
       },
     });
 
