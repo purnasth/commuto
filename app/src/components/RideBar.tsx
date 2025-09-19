@@ -1,19 +1,30 @@
+import React, { useEffect, useState } from 'react';
+
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
-import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate } from 'react-router-dom';
 import { yupResolver } from '@hookform/resolvers/yup';
 
-import { TbUser, TbMapPin, TbBrandHipchat } from 'react-icons/tb';
 import { TbMoodTongueWink2 } from 'react-icons/tb';
 import { PiSmileyMeltingBold } from 'react-icons/pi';
+import { TbUser, TbMapPin, TbBrandHipchat } from 'react-icons/tb';
 
+import {
+  USER_ROLE,
+  RIDE_STATUS,
+  LS_RIDE_FORM_DATA_KEY,
+} from '../constants/enums';
+import { ROUTE_LOGIN } from '../constants/routes';
 import { findRideFormFields } from '../constants/data';
-import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
 
-import { RideFormData, RideBarProps } from '../interfaces/types';
+import { rideFormSchema } from '../schemas/formSchema';
+
+import { apiFetch } from '../utils/api';
+import { useRideEvent } from '../utils/useRideEvent';
+
+import { RideFormData, RideBarProps, UserDetails } from '../interfaces/types';
 
 import AgreeInfo from './ui/AgreeInfo';
 import NoRideFound from './ui/NoRideFound';
@@ -29,10 +40,6 @@ import RideResultsList from '../pages/RideResultsList';
 import useRideForm from '../hooks/useRideForm';
 import useScrollVisibility from '../hooks/useScrollVisibility';
 
-import { rideFormSchema } from '../schemas/formSchema';
-import { apiFetch } from '../utils/api';
-import { useRideEvent } from '../utils/useRideEvent';
-
 const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [showMessagePopup, setShowMessagePopup] = useState(false);
@@ -42,7 +49,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showModal, setShowModal] = useState(false);
   const [showRideStatusModal, setShowRideStatusModal] = useState(false);
   const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
-  const [notifications, setNotifications] = useState<string[]>([]);
+  const [, setNotifications] = useState<string[]>([]);
   const [user, setUser] = useState<{ id: number } | null>(null);
   const navigate = useNavigate();
   const showRideBar = useScrollVisibility(100);
@@ -70,7 +77,17 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   }, [role, setValue]);
 
   // Use the custom hook for pre-filling form data
-  useRideForm(setValue);
+  const savedCoords = useRideForm(setValue);
+
+  // Set coordinates when saved data is loaded
+  useEffect(() => {
+    if (savedCoords.fromCoords) {
+      setFromCoords(savedCoords.fromCoords);
+    }
+    if (savedCoords.toCoords) {
+      setToCoords(savedCoords.toCoords);
+    }
+  }, [savedCoords]);
 
   // Add state for coordinates
   const [fromCoords, setFromCoords] = useState<[number, number] | null>(null);
@@ -157,10 +174,24 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const onSubmit = async (data: RideFormData) => {
     const userStr = localStorage.getItem('user');
     if (!userStr) {
-      localStorage.setItem('rideFormData', JSON.stringify(data));
+      // Include coordinates in the stored data for non-logged-in users
+      const dataWithCoordinates = {
+        ...data,
+        fromLat: fromCoords ? fromCoords[1] : undefined,
+        fromLng: fromCoords ? fromCoords[0] : undefined,
+        toLat: toCoords ? toCoords[1] : undefined,
+        toLng: toCoords ? toCoords[0] : undefined,
+      };
+
+      localStorage.setItem(
+        LS_RIDE_FORM_DATA_KEY,
+        JSON.stringify(dataWithCoordinates),
+      );
       localStorage.setItem('redirectAfterLogin', window.location.pathname);
+
       toast.error('Please log in to confirm your ride route.');
-      navigate('/login');
+      navigate(ROUTE_LOGIN);
+
       return;
     }
     const user = JSON.parse(userStr);
@@ -171,7 +202,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       toLat: toCoords ? toCoords[1] : undefined,
       toLng: toCoords ? toCoords[0] : undefined,
       timestamp: new Date().toISOString(),
-      riderId: user.id,
+      createdBy: user.id, // Changed from riderId to createdBy
     };
 
     const loadingToastId = toast.loading('Submitting your ride route...');
@@ -236,29 +267,13 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       }
     }
   };
+
   useEffect(() => {
     const savedSearchParams = localStorage.getItem('lastSearchParams');
     if (savedSearchParams) {
       setLastSearchParams(JSON.parse(savedSearchParams));
     }
   }, []);
-  useEffect(() => {
-    const savedFormData = localStorage.getItem('rideFormData');
-    if (savedFormData) {
-      const parsedData: Partial<RideFormData> = JSON.parse(savedFormData);
-
-      // Prefill the form fields
-      (Object.keys(parsedData) as (keyof RideFormData)[])
-        .filter((key) => key !== 'timestamp')
-        .forEach((key) => {
-          if (parsedData[key]) {
-            setValue(key, parsedData[key] as string);
-          }
-        });
-
-      localStorage.removeItem('rideFormData');
-    }
-  }, [setValue]);
 
   const onError = () => {
     const errorMessages = Object.values(errors)
@@ -306,7 +321,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
       let notificationMessage = `Ride ${payload.id} from ${payload.from} to ${payload.to} has been confirmed!`;
 
-      if (payload.riderId === user.id) {
+      if (payload.riderId === user?.id || payload.passengerId === user?.id) {
         notificationMessage = `Your ride (${payload.id}) has been confirmed!`;
       } else {
         notificationMessage = `A ride you requested/are interested in (${payload.id}) has been confirmed!`;
@@ -336,26 +351,119 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
   const handleConfirm = async (ride: RideFormData) => {
     try {
-      await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/confirm`, // TODO: Centralize API path if used in multiple places
-        {
-          method: 'POST',
-        },
-      );
-      setRidesFound((prev) => prev.filter((r) => r.id !== ride.id));
-      triggerRideConfirmed({
-        id: ride.id,
-        from: ride.from,
-        to: ride.to,
-        message: ride.message,
-        role: ride.role,
-        timestamp: ride.timestamp,
-        // TODO: use enum here for the status i.e. RIDE_STATUS.CONFIRMED
-        status: 'CONFIRMED',
-        riderId: ride.riderId,
-      });
-      toast.success('Congratulations! Your ride has been confirmed!');
-      setShowModal(false);
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        toast.error('You must be logged in to confirm a ride.');
+        return;
+      }
+
+      const user = JSON.parse(userStr);
+
+      // First, we need to find the current user's own ride to get the proper IDs
+      try {
+        const userRidesResponse = await apiFetch<{ rides: RideFormData[] }>(
+          `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${user.id}`,
+        );
+
+        const userRides = userRidesResponse.rides || [];
+
+        // Find the user's most recent active ride where they are creator, rider, or passenger
+        const currentUserRide = userRides.find(
+          (r) =>
+            (r.createdBy === user.id ||
+              r.riderId === user.id ||
+              r.passengerId === user.id) &&
+            (r.status === RIDE_STATUS.ACTIVE || r.status === undefined),
+        );
+
+        if (!currentUserRide) {
+          // Check if user has any recent rides that might have been cancelled/expired
+          const recentRides = userRides.filter((r) => {
+            const rideTime = new Date(r.timestamp || '');
+            const now = new Date();
+            const timeDiff = now.getTime() - rideTime.getTime();
+            const minutesDiff = timeDiff / (1000 * 60);
+            return minutesDiff <= 30; // Within last 30 minutes
+          });
+
+          if (recentRides.length > 0) {
+            toast.error(
+              'Your recent ride has expired or been cancelled. Please create a new active ride first before confirming others.',
+            );
+          } else {
+            toast.error(
+              'You need to create your own ride first before confirming others.',
+            );
+          }
+          return;
+        }
+
+        // Determine what payload to send based on current user's role and the ride being confirmed
+        let confirmPayload: {
+          passengerId?: number;
+          passengerRideId?: number;
+          riderId?: number;
+          riderRideId?: number;
+        } = {};
+
+        if (user.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
+          // Current user is a rider, confirming a passenger's ride
+          // The ride being confirmed should have a passengerId set (passenger who created it)
+          const passengerUserId = ride.passengerId || ride.createdBy;
+
+          if (!passengerUserId || !ride.id) {
+            toast.error('Invalid passenger or ride ID. Please try again.');
+
+            return;
+          }
+
+          confirmPayload = {
+            passengerId: parseInt(passengerUserId.toString()),
+            passengerRideId: parseInt(ride.id.toString()),
+          };
+        } else {
+          // Current user is a passenger, confirming a rider's ride
+          // The ride being confirmed should have a riderId set (rider who created it)
+          const riderUserId = ride.riderId || ride.createdBy;
+
+          if (!riderUserId || !ride.id) {
+            toast.error('Invalid rider or ride ID. Please try again.');
+
+            return;
+          }
+
+          confirmPayload = {
+            riderId: parseInt(riderUserId.toString()),
+            riderRideId: parseInt(ride.id.toString()),
+          };
+        }
+
+        await apiFetch(
+          `${import.meta.env.VITE_API_BASE_URL}/rides/${currentUserRide.id}/confirm`,
+          {
+            method: 'POST',
+            body: JSON.stringify(confirmPayload),
+          },
+        );
+
+        setRidesFound((prev) => prev.filter((r) => r.id !== ride.id));
+        triggerRideConfirmed({
+          id: ride.id,
+          from: ride.from,
+          to: ride.to,
+          message: ride.message,
+          role: ride.role,
+          timestamp: ride.timestamp,
+          status: RIDE_STATUS.CONFIRMED,
+          riderId: ride.riderId,
+        });
+        toast.success('Congratulations! Your ride has been confirmed!');
+        setShowModal(false);
+      } catch (apiError) {
+        console.error('Failed to fetch user rides or confirm:', apiError);
+        toast.error('Failed to confirm ride. Please try again.');
+        return;
+      }
     } catch {
       toast.error('Failed to confirm ride.');
     }
@@ -397,7 +505,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       // Find the latest ride that is not already CANCELLED or REJECTED
       const cancellableRide = rides.find(
         (r) =>
-          r.riderId === user.id &&
+          (r.createdBy === user.id ||
+            r.riderId === user.id ||
+            r.passengerId === user.id) &&
           r.status !== undefined &&
           r.status !== RIDE_STATUS.CANCELLED &&
           r.status !== RIDE_STATUS.REJECTED,
@@ -617,7 +727,15 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         >
           {ridesFound.length > 0 ? (
             <RideResultsList
-              ridesFound={ridesFound}
+              ridesFound={
+                ridesFound.filter(
+                  (ride) => ride.createdByUser, // For ACTIVE rides, we just need the creator
+                ) as Array<
+                  RideFormData & {
+                    createdByUser: UserDetails;
+                  }
+                >
+              }
               role={role as USER_ROLE}
               handleConfirm={handleConfirm}
               handleReject={handleReject}

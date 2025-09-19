@@ -31,7 +31,7 @@ const UserDisplay: React.FC<UserDisplayProps> = ({
     <div className={`flex items-center gap-1.5 ${className}`}>
       {showProfilePicture && (
         <div
-          className="inline-flex size-6 items-center justify-center rounded-full bg-teal-100 text-xs font-medium text-teal-600 shadow-sm"
+          className="inline-flex size-5 md:size-6 items-center justify-center rounded-full bg-teal-100 text-xs font-medium text-teal-600 shadow-sm"
           title={user.fullname}
         >
           {user.profilePicture ? (

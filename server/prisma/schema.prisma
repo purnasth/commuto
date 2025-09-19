@@ -28,6 +28,7 @@ model User {
   rideRequests   RideRequest[]
   messages       Message[] @relation("UserMessages")
   passengerRides Ride[]    @relation("RidePassengers")
+  createdRides   Ride[]    @relation("CreatedUser")
   ratingsGiven   Rating[]  @relation("FromUser")
   ratingsReceived Rating[] @relation("ToUser")
   createdAt      DateTime  @default(now())
@@ -47,9 +48,12 @@ model Ride {
   message     String?
   role        String
   timestamp   DateTime      @default(now())
-  rider       User          @relation("RiderRides", fields: [riderId], references: [id])
+  createdBy   Int           // ID of user who created the ride (could be passenger or rider)
+  createdByUser User        @relation("CreatedUser", fields: [createdBy], references: [id])
+  rider       User?         @relation("RiderRides", fields: [riderId], references: [id])
   estimatedTimeOfArrival Int?   // ETA in minutes
-  riderId     Int
+  riderId     Int?          // Made optional since it can be null for passenger-created rides
+  passengerId Int?          // ID of the passenger who requested the ride (if applicable)
   requests    RideRequest[]
   passengers  User[]        @relation("RidePassengers")
   ratings     Rating[]

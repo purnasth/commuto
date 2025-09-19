@@ -8,6 +8,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Ride } from 'generated/prisma';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 
 const userSocketMap = new Map<string, string>();
@@ -21,18 +22,19 @@ const userSocketMap = new Map<string, string>();
 export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
+  private readonly logger = new Logger(RideGateway.name);
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    this.logger.log(`Client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`Client disconnected: ${client.id}`);
 
     for (const [userId, socketId] of userSocketMap.entries()) {
       if (socketId === client.id) {
         userSocketMap.delete(userId);
-        console.log(`User ${userId} deregistered on disconnect.`);
+        this.logger.log(`User ${userId} deregistered on disconnect.`);
         break;
       }
     }
@@ -44,7 +46,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ): void {
     userSocketMap.set(userId.toString(), client.id);
-    console.log(`User ${userId} registered with socket ${client.id}`);
+    this.logger.log(`User ${userId} registered with socket ${client.id}`);
 
     client.emit(
       'registrationSuccess',
@@ -57,7 +59,6 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: string,
     @ConnectedSocket() client: Socket,
   ): string {
-    console.log(`Received ping from ${client.id}: ${data}`);
     client.emit('pong', `Pong! You sent: ${data}`);
     return `Server received: ${data}`;
   }
@@ -67,7 +68,6 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() message: string,
     @ConnectedSocket() client: Socket,
   ): void {
-    console.log(`Received 'sendToAll' from ${client.id}: ${message}`);
     this.server.emit('messageToAll', { sender: client.id, message: message });
   }
 
@@ -82,27 +82,19 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
         senderUserId: 'Server',
         message: data.message,
       });
-      console.log(`Sent private message to user ${data.targetUserId}`);
+      this.logger.log(`Sent private message to user ${data.targetUserId}`);
     } else {
       client.emit(
         'error',
         `User ${data.targetUserId} not found or not registered.`,
       );
-      console.log(`User ${data.targetUserId} not found for private message.`);
+      this.logger.warn(
+        `User ${data.targetUserId} not found for private message.`,
+      );
     }
   }
 
   notifyRideConfirmation(confirmedRide: Ride) {
-    const riderId = confirmedRide.riderId;
-
-    if (!riderId) {
-      console.warn(
-        `Ride ${confirmedRide.id} confirmation cannot be emitted to rider: ` +
-          `Missing riderId.`,
-      );
-      return;
-    }
-
     const payload = {
       id: confirmedRide.id,
       from: confirmedRide.from,
@@ -112,18 +104,46 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
       timestamp: confirmedRide.timestamp?.toISOString(),
       status: confirmedRide.status,
       riderId: confirmedRide.riderId,
+      passengerId: confirmedRide.passengerId,
     };
 
-    const riderSocketId = userSocketMap.get(riderId.toString());
+    // Notify the rider if present
+    if (confirmedRide.riderId !== null) {
+      const riderSocketId = userSocketMap.get(confirmedRide.riderId.toString());
 
-    console.log('riderSocketId:', riderSocketId);
+      if (riderSocketId) {
+        this.server.to(riderSocketId).emit('rideConfirmed', payload);
+        this.logger.log(
+          `'rideConfirmed' emitted to rider ${confirmedRide.riderId}`,
+        );
+      } else {
+        this.logger.warn(
+          `Rider ${confirmedRide.riderId} not connected via WebSocket.`,
+        );
+      }
+    }
 
-    if (riderSocketId) {
-      console.log('event emit');
-      this.server.to(riderSocketId).emit('rideConfirmed', payload);
-      console.log(`'rideConfirmed' emitted to rider ${riderId}`);
-    } else {
-      console.log(`Rider ${riderId} not connected via WebSocket.`);
+    // Notify the passenger if present
+    if (confirmedRide.passengerId !== null) {
+      const passengerSocketId = userSocketMap.get(
+        confirmedRide.passengerId.toString(),
+      );
+      if (passengerSocketId) {
+        this.server.to(passengerSocketId).emit('rideConfirmed', payload);
+        this.logger.log(
+          `'rideConfirmed' emitted to passenger ${confirmedRide.passengerId}`,
+        );
+      } else {
+        this.logger.warn(
+          `Passenger ${confirmedRide.passengerId} not connected via WebSocket.`,
+        );
+      }
+    }
+
+    if (!confirmedRide.riderId && !confirmedRide.passengerId) {
+      this.logger.warn(
+        `Ride ${confirmedRide.id} confirmation cannot be emitted: Missing both riderId and passengerId.`,
+      );
     }
   }
 
@@ -137,24 +157,48 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
       timestamp: ride.timestamp?.toISOString(),
       status: ride.status,
       riderId: ride.riderId,
+      passengerId: ride.passengerId,
       distance: ride.distance,
       co2Saved: ride.co2Saved,
       peopleImpacted: ride.peopleImpacted,
     };
 
-    const riderSocketId = userSocketMap.get(ride.riderId.toString());
+    if (ride.riderId !== null) {
+      const riderSocketId = userSocketMap.get(ride.riderId.toString());
 
-    if (riderSocketId) {
-      this.server.to(riderSocketId).emit('rideCompleted', payload);
-      console.log(`'rideCompleted' emitted to rider ${ride.riderId}`);
+      if (riderSocketId) {
+        this.server.to(riderSocketId).emit('rideCompleted', payload);
+        this.logger.log(`'rideCompleted' emitted to rider ${ride.riderId}`);
+      } else {
+        this.logger.warn(`Rider ${ride.riderId} not connected via WebSocket.`);
+      }
+    } else {
+      this.logger.warn(
+        `Ride ${ride.id} completion cannot be emitted to rider: Missing riderId.`,
+      );
+    }
+
+    // Also notify passenger if present
+    if (ride.passengerId !== null) {
+      const passengerSocketId = userSocketMap.get(ride.passengerId.toString());
+
+      if (passengerSocketId) {
+        this.server.to(passengerSocketId).emit('rideCompleted', payload);
+        this.logger.log(
+          `'rideCompleted' emitted to passenger ${ride.passengerId}`,
+        );
+      } else {
+        this.logger.warn(
+          `Passenger ${ride.passengerId} not connected via WebSocket.`,
+        );
+      }
     }
   }
 
   notifyRideConfirmationForPassenger(confirmedRide: Ride, passengerId: number) {
     if (!passengerId) {
-      console.warn(
-        `Ride ${confirmedRide.id} confirmation cannot be emitted to passenger: ` +
-          `Missing passengerId.`,
+      this.logger.warn(
+        `Ride ${confirmedRide.id} confirmation cannot be emitted to passenger: Missing passengerId.`,
       );
       return;
     }
@@ -174,20 +218,22 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (passengerSocketId) {
       this.server.to(passengerSocketId).emit('rideConfirmed', payload);
-      console.log(`'rideConfirmed' emitted to passenger ${passengerId}`);
+      this.logger.log(`'rideConfirmed' emitted to passenger ${passengerId}`);
     } else {
-      console.log(`Passenger ${passengerId} not connected via WebSocket.`);
+      this.logger.warn(`Passenger ${passengerId} not connected via WebSocket.`);
     }
   }
 
   @SubscribeMessage('joinRideRoom')
-  handleJoinRideRoom(
+  async handleJoinRideRoom(
     @MessageBody() data: { rideId: string },
     @ConnectedSocket() client: Socket,
   ) {
     const room = `ride_${data.rideId}`;
-    client.join(room);
-    console.log(`Client ${client.id} joined room: ${room}`);
+
+    await client.join(room);
+
+    this.logger.log(`Client ${client.id} joined room: ${room}`);
 
     return { message: `Joined room: ${room}`, success: true };
   }

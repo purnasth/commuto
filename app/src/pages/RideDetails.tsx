@@ -1,25 +1,125 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
-import { formatFullDate } from '../utils/functions';
-import { FaWalking } from 'react-icons/fa';
-import { MdOutlineDirectionsBike } from 'react-icons/md';
+import React, { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+
+import {
+  MdEmail,
+  MdVerified,
+  MdLocalPhone,
+  MdOutlineDirectionsBike,
+} from 'react-icons/md';
 import { IoClose } from 'react-icons/io5';
+import { FaWalking } from 'react-icons/fa';
+import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
+
+import { RideFormData, UserDetails } from '../interfaces/types';
+
 import { USER_ROLE } from '../constants/enums';
-import { useRideEvent } from '../utils/useRideEvent';
 import { ROUTE_PROFILE } from '../constants/routes';
-import { useSocket } from '../utils/useSocket';
-import { io } from 'socket.io-client';
+
 import { apiFetch } from '../utils/api';
-import { RideFormData } from '../interfaces/types';
+import { useSocket } from '../utils/useSocket';
+import { formatFullDate } from '../utils/functions';
+import { determineMatchedUser } from '../utils/utils';
+
+/**
+ * Component to display matched user information
+ */
+const MatchedUserCard: React.FC<{ matchedUser: UserDetails }> = ({
+  matchedUser,
+}) => (
+  <div className="!mt-0 space-y-3 rounded-xl border border-teal-200/50 bg-teal-50 p-4 shadow-sm dark:border-teal-300/30 dark:bg-teal-950">
+    <h4 className="inline-flex w-fit items-center justify-center gap-2 text-lg font-medium capitalize text-teal-500 dark:text-teal-300">
+      {matchedUser.role.toLowerCase() === USER_ROLE.RIDER ? (
+        <MdOutlineDirectionsBike />
+      ) : (
+        <FaWalking />
+      )}
+      {matchedUser.role} details
+    </h4>
+
+    <div className="flex w-full items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center rounded-full bg-teal-200 dark:bg-teal-800">
+          {matchedUser.profilePicture ? (
+            <img
+              src={matchedUser.profilePicture}
+              alt={matchedUser.fullname}
+              className="size-14 rounded-full border object-cover shadow-sm"
+            />
+          ) : (
+            <TbCircleDashed className="text-2xl text-teal-600 dark:text-teal-300" />
+          )}
+        </div>
+        <div>
+          <h4 className="inline-flex items-center gap-1 text-base font-medium text-dark dark:text-light">
+            {matchedUser.fullname}
+            <MdVerified className="text-teal-500 dark:text-teal-300" />
+          </h4>
+
+          <p className="text-sm font-light">{matchedUser.address}</p>
+        </div>
+      </div>
+
+      <div className="mt-1 flex items-center gap-2">
+        <Link
+          to={`tel:${matchedUser.phone}`}
+          className="transition-150 rounded-full border bg-green-600 px-6 py-2.5 text-lg text-green-50 transition hover:bg-green-400 hover:text-green-900 dark:bg-green-500 dark:text-green-950 dark:hover:bg-green-700 dark:hover:text-green-100"
+        >
+          <MdLocalPhone className="scale-125" />
+          {/* {matchedUser.phone} */}
+        </Link>
+        <Link
+          to={`mailto:${matchedUser.email}`}
+          className="transition-150 rounded-full border bg-amber-400 px-6 py-2.5 text-lg text-amber-50 transition hover:bg-amber-200 hover:text-amber-600 dark:bg-amber-300 dark:text-amber-900 dark:hover:bg-amber-400 dark:hover:text-amber-950"
+        >
+          <MdEmail className="scale-125" />
+          {/* {matchedUser.email} */}
+        </Link>
+      </div>
+    </div>
+  </div>
+);
+
+/**
+ * Button component for completing a ride with proper role-based logic
+ */
+const CompleteRideButton: React.FC<{
+  user: { id: number } | null;
+  rideDetails: RideFormData;
+  onComplete: (ride: RideFormData) => Promise<void>;
+  onFeedback: () => void;
+}> = ({ user, rideDetails, onComplete, onFeedback }) => {
+  const isRider = Number(user?.id) === Number(rideDetails.riderId);
+
+  const handleClick = async () => {
+    if (isRider) {
+      await onComplete(rideDetails);
+      window.location.href = ROUTE_PROFILE;
+    } else {
+      onFeedback();
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
+    >
+      <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
+      <span className="relative z-10 font-medium tracking-wide">
+        Complete the ride
+      </span>
+    </button>
+  );
+};
 
 const RideDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [showMap, setShowMap] = useState(false);
   const { showFeedbackPopup, setShowFeedbackPopup } = useSocket();
-
-  const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
   const [user, setUser] = useState<{ id: number } | null>(null);
+  const [matchedUser, setMatchedUser] = useState<UserDetails | null>(null);
   // const from = searchParams.get('from');
   // const to = searchParams.get('to');
   // const message = searchParams.get('message');
@@ -43,112 +143,55 @@ const RideDetails: React.FC = () => {
       setUser(JSON.parse(userStr));
     }
   }, []);
+
+  // Fetch full ride details with matched user information
+  useEffect(() => {
+    const fetchRideDetails = async () => {
+      if (!rideDetails.id || !user?.id) return;
+
+      try {
+        const response = await apiFetch<{ ride: RideFormData }>(
+          `${import.meta.env.VITE_API_BASE_URL}/rides/${rideDetails.id}?userId=${user.id}`,
+        );
+
+        const ride = response.ride;
+        const matchedUser = determineMatchedUser(ride, user.id);
+        setMatchedUser(matchedUser);
+      } catch (error) {
+        console.error('Error fetching ride details:', error);
+      }
+    };
+
+    fetchRideDetails();
+  }, [rideDetails.id, user?.id]);
+
   const from = rideDetails.from;
   const to = rideDetails.to;
   const message = rideDetails.message;
   const role = rideDetails.role;
   const timestamp = rideDetails.timestamp;
 
-  // const getDirectionsUrl = () => {
-  //   if (!from || !to) return 'https://www.openstreetmap.org';
-  //   return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(from)}%3B${encodeURIComponent(to)}`;
-  // };
-
   const getDirectionsUrl = () => {
-    if (!rideDetails.from || !rideDetails.to)
+    if (!rideDetails.from || !rideDetails.to) {
       return 'https://www.openstreetmap.org';
+    }
     return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(rideDetails.from)}%3B${encodeURIComponent(rideDetails.to)}`;
   };
 
-  const { resetRideConfirmed } = useRideEvent();
-  const rideChannel = useMemo(() => new BroadcastChannel('rideChannel'), []);
-
-  const rideChannelRef = useRef<BroadcastChannel | null>(null);
-
-  useEffect(() => {
-    rideChannelRef.current = new BroadcastChannel('rideChannel');
-
-    return () => {
-      rideChannelRef.current?.close();
-    };
-  }, []);
-
-  // useEffect(() => {
-  //   const registerUserOnConnect = () => {
-  //     if (user?.id) {
-  //       console.log(`Attempting to register user ${user.id}`);
-  //       socket.emit('registerUser', user.id.toString());
-  //     }
-  //   };
-
-  //   socket.on('connect', registerUserOnConnect);
-
-  //   if (socket.connected && user?.id) {
-  //     registerUserOnConnect();
-  //   }
-
-  //   socket.on('rideCompleted', (payload) => {
-  //     console.log('Ride completed notification received:', payload);
-
-  //     let notificationMessage = `Ride ${payload.id} from ${payload.from} to ${payload.to} has been confirmed!`;
-  //   });
-
-  //   socket.on('disconnect', () => {
-  //     console.log('Disconnected from WebSocket server');
-  //   });
-
-  //   return () => {
-  //     socket.off('connect', registerUserOnConnect);
-  //     socket.off('rideConfirmed');
-  //     socket.off('disconnect');
-  //   };
-  // }, [socket]);
-
   const handleCompleteRide = async (ride: RideFormData) => {
     try {
-      console.log('ride', ride);
-
-      // if (!ride || !ride.id) {
-      //   console.error('Invalid ride data:', ride);
-      //   return;
-      // }
       await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/complete`, // TODO: Centralize API path if used in multiple places
-        {
-          method: 'POST',
-        },
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/complete`,
+        { method: 'POST' },
       );
 
-      // Reset ride status in local storage
+      // Clean up local storage
       localStorage.removeItem('activeRide');
       localStorage.setItem('rideStatus', 'completed');
-
-      // setRideStatus('completed');
-
-      // if (rideChannelRef.current) {
-      //   rideChannelRef.current.postMessage({ type: 'RESET_RIDE', user });
-      // } else {
-      //   console.error('BroadcastChannel is closed');
-      // }
-      // resetRideConfirmed();
     } catch (error) {
       console.error('Error completing ride:', error);
     }
   };
-  // useEffect(() => {
-  //   if (rideChannelRef.current) {
-  //     rideChannelRef.current.onmessage = (event) => {
-  //       if (event.data.type === 'RESET_RIDE') {
-  //         console.log('Ride reset event received:', event.data);
-
-  //         localStorage.removeItem('activeRide');
-  //         resetRideConfirmed();
-  //       }
-  //     };
-  //   }
-
-  //   return () => {};
-  // }, [resetRideConfirmed]);
 
   return (
     <>
@@ -157,19 +200,12 @@ const RideDetails: React.FC = () => {
           Ride Details
         </h1>
 
-        <div className="relative mx-auto max-w-4xl space-y-6 overflow-hidden rounded-xl border border-gray-200/80 bg-teal-50 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-light/40 dark:bg-transparent md:p-6">
-          <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px] dark:opacity-30" />
-          <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px] dark:opacity-60" />
-          <div>
-            <p className="inline-flex w-fit items-center justify-center gap-2 rounded-full bg-teal-100 px-4 py-1 text-base font-medium text-teal-500 dark:bg-teal-900">
-              {role === USER_ROLE.RIDER ? (
-                <MdOutlineDirectionsBike />
-              ) : (
-                <FaWalking />
-              )}
-              {role === USER_ROLE.RIDER ? 'Rider' : 'Passenger'}
-            </p>
-          </div>
+        <div className="relative mx-auto max-w-4xl space-y-6 overflow-hidden rounded-xl border border-gray-200/80 bg-teal-50/50 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-light/40 dark:bg-transparent md:p-6">
+          <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-70 blur-[100px] dark:opacity-30" />
+          <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-100 blur-[200px] dark:opacity-60" />
+
+          {matchedUser && <MatchedUserCard matchedUser={matchedUser} />}
+
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-center">
               <TbCircleDashed className="text-xl text-teal-500" />
@@ -236,39 +272,12 @@ const RideDetails: React.FC = () => {
                 {showMap ? 'Hide Route' : 'View Route'}
               </button>
 
-              {/*  TEMP: both of the actors get the feedback form which is not expected fix this letter but okay for now: and 
-            TODO: also integrate this with backend.
-             */}
-              {user?.id &&
-              rideDetails.riderId &&
-              Number(user.id) === Number(rideDetails.riderId) ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await handleCompleteRide(rideDetails);
-                    window.location.href = ROUTE_PROFILE;
-                  }}
-                  className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
-                >
-                  <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
-                  <span className="relative z-10 font-medium tracking-wide">
-                    Complete the ride
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFeedbackPopup(true);
-                  }}
-                  className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
-                >
-                  <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
-                  <span className="relative z-10 font-medium tracking-wide">
-                    Complete the ride
-                  </span>
-                </button>
-              )}
+              <CompleteRideButton
+                user={user}
+                rideDetails={rideDetails}
+                onComplete={handleCompleteRide}
+                onFeedback={() => setShowFeedbackPopup(true)}
+              />
             </div>
             {showMap && (
               <>
@@ -326,7 +335,6 @@ const FeedbackModal = ({
 }: FeedbackModalProps) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
-  const navigate = useNavigate();
 
   const handleSubmit = async () => {
     console.log('Feedback submitted:', { rating, comment });
