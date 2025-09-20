@@ -35,6 +35,6 @@ export enum RIDE_STATUS {
 export const RIDE_MATCH_WINDOW_MINUTES = 5;
 
 /**
- * Expiration window (in minutes) for how long a ride remains ACTIVE after its scheduled time
+ * Expiration window (in minutes) for how long a ride remains ACTIVE after its creation time
  */
 export const RIDE_EXPIRATION_GRACE_MINUTES = 5;

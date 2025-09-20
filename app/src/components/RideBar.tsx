@@ -39,6 +39,7 @@ import RideResultsList from '../pages/RideResultsList';
 
 import useRideForm from '../hooks/useRideForm';
 import useScrollVisibility from '../hooks/useScrollVisibility';
+import { useCurrentRide } from '../hooks/useCurrentRide';
 
 const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [showLocationPopup, setShowLocationPopup] = useState(false);
@@ -53,6 +54,13 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [user, setUser] = useState<{ id: number } | null>(null);
   const navigate = useNavigate();
   const showRideBar = useScrollVisibility(100);
+
+  // Use the new hook to get real backend ride data
+  const {
+    currentRide,
+    hasActiveRide,
+    refetch: refetchCurrentRide,
+  } = useCurrentRide(user?.id);
 
   const {
     register,
@@ -103,6 +111,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     message?: string;
     timestamp?: string;
     status?: RIDE_STATUS;
+    expiryTime?: number;
+    remainingTimeSeconds?: number;
   } | null>(null);
 
   const handleInputClick = (fieldName: string) => {
@@ -216,6 +226,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
       toast.dismiss(loadingToastId);
       setIsLoading(true);
+
+      // Refetch current ride to get the new ride with backend data
+      await refetchCurrentRide();
+
       setTimeout(async () => {
         const availableRides = await fetchAvailableRides(
           data.role,
@@ -336,6 +350,25 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       );
     });
 
+    // Listen for ride status updates (including expiry)
+    socket.on('rideStatusUpdate', (payload) => {
+      console.log('Ride status update received:', payload);
+
+      if (payload.userId === user?.id) {
+        if (payload.status === RIDE_STATUS.EXPIRED) {
+          // Handle ride expiry
+          setShowRideStatusModal(false);
+          setLastSearchParams(null);
+          toast.error(
+            'Your ride has expired. Please create a new ride request.',
+          );
+        }
+
+        // Refetch current ride data to get updated status
+        refetchCurrentRide();
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
     });
@@ -343,9 +376,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     return () => {
       socket.off('connect', registerUserOnConnect);
       socket.off('rideConfirmed');
+      socket.off('rideStatusUpdate');
       socket.off('disconnect');
     };
-  }, [user, socket]);
+  }, [user, socket, refetchCurrentRide]);
 
   const { triggerRideConfirmed } = useRideEvent();
 
@@ -497,42 +531,64 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         return;
       }
       const user = JSON.parse(userStr);
-      // Try to get the user's latest ride that is not already CANCELLED or REJECTED
-      const res = await apiFetch<{ rides: RideFormData[] }>(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${user.id}`, // TODO: Centralize API path if used in multiple places
-      );
-      const rides = res.rides || [];
-      // Find the latest ride that is not already CANCELLED or REJECTED
-      const cancellableRide = rides.find(
-        (r) =>
-          (r.createdBy === user.id ||
-            r.riderId === user.id ||
-            r.passengerId === user.id) &&
-          r.status !== undefined &&
-          r.status !== RIDE_STATUS.CANCELLED &&
-          r.status !== RIDE_STATUS.REJECTED,
-      );
+
+      // Use current ride data if available, otherwise fallback to API call
+      let rideIdToCancel = currentRide?.id;
+
+      if (!rideIdToCancel) {
+        // Fallback: Try to get the user's latest ride that is not already CANCELLED or REJECTED
+        const res = await apiFetch<{ rides: RideFormData[] }>(
+          `${import.meta.env.VITE_API_BASE_URL}/rides/history?userId=${user.id}`,
+        );
+        const rides = res.rides || [];
+        const cancellableRide = rides.find(
+          (r) =>
+            (r.createdBy === user.id ||
+              r.riderId === user.id ||
+              r.passengerId === user.id) &&
+            r.status !== undefined &&
+            r.status !== RIDE_STATUS.CANCELLED &&
+            r.status !== RIDE_STATUS.REJECTED,
+        );
+
+        if (!cancellableRide) {
+          toast.info('No ride to cancel.');
+          return;
+        }
+        rideIdToCancel = Number(cancellableRide.id);
+      }
+
       localStorage.removeItem('lastSearchParams');
 
-      if (!cancellableRide) {
-        toast.info('No ride to cancel.');
-        return;
-      }
       // Call cancel endpoint
       await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${cancellableRide.id}/cancel`, // TODO: Centralize API path if used in multiple places
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${rideIdToCancel}/cancel`, // TODO: Centralize API path if used in multiple places
         {
           method: 'POST',
           body: JSON.stringify({ userId: user.id }),
         },
       );
+
       toast.success('Your ride has been cancelled.');
       setShowRideStatusModal(false);
       setLastSearchParams(null);
       setRidesFound([]);
+
+      // Refetch current ride data to reflect the cancellation
+      await refetchCurrentRide();
     } catch {
       toast.error('Failed to cancel ride.');
     }
+  };
+
+  // Handle ride expiry
+  const handleRideExpiry = async () => {
+    setShowRideStatusModal(false);
+    setLastSearchParams(null);
+    toast.error('Your ride has expired. Please create a new ride request.');
+
+    // Refetch current ride data to get updated status
+    await refetchCurrentRide();
   };
 
   // Determine if the user's role matches the RideBar's role (case-insensitive)m
@@ -550,15 +606,32 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const roleMismatch =
     userRole && role && userRole.toLowerCase() !== role.toLowerCase();
 
-  // Helper to get current ride details from lastSearchParams
+  // Helper to get current ride details from backend data
   const getCurrentRideDetails = () => {
+    // Use real backend data if available
+    if (currentRide && hasActiveRide) {
+      return {
+        from: currentRide.from,
+        to: currentRide.to,
+        message: currentRide.message,
+        role: currentRide.role,
+        time: new Date(currentRide.timestamp).toLocaleString(),
+        expiryTime: currentRide.remainingTimeSeconds, // Real remaining time from backend
+        originalDuration: currentRide.expiryTimeSeconds, // Original total duration for progress bar
+        status: currentRide.status,
+      };
+    }
+
+    // Fallback to lastSearchParams if no backend data (shouldn't happen in normal flow)
     if (!lastSearchParams) return null;
+
     // Ensure role is either "rider" or "passenger"
     const roleValue =
       lastSearchParams.role === USER_ROLE.RIDER ||
       lastSearchParams.role === USER_ROLE.PASSENGER
         ? lastSearchParams.role
         : USER_ROLE.RIDER;
+
     return {
       from: lastSearchParams.from || '-',
       to: lastSearchParams.to || '-',
@@ -567,6 +640,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       time: lastSearchParams.timestamp
         ? new Date(lastSearchParams.timestamp).toLocaleString()
         : '',
+      expiryTime: 0, // No real data available
+      originalDuration: 0, // No real data available
+      status: RIDE_STATUS.ACTIVE, // Default fallback
     };
   };
 
@@ -597,6 +673,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       );
     }
   }, [lastSearchParams]);
+
   if (isLoading) {
     return (
       <FullScreenModal onClose={() => setIsLoading(false)}>
@@ -748,8 +825,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         </FullScreenModal>
       )}
 
-      {/* Ride Status Modal */}
-      {showRideStatusModal && lastSearchParams && (
+      {/* Ride Status Modal - Show only if we have an active ride */}
+      {showRideStatusModal && (hasActiveRide || lastSearchParams) && (
         <FullScreenModal
           onClose={() => setShowRideStatusModal(false)}
           aria-labelledby="ride-status-modal-title"
@@ -762,6 +839,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
                 details={details}
                 onSearchAgain={handleSearchAgain}
                 onCancelRide={handleCancelRide}
+                onExpiry={handleRideExpiry}
               />
             );
           })()}
@@ -781,18 +859,21 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         </button>
       )}
 
-      {/* Show My Current Ride Status button if no rides found, modal is closed, and user still has an active ride (ridesFound.length === 0) */}
-      {ridesFound.length === 0 && !showModal && lastSearchParams && (
-        <button
-          type="button"
-          aria-label="Current Ride Status"
-          onClick={() => setShowRideStatusModal(true)}
-          className="fixed left-1/2 top-0 z-50 flex origin-center -translate-x-1/2 items-center gap-1.5 rounded-xl rounded-t-none bg-gradient-to-r from-teal-300 via-teal-400 to-teal-400 px-5 py-1.5 text-xs font-normal text-dark shadow-xl transition-all duration-200 hover:scale-105 hover:from-teal-400 hover:to-teal-500 md:text-base"
-        >
-          <PiSmileyMeltingBold className="text-sm md:text-lg" />
-          Current Ride Status
-        </button>
-      )}
+      {/* Show My Current Ride Status button if user has an active ride and no available rides are being shown */}
+      {ridesFound.length === 0 &&
+        !showModal &&
+        hasActiveRide &&
+        currentRide?.status === RIDE_STATUS.ACTIVE && (
+          <button
+            type="button"
+            aria-label="Current Ride Status"
+            onClick={() => setShowRideStatusModal(true)}
+            className="fixed left-1/2 top-0 z-50 flex origin-center -translate-x-1/2 items-center gap-1.5 rounded-xl rounded-t-none bg-gradient-to-r from-teal-300 via-teal-400 to-teal-400 px-5 py-1.5 text-xs font-normal text-dark shadow-xl transition-all duration-200 hover:scale-105 hover:from-teal-400 hover:to-teal-500 md:text-base"
+          >
+            <PiSmileyMeltingBold className="text-sm md:text-lg" />
+            Current Ride Status
+          </button>
+        )}
     </>
   );
 };
