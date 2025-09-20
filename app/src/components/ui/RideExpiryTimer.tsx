@@ -3,28 +3,29 @@ import { TbAlertCircle, TbRotateClockwise2 } from 'react-icons/tb';
 import { useCountdown } from '../../hooks/useCountdown';
 
 interface RideExpiryTimerProps {
-  expiryTime: number; // Remaining seconds from backend
-  originalDuration?: number; // Original total duration from backend (for progress bar)
+  expiryTime: number;
+  originalDuration?: number;
   onExpiry?: () => void;
+  rideTimestamp?: string;
 }
 
 export function RideExpiryTimer({
   expiryTime: totalSeconds,
   originalDuration,
   onExpiry,
+  rideTimestamp,
 }: RideExpiryTimerProps) {
-  const { remaining, progress } = useCountdown({ 
-    totalSeconds, 
+  const { remaining, progress } = useCountdown({
+    totalSeconds,
     onExpiry,
-    originalDuration 
+    originalDuration,
+    rideTimestamp,
   });
 
   const getProgressGradient = () => {
     const duration = originalDuration || totalSeconds;
-    if (remaining > duration * (2 / 3))
-      return 'from-green-600 to-green-400';
-    if (remaining > duration * (1 / 3))
-      return 'from-orange-400 to-orange-300';
+    if (remaining > duration * (2 / 3)) return 'from-green-600 to-green-400';
+    if (remaining > duration * (1 / 3)) return 'from-orange-400 to-orange-300';
 
     return 'from-red-600 to-red-400';
   };
@@ -54,7 +55,7 @@ export function RideExpiryTimer({
       <div className="w-full overflow-hidden rounded-full bg-gradient-to-l from-gray-300 to-gray-200">
         <div
           className={`h-2 bg-gradient-to-r transition-[width] duration-1000 ease-linear ${getProgressGradient()}`}
-          style={{ width: `${100 - progress}%` }} // Invert progress to show remaining time
+          style={{ width: `${100 - progress}%` }}
         />
       </div>
     </div>

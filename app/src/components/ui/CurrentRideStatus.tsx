@@ -10,9 +10,10 @@ interface CurrentRideStatusProps {
     message: string;
     time?: string;
     role: USER_ROLE;
-    expiryTime: number; // Remaining seconds from backend
-    originalDuration?: number; // Original total duration from backend
-    status: RIDE_STATUS; // Backend status (ACTIVE, EXPIRED, CONFIRMED, etc.)
+    expiryTime: number;
+    originalDuration?: number;
+    status: RIDE_STATUS;
+    timestamp?: string;
   };
   onSearchAgain: () => void;
   onCancelRide: () => void;
@@ -41,6 +42,7 @@ const CurrentRideStatus: React.FC<CurrentRideStatusProps> = ({
               expiryTime={details.expiryTime}
               originalDuration={details.originalDuration}
               onExpiry={onExpiry}
+              rideTimestamp={details.timestamp}
             />
           )}
 

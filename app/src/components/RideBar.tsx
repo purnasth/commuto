@@ -319,7 +319,6 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   useEffect(() => {
     const registerUserOnConnect = () => {
       if (user?.id) {
-        console.log(`Attempting to register user ${user.id}`);
         socket.emit('registerUser', user.id.toString());
       }
     };
@@ -352,16 +351,11 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
     // Listen for ride status updates (including expiry)
     socket.on('rideStatusUpdate', (payload) => {
-      console.log('Ride status update received:', payload);
-
       if (payload.userId === user?.id) {
         if (payload.status === RIDE_STATUS.EXPIRED) {
           // Handle ride expiry
           setShowRideStatusModal(false);
           setLastSearchParams(null);
-          toast.error(
-            'Your ride has expired. Please create a new ride request.',
-          );
         }
 
         // Refetch current ride data to get updated status
@@ -585,7 +579,11 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const handleRideExpiry = async () => {
     setShowRideStatusModal(false);
     setLastSearchParams(null);
-    toast.error('Your ride has expired. Please create a new ride request.');
+
+    // Use a fixed toast ID to prevent duplicates
+    toast.error('Your ride has expired. Please create a new ride request.', {
+      toastId: 'ride-expired', // This prevents duplicate toasts
+    });
 
     // Refetch current ride data to get updated status
     await refetchCurrentRide();
@@ -616,9 +614,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         message: currentRide.message,
         role: currentRide.role,
         time: new Date(currentRide.timestamp).toLocaleString(),
-        expiryTime: currentRide.remainingTimeSeconds, // Real remaining time from backend
-        originalDuration: currentRide.expiryTimeSeconds, // Original total duration for progress bar
+        expiryTime: currentRide.remainingTimeSeconds,
+        originalDuration: currentRide.expiryTimeSeconds,
         status: currentRide.status,
+        timestamp: currentRide.timestamp,
       };
     }
 
@@ -640,9 +639,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       time: lastSearchParams.timestamp
         ? new Date(lastSearchParams.timestamp).toLocaleString()
         : '',
-      expiryTime: 0, // No real data available
-      originalDuration: 0, // No real data available
-      status: RIDE_STATUS.ACTIVE, // Default fallback
+      expiryTime: 0,
+      originalDuration: 0,
+      status: RIDE_STATUS.ACTIVE,
+      timestamp: lastSearchParams.timestamp,
     };
   };
 
