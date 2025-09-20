@@ -1,6 +1,7 @@
 import React from 'react';
 import { TbAlarm, TbCircleDashed, TbMapPin } from 'react-icons/tb';
 import { USER_ROLE } from '../../constants/enums';
+import { RideExpiryTimer } from './RideExpiryTimer';
 
 interface CurrentRideStatusProps {
   details: {
@@ -27,15 +28,13 @@ const CurrentRideStatus: React.FC<CurrentRideStatusProps> = ({
         <h3 className="pb-3 text-base font-medium text-teal-500 dark:text-teal-300 md:text-lg">
           Current Ride Status (Pending)
         </h3>
+
         <div className="space-y-3 rounded-xl border bg-teal-100/60 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-teal-300/50 dark:bg-teal-950">
-          {/* <p className="inline-flex w-fit items-center justify-center gap-1 rounded-full bg-teal-200 px-3 py-1 text-sm font-medium text-teal-600 dark:bg-teal-900">
-              {details.role === 'rider' ? (
-                <MdOutlineDirectionsBike />
-              ) : (
-                <FaWalking />
-              )}
-              {details.role === 'rider' ? 'Rider' : 'Passenger'}
-            </p> */}
+          {/* // TODO: use dynamic time here from server  */}
+          <RideExpiryTimer expiryTime={60} />
+
+          {/* <hr className="border-teal-600/20 dark:border-teal-300/20" /> */}
+
           <div className="flex items-center gap-2">
             <div className="flex flex-col items-center">
               <TbCircleDashed className="text-base text-teal-500" />
