@@ -5,14 +5,11 @@ import { useNavigate } from 'react-router-dom';
 
 import { ReflectionStats, RideHistory } from '../interfaces/types';
 import { ROUTE_REDEEM } from '../constants/routes';
-import {
-  getPeopleImpactedFromRides,
-  splitPeopleForDisplay,
-} from '../utils/reflectionUtils';
+import { getPeopleImpactedFromRides } from '../utils/reflectionUtils';
 
 import UserCard from './UserCard';
 import TitleBar from './ui/TitleBar';
-import Tooltip from './ui/Tooltip';
+import PeopleAvatarGrid from './ui/PeopleAvatarGrid';
 
 import tree1 from '../assets/trees/1.webp';
 
@@ -140,67 +137,7 @@ const ReflectionDashboard = ({
       </div>
       <div className="col-span-1 rounded-3xl rounded-b-none bg-none dark:bg-teal-900 md:bg-teal-50">
         <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white py-5 dark:bg-dark">
-          <div className="flex items-center justify-center gap-1">
-            {people.length > 0 ? (
-              (() => {
-                const { visible, others } = splitPeopleForDisplay(people);
-                return (
-                  <>
-                    <div className="flex items-center">
-                      {visible.map((person, idx) => (
-                        <div
-                          key={person.id}
-                          className={`relative ${idx !== 0 ? '-ml-2.5' : ''} z-[${idx}] transition-150 group hover:z-50`}
-                        >
-                          <Tooltip content={person.name}>
-                            <img
-                              src={person.img}
-                              alt={person.name}
-                              className="transition-150 inline-block aspect-square size-9 rounded-full border-2 border-teal-300 object-cover group-hover:scale-110 group-hover:border dark:border-2 dark:border-teal-700 md:size-11"
-                            />
-                          </Tooltip>
-                        </div>
-                      ))}
-                      {others.length > 0 && (
-                        <Tooltip
-                          content={
-                            <div>
-                              {others.map((person, idx) => (
-                                <div
-                                  key={person.id}
-                                  className={`flex items-center gap-1.5 px-0 py-1.5 ${idx !== others.length - 1 ? 'border-b border-light/20 dark:border-dark/20' : ''}`}
-                                >
-                                  <img
-                                    src={person.img}
-                                    alt={person.name}
-                                    className="size-9 rounded-full border border-light/30 object-cover dark:border-dark/30"
-                                  />
-                                  <span className="truncate text-sm">
-                                    {person.name}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          }
-                        >
-                          <span className="transition-150 relative z-auto -ml-2.5 inline-flex aspect-square size-9 items-center justify-center rounded-full border-2 border-white bg-gradient-to-tl from-teal-400 via-teal-200 to-teal-500 text-sm font-medium hover:scale-110 hover:bg-gradient-to-tr dark:border-teal-700 dark:bg-gradient-to-tr dark:from-teal-600 dark:via-teal-500 dark:to-teal-400 dark:text-dark md:size-11 md:text-base">
-                            +{others.length}
-                          </span>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </>
-                );
-              })()
-            ) : (
-              <div className="text-center text-teal-600 dark:text-teal-400">
-                <p className="text-sm font-medium">No rides completed yet</p>
-                <p className="text-xs opacity-75">
-                  Start sharing rides to see people you've impacted!
-                </p>
-              </div>
-            )}
-          </div>
+          <PeopleAvatarGrid people={people} />
           <TitleBar
             // content={
             //   people.length > 0
