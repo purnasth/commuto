@@ -1,6 +1,7 @@
 import React from 'react';
 import { TbAlarm, TbCircleDashed, TbMapPin } from 'react-icons/tb';
-import { USER_ROLE } from '../../constants/enums';
+import { USER_ROLE, RIDE_STATUS } from '../../constants/enums';
+import { RideExpiryTimer } from './RideExpiryTimer';
 
 interface CurrentRideStatusProps {
   details: {
@@ -9,15 +10,21 @@ interface CurrentRideStatusProps {
     message: string;
     time?: string;
     role: USER_ROLE;
+    expiryTime: number;
+    originalDuration?: number;
+    status: RIDE_STATUS;
+    timestamp?: string;
   };
   onSearchAgain: () => void;
   onCancelRide: () => void;
+  onExpiry?: () => void; // Handle expiry callback for UI updates
 }
 
 const CurrentRideStatus: React.FC<CurrentRideStatusProps> = ({
   details,
   onSearchAgain,
   onCancelRide,
+  onExpiry,
 }) => {
   return (
     <main className="relative flex size-full flex-col items-center justify-center overflow-hidden bg-white p-0 dark:bg-dark sm:p-5">
@@ -27,15 +34,28 @@ const CurrentRideStatus: React.FC<CurrentRideStatusProps> = ({
         <h3 className="pb-3 text-base font-medium text-teal-500 dark:text-teal-300 md:text-lg">
           Current Ride Status (Pending)
         </h3>
+
         <div className="space-y-3 rounded-xl border bg-teal-100/60 p-4 shadow-sm transition-shadow hover:shadow-md dark:border-teal-300/50 dark:bg-teal-950">
-          {/* <p className="inline-flex w-fit items-center justify-center gap-1 rounded-full bg-teal-200 px-3 py-1 text-sm font-medium text-teal-600 dark:bg-teal-900">
-              {details.role === 'rider' ? (
-                <MdOutlineDirectionsBike />
-              ) : (
-                <FaWalking />
-              )}
-              {details.role === 'rider' ? 'Rider' : 'Passenger'}
-            </p> */}
+          {/* Real-time expiry timer from backend */}
+          {details.status === RIDE_STATUS.ACTIVE && (
+            <RideExpiryTimer
+              expiryTime={details.expiryTime}
+              originalDuration={details.originalDuration}
+              onExpiry={onExpiry}
+              rideCreationTimestamp={details.timestamp}
+            />
+          )}
+
+          {details.status === RIDE_STATUS.EXPIRED && (
+            <div className="rounded-lg bg-red-100 p-3 text-center dark:bg-red-900">
+              <p className="text-sm font-medium text-red-600 dark:text-red-300">
+                This ride has expired. You can create a new ride request.
+              </p>
+            </div>
+          )}
+
+          {/* <hr className="border-teal-600/20 dark:border-teal-300/20" /> */}
+
           <div className="flex items-center gap-2">
             <div className="flex flex-col items-center">
               <TbCircleDashed className="text-base text-teal-500" />
@@ -66,14 +86,16 @@ const CurrentRideStatus: React.FC<CurrentRideStatusProps> = ({
             <button
               type="button"
               onClick={onSearchAgain}
-              className="transition-150 w-full rounded-lg border border-teal-300 bg-teal-600 px-4 py-2 text-sm font-medium tracking-wide text-light hover:border-teal-500 hover:bg-teal-500 hover:text-light dark:hover:bg-teal-500"
+              disabled={details.status === RIDE_STATUS.EXPIRED}
+              className="transition-150 w-full rounded-lg border border-teal-300 bg-teal-600 px-4 py-2 text-sm font-medium tracking-wide text-light hover:border-teal-500 hover:bg-teal-500 hover:text-light disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-teal-500"
             >
-              Request Again
+              Search Again
             </button>
             <button
               type="button"
               onClick={onCancelRide}
-              className="transition-150 w-full rounded-lg border border-red-500 bg-red-100 px-4 py-2 text-sm font-medium tracking-wide text-red-500 hover:border-red-500 hover:bg-red-500 hover:text-light dark:hover:bg-red-500"
+              disabled={details.status === RIDE_STATUS.EXPIRED}
+              className="transition-150 w-full rounded-lg border border-red-500 bg-red-100 px-4 py-2 text-sm font-medium tracking-wide text-red-500 hover:border-red-500 hover:bg-red-500 hover:text-light disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-500"
             >
               Cancel Ride
             </button>

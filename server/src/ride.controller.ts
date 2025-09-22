@@ -230,24 +230,23 @@ export class RideController {
         `Role mismatch: You're a '${user.role}', not a '${body.role}'.`,
       );
     }
-    // Prevent posting if user has an active ride in last 5 minutes
-    const fiveMinAgo = new Date(getNow().getTime() - 5 * 60 * 1000);
+    // Prevent posting if user has an active or confirmed ride (regardless of time)
     const existingActiveRide = await this.prisma.ride.findFirst({
       where: {
         createdBy: body.createdBy,
-        status: RIDE_STATUS.ACTIVE,
-        timestamp: { gte: fiveMinAgo },
+        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
       },
     });
     if (existingActiveRide) {
       this.logger.log({
         level: 'warn',
-        message: `Ride creation failed: UserId=${body.createdBy} already has an active ride`,
+        message: `Ride creation failed: UserId=${body.createdBy} already has an active or confirmed ride`,
         tag: 'ride',
         userId: body.createdBy,
+        existingRideStatus: existingActiveRide.status,
       });
       throw new BadRequestException(
-        'You already have an active ride and cannot post another at this time.',
+        'You already have an active or confirmed ride and cannot post another at this time.',
       );
     }
 
@@ -300,13 +299,7 @@ export class RideController {
   async getRides(@Query('role') role?: string) {
     const now = getNow();
     // Expire rides whose timestamp is in the past and still ACTIVE
-    await this.prisma.ride.updateMany({
-      where: {
-        status: RIDE_STATUS.ACTIVE,
-        timestamp: { lt: now },
-      },
-      data: { status: RIDE_STATUS.EXPIRED },
-    });
+    await this.expireOldRides();
 
     this.logger.log({
       level: 'info',
@@ -329,6 +322,13 @@ export class RideController {
       orderBy: { timestamp: 'desc' },
     });
 
+    // Add expiry information to each ride
+    const ridesWithExpiry = rides.map((ride) => ({
+      ...ride,
+      expiryTimeSeconds: this.calculateExpiryTimeSeconds(),
+      remainingTimeSeconds: this.calculateRemainingTimeSeconds(ride.timestamp),
+    }));
+
     this.logger.log({
       level: 'info',
       message: `Fetched rides`,
@@ -336,7 +336,7 @@ export class RideController {
       role,
       rideCount: rides.length,
     });
-    return { rides };
+    return { rides: ridesWithExpiry };
   }
 
   // Get all ride history for a user (as rider or passenger)
@@ -347,27 +347,14 @@ export class RideController {
   //   4. Document API changes for frontend
   @Get('history')
   async getRideHistory(@Query('userId') userId: string) {
-    const now = getNow();
-    // Use global constant for expiration grace period
-    const expirationTime = new Date(
-      now.getTime() - RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000, // Convert minutes to milliseconds: minutes * 60 (seconds) * 1000 (ms)
-    );
-
-    // Expire rides whose timestamp is more than grace period in the past and still ACTIVE
-    await this.prisma.ride.updateMany({
-      where: {
-        status: RIDE_STATUS.ACTIVE,
-        timestamp: { lt: expirationTime },
-      },
-      data: { status: RIDE_STATUS.EXPIRED },
-    });
+    // Expire old rides using the centralized helper
+    await this.expireOldRides();
 
     this.logger.log({
       level: 'info',
       message: `Expired rides older than grace period for history fetch`,
       tag: 'ride',
-      timestamp: now,
-      expirationTime,
+      timestamp: getNow(),
       userId,
     });
     const id = Number(userId);
@@ -890,5 +877,134 @@ export class RideController {
       userId: body.userId,
       ride,
     };
+  }
+
+  // Get current user's active ride with expiry information
+  @Get('user/:userId/current')
+  async getCurrentUserRide(@Param('userId', ParseIntPipe) userId: number) {
+    // First expire any old rides
+    await this.expireOldRides();
+
+    const activeRide = await this.prisma.ride.findFirst({
+      where: {
+        createdBy: userId,
+        status: RIDE_STATUS.ACTIVE,
+      },
+      include: {
+        rider: true,
+        createdByUser: true,
+        passengers: true,
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    if (!activeRide) {
+      return { hasActiveRide: false, ride: null };
+    }
+
+    // Calculate expiry information
+    const now = getNow();
+    const rideCreationTime = new Date(activeRide.timestamp);
+
+    const remainingTimeSeconds =
+      this.calculateRemainingTimeSeconds(rideCreationTime);
+
+    // Calculate the exact expiry time for logging purposes
+    const expiryTime = new Date(
+      rideCreationTime.getTime() + RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000,
+    );
+
+    const rideWithExpiry = {
+      ...activeRide,
+      expiryTimeSeconds: this.calculateExpiryTimeSeconds(),
+      remainingTimeSeconds,
+    };
+
+    this.logger.log({
+      level: 'info',
+      message: `Current ride fetched for user`,
+      tag: 'ride',
+      userId,
+      rideId: activeRide.id,
+      rideCreationTime: rideCreationTime.toISOString(),
+      expiryTime: expiryTime.toISOString(),
+      now: now.toISOString(),
+      remainingSeconds: remainingTimeSeconds,
+      status: activeRide.status,
+    });
+
+    return { hasActiveRide: true, ride: rideWithExpiry };
+  }
+
+  /**
+   * Helper method to expire old rides
+   */
+  private async expireOldRides(): Promise<void> {
+    const now = getNow();
+    // Calculate the cutoff time: rides created before (now - GRACE_MINUTES) should be expired
+    const cutoffTime = new Date(
+      now.getTime() - RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000,
+    );
+
+    const ridesToExpire = await this.prisma.ride.findMany({
+      where: {
+        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] }, // Expire both ACTIVE and CONFIRMED rides
+        timestamp: { lt: cutoffTime },
+      },
+      select: { id: true, timestamp: true, createdBy: true, status: true },
+    });
+
+    if (ridesToExpire.length > 0) {
+      this.logger.log({
+        level: 'info',
+        message: `Expiring ${ridesToExpire.length} old rides`,
+        tag: 'ride',
+        now: now.toISOString(),
+        cutoffTime: cutoffTime.toISOString(),
+        graceMinutes: RIDE_EXPIRATION_GRACE_MINUTES,
+        ridesToExpire: ridesToExpire.map((r) => ({
+          id: r.id,
+          createdBy: r.createdBy,
+          timestamp: r.timestamp.toISOString(),
+          status: r.status,
+        })),
+      });
+    }
+
+    await this.prisma.ride.updateMany({
+      where: {
+        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] }, // Expire both ACTIVE and CONFIRMED rides
+        timestamp: { lt: cutoffTime },
+      },
+      data: { status: RIDE_STATUS.EXPIRED },
+    });
+  }
+
+  /**
+   * Calculate total expiry time in seconds for a ride
+   * This represents the grace period (in seconds) after which a ride is considered expired.
+   * @returns Total expiry time in seconds
+   */
+  private calculateExpiryTimeSeconds(): number {
+    // Rides expire RIDE_EXPIRATION_GRACE_MINUTES after their creation time
+    return RIDE_EXPIRATION_GRACE_MINUTES * 60; // Convert minutes to seconds
+  }
+
+  /**
+   * Calculate remaining time in seconds before ride expires
+   * @param rideCreationTimestamp The ride's creation timestamp
+   * @returns Remaining seconds until expiry (0 if expired)
+   */
+  private calculateRemainingTimeSeconds(rideCreationTimestamp: Date): number {
+    const now = getNow();
+    // Rides expire RIDE_EXPIRATION_GRACE_MINUTES after their CREATION time, not scheduled time
+    const expiryTime = new Date(
+      rideCreationTimestamp.getTime() +
+        RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000,
+    );
+
+    const remainingMs = expiryTime.getTime() - now.getTime();
+
+    return Math.max(0, Math.floor(remainingMs / 1000)); // Return 0 if expired
   }
 }
