@@ -13,17 +13,25 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { Ride, User } from 'generated/prisma';
 import { PrismaService } from './prisma.service';
 import { RideGateway } from './rides/rides.gateway';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import {
-  RIDE_MATCH_WINDOW_MINUTES,
-  RIDE_EXPIRATION_GRACE_MINUTES,
   FEEDBACK_EMOJI,
   FEEDBACK_POINTS,
+  RIDE_MATCH_WINDOW_MINUTES,
+  RIDE_EXPIRATION_GRACE_MINUTES,
 } from './constants/enums';
 import { USER_ROLE, RIDE_STATUS } from './constants/enums';
+
+import {
+  RideDto,
+  FeedbackDto,
+  ConfirmRideDto,
+  AverageScoreResult,
+} from './interfaces/types';
 
 import {
   calculateETA,
@@ -33,37 +41,7 @@ import {
 } from './utils/rideStats.util';
 import { getNow } from './utils/date.util';
 import { getTimeWindow } from './utils/timeWindow.util';
-
-interface RideDto {
-  from: string;
-  fromLat?: number;
-  fromLng?: number;
-  to: string;
-  toLat?: number;
-  toLng?: number;
-  message?: string;
-  role: USER_ROLE;
-  createdBy: number; // user id of the creator
-  estimatedTimeOfArrival?: number;
-  timestamp?: string;
-  status?: RIDE_STATUS;
-}
-
-interface ConfirmRideDto {
-  passengerId?: number;
-  passengerRideId?: number;
-  riderId?: number;
-  riderRideId?: number;
-}
-
-interface FeedbackDto {
-  rideId: number;
-  fromUserId: number;
-  toUserId: number;
-  role: USER_ROLE;
-  emoji: FEEDBACK_EMOJI; // 0=😊, 1=😐, 2=😠
-  comment?: string;
-}
+import { processFeedbackData } from './utils/feedback.util';
 
 @Controller('rides')
 export class RideController {
@@ -263,9 +241,11 @@ export class RideController {
       where: { rideId: body.rideId },
     });
 
-    const riderFeedback = allFeedback.find((f) => f.role === USER_ROLE.RIDER);
+    const riderFeedback = allFeedback.find(
+      (f) => f.role === (USER_ROLE.RIDER as string),
+    );
     const passengerFeedback = allFeedback.find(
-      (f) => f.role === USER_ROLE.PASSENGER,
+      (f) => f.role === (USER_ROLE.PASSENGER as string),
     );
 
     // Since ride is already completed, check if both users have now submitted feedback
@@ -279,7 +259,7 @@ export class RideController {
 
     return {
       message: 'Feedback submitted successfully',
-      feedback,
+      feedback: feedback as FeedbackDto,
       pointsAwarded: totalPoints,
       user: updatedUser,
       feedbackComplete: bothSubmitted,
@@ -990,7 +970,11 @@ export class RideController {
     const peopleImpacted = ride.passengers.length;
 
     // Update ALL rides in the same match group to COMPLETED status
-    let updatedRides: any[];
+    let updatedRides: (Ride & {
+      passengers: User[];
+      rider: User | null;
+      createdByUser: User | null;
+    })[];
     if (ride.matchGroupId) {
       // Update all rides with the same matchGroupId
       await this.prisma.ride.updateMany({
@@ -1048,7 +1032,7 @@ export class RideController {
 
     // Notify both users via socket that the ride is completed and they should show feedback modal
     // Use the first ride for notification (both should have same essential data)
-    this.rideGateway.notifyRideCompletion(updatedRides[0]);
+    this.rideGateway.notifyRideCompletion(updatedRides[0] as Ride);
 
     return {
       message:
@@ -1203,6 +1187,56 @@ export class RideController {
       },
       data: { status: RIDE_STATUS.EXPIRED },
     });
+  }
+
+  @Get('/user/:userId/average-score')
+  /**
+   * Get average feedback score for a user
+   * Calculates the average emoji feedback received by a user across all rides
+   * @param userId The user ID to calculate average score for
+   * @returns Object containing average score, total feedback count, and emoji breakdown
+   */
+  async getUserAverageScore(
+    @Param('userId', ParseIntPipe) userId: number,
+  ): Promise<AverageScoreResult> {
+    this.logger.log({
+      level: 'info',
+      message: `Getting average score for user ${userId}`,
+      tag: 'average-score',
+      userId,
+    });
+
+    try {
+      // Get all feedback received by this user
+      const feedbackReceived: Array<{ emoji: number }> =
+        (await this.prisma.feedback.findMany({
+          where: { toUserId: userId },
+          select: { emoji: true },
+        })) as Array<{ emoji: number }>;
+
+      // Use utility function to process the feedback data
+      const result = processFeedbackData(feedbackReceived);
+
+      this.logger.log({
+        level: 'info',
+        message: `Average score calculated for user ${userId}: ${result.averageScore}`,
+        tag: 'average-score',
+        userId,
+        averageScore: result.averageScore,
+        totalFeedback: result.totalFeedback,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        message: `Error calculating average score for user ${userId}`,
+        tag: 'average-score',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId,
+      });
+      throw new BadRequestException('Error calculating average score');
+    }
   }
 
   /**

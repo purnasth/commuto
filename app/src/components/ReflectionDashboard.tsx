@@ -136,9 +136,9 @@ const ReflectionDashboard = ({
         </div>
       </div>
       <div className="col-span-1 rounded-3xl rounded-b-none bg-none dark:bg-teal-900 md:bg-teal-50">
-        <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white pt-1 pb-4 dark:bg-dark">
+        <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white pb-4 pt-1 dark:bg-dark">
           {/* <PeopleAvatarGrid people={people} /> */}
-          <PeopleImpactedWithScore people={people} />
+          <PeopleImpactedWithScore people={people} userId={currentUserId} />
           <TitleBar
             // content={
             //   people.length > 0

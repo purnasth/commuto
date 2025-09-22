@@ -18,6 +18,8 @@ import {
   RIDE_STATUS,
   LS_RIDE_FORM_DATA_KEY,
 } from '../constants/enums';
+
+import { capitalize } from '../utils/functions';
 import { ROUTE_HOME, ROUTE_ROLE } from '../constants/routes';
 
 import { RideHistory } from '../interfaces/types';
@@ -72,7 +74,7 @@ const RideStatusBadge = ({ status }: { status: RIDE_STATUS }) => {
 
   if (!s) return null;
 
-  const label = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  const label = capitalize(status);
 
   return (
     <span

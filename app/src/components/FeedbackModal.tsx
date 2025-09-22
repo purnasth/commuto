@@ -13,6 +13,7 @@ import {
 import { ROUTE_PROFILE } from '../constants/routes';
 
 import { apiFetch } from '../utils/api';
+import { capitalize } from '../utils/functions';
 
 interface FeedbackModalProps {
   onClose: () => void;
@@ -88,25 +89,13 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
     toUserId = rideDetails.rider.id;
   }
 
-  //   TODO: use the enums here instead of another static emojiOptions.
-  // Available emoji options
-  const emojiOptions = [
-    {
-      value: FEEDBACK_EMOJI.SATISFIED,
-      char: FEEDBACK_EMOJI_CHARS[FEEDBACK_EMOJI.SATISFIED],
-      label: 'Satisfied',
-    },
-    {
-      value: FEEDBACK_EMOJI.NEUTRAL,
-      char: FEEDBACK_EMOJI_CHARS[FEEDBACK_EMOJI.NEUTRAL],
-      label: 'Neutral',
-    },
-    {
-      value: FEEDBACK_EMOJI.DISSATISFIED,
-      char: FEEDBACK_EMOJI_CHARS[FEEDBACK_EMOJI.DISSATISFIED],
-      label: 'Not Satisfied',
-    },
-  ];
+  const emojiOptions = Object.entries(FEEDBACK_EMOJI)
+    .filter(([, value]) => typeof value === 'number') // Filter out reverse mappings
+    .map(([key, value]) => ({
+      value: value as FEEDBACK_EMOJI,
+      char: FEEDBACK_EMOJI_CHARS[value as FEEDBACK_EMOJI],
+      label: capitalize(key),
+    }));
 
   const getRoleBasedPrompt = () => {
     if (userRole === USER_ROLE.RIDER) {

@@ -138,3 +138,11 @@ export interface RedeemableReward {
   points: number;
   description: string;
 }
+
+export interface AverageScoreResult {
+  averageScore: number | null;
+  totalFeedback: number;
+  emojiBreakdown: {
+    [key: number]: number;
+  };
+}
