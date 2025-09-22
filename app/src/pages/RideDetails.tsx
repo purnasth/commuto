@@ -14,12 +14,14 @@ import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
 import { RideFormData, UserDetails } from '../interfaces/types';
 
 import { USER_ROLE } from '../constants/enums';
-import { ROUTE_PROFILE } from '../constants/routes';
 
 import { apiFetch } from '../utils/api';
 import { useSocket } from '../utils/useSocket';
 import { formatFullDate } from '../utils/functions';
 import { determineMatchedUser } from '../utils/utils';
+
+import FeedbackModal from '../components/FeedbackModal';
+import { toast } from 'react-toastify';
 
 /**
  * Component to display matched user information
@@ -81,34 +83,67 @@ const MatchedUserCard: React.FC<{ matchedUser: UserDetails }> = ({
 );
 
 /**
- * Button component for completing a ride with proper role-based logic
+ * Button component for completing a ride or providing feedback based on ride status
  */
-const CompleteRideButton: React.FC<{
-  user: { id: number } | null;
+const RideActionButton: React.FC<{
   rideDetails: RideFormData;
-  onComplete: (ride: RideFormData) => Promise<void>;
+  user: { id: number } | null;
   onFeedback: () => void;
-}> = ({ user, rideDetails, onComplete, onFeedback }) => {
-  const isRider = Number(user?.id) === Number(rideDetails.riderId);
+  onCompleteRide: (ride: RideFormData) => void;
+}> = ({ rideDetails, user, onFeedback, onCompleteRide }) => {
+  // Check if ride is completed
+  const isCompleted = rideDetails.status === 'COMPLETED';
+
+  // Check if user has already provided feedback
+  const hasFeedbackPending = localStorage.getItem('rideStatus') === 'completed';
+  const feedbackKey = `feedback_${rideDetails.id}_${user?.id}`;
+  const hasSubmittedFeedback = localStorage.getItem(feedbackKey) === 'true';
 
   const handleClick = async () => {
-    if (isRider) {
-      await onComplete(rideDetails);
-      window.location.href = ROUTE_PROFILE;
-    } else {
+    if (hasSubmittedFeedback) {
+      // User already submitted feedback, don't show modal
+      toast.info('You have already submitted feedback for this ride.');
+      return;
+    }
+
+    if (isCompleted || hasFeedbackPending) {
+      // Show feedback modal if ride is completed
       onFeedback();
+    } else {
+      // Complete the ride first
+      await onCompleteRide(rideDetails);
     }
   };
+
+  // Don't show button if feedback already submitted
+  if (hasSubmittedFeedback) {
+    return (
+      <div className="rounded-full border border-green-200 bg-green-100 px-7 py-3 text-sm text-green-700">
+        <span className="font-medium">✓ Feedback Submitted</span>
+      </div>
+    );
+  }
+
+  const buttonText =
+    isCompleted || hasFeedbackPending
+      ? 'Provide Feedback'
+      : 'Complete the ride';
+  const buttonColor =
+    isCompleted || hasFeedbackPending
+      ? 'bg-amber-400 hover:bg-amber-500'
+      : 'bg-teal-400 hover:bg-green-500';
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      className="group relative overflow-hidden rounded-full border border-teal-200 bg-teal-400 px-7 py-3 text-sm text-light hover:bg-green-500 dark:text-dark"
+      className={`group relative overflow-hidden rounded-full border border-teal-200 px-7 py-3 text-sm text-light dark:text-dark ${buttonColor}`}
     >
-      <span className="absolute inset-0 z-0 animate-slide bg-gradient-to-r from-green-500 to-green-400 group-hover:animate-none"></span>
+      <span
+        className={`absolute inset-0 z-0 animate-slide ${isCompleted || hasFeedbackPending ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-green-500 to-green-400'} group-hover:animate-none`}
+      ></span>
       <span className="relative z-10 font-medium tracking-wide">
-        Complete the ride
+        {buttonText}
       </span>
     </button>
   );
@@ -157,6 +192,9 @@ const RideDetails: React.FC = () => {
         const ride = response.ride;
         const matchedUser = determineMatchedUser(ride, user.id);
         setMatchedUser(matchedUser);
+
+        // Update rideDetails with complete data from API
+        setRideDetails(ride);
       } catch (error) {
         console.error('Error fetching ride details:', error);
       }
@@ -179,10 +217,21 @@ const RideDetails: React.FC = () => {
   };
 
   const handleCompleteRide = async (ride: RideFormData) => {
+    if (!user?.id) {
+      console.error('User not found');
+      return;
+    }
+
     try {
       await apiFetch(
         `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/complete`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          body: JSON.stringify({ userId: user.id }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
       );
 
       // Clean up local storage
@@ -272,11 +321,11 @@ const RideDetails: React.FC = () => {
                 {showMap ? 'Hide Route' : 'View Route'}
               </button>
 
-              <CompleteRideButton
-                user={user}
+              <RideActionButton
                 rideDetails={rideDetails}
-                onComplete={handleCompleteRide}
+                user={user}
                 onFeedback={() => setShowFeedbackPopup(true)}
+                onCompleteRide={handleCompleteRide}
               />
             </div>
             {showMap && (
@@ -314,6 +363,7 @@ const RideDetails: React.FC = () => {
           onClose={() => setShowFeedbackPopup(false)}
           handleCompleteRide={handleCompleteRide}
           rideDetails={rideDetails}
+          user={user}
         />
       )}
     </>
@@ -321,92 +371,3 @@ const RideDetails: React.FC = () => {
 };
 
 export default RideDetails;
-
-interface FeedbackModalProps {
-  onClose: () => void;
-  handleCompleteRide: (ride: RideFormData) => Promise<void>;
-  rideDetails: RideFormData;
-}
-
-const FeedbackModal = ({
-  onClose,
-  handleCompleteRide,
-  rideDetails,
-}: FeedbackModalProps) => {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-
-  const handleSubmit = async () => {
-    console.log('Feedback submitted:', { rating, comment });
-    await handleCompleteRide(rideDetails);
-    onClose();
-    window.location.href = ROUTE_PROFILE;
-  };
-
-  return (
-    <main className="fixed inset-0 z-50 flex size-full min-h-screen items-center justify-center bg-white">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-teal-300 p-10 shadow-lg">
-        <div className="pointer-events-none absolute -left-[20%] top-1/2 -z-10 size-48 rounded-full bg-teal-300 blur-[80px]" />
-        <div className="pointer-events-none absolute -right-10 -top-12 -z-10 size-40 rounded-full bg-teal-300 blur-[50px]" />
-        <h2 className="mb-2 text-xl font-semibold text-gray-800">
-          Share Your Experience
-        </h2>
-        <p className="mb-4 text-sm text-gray-600">
-          Your experience will not shown to the rider, but it impacts the
-          overall ride quality.
-        </p>
-
-        <div className="mb-8">
-          <p className="mb-2 text-sm text-gray-600">Select an emoji:</p>
-          <div className="flex gap-2">
-            {['😀', '😊', '😐', '😞', '😠'].map((emoji) => {
-              const isSelected = rating === emoji.charCodeAt(0);
-              return (
-                <button
-                  key={emoji}
-                  onClick={() => setRating(emoji.charCodeAt(0))}
-                  className={`flex aspect-square size-9 items-center justify-center rounded-full border text-2xl transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400 ${
-                    isSelected
-                      ? 'border-teal-400/50 bg-teal-50 text-teal-400 shadow-lg'
-                      : 'border-amber-400/50 bg-amber-50 text-amber-400'
-                  }`}
-                  aria-label={`Rate ${emoji}`}
-                >
-                  {emoji}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <textarea
-          rows={3}
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Leave a comment (optional)"
-          className="w-full rounded px-3 py-2 text-sm text-dark outline outline-teal-300/50 focus:outline-teal-300/80"
-        />
-
-        <div className="mt-6 flex justify-end gap-3">
-          {/* <button
-              onClick={onClose}
-              className="rounded bg-gray-300 px-4 py-2 text-sm hover:bg-gray-400"
-            >
-              Cancel
-            </button> */}
-          <button
-            onClick={handleSubmit}
-            disabled={rating === 0}
-            className={`rounded-full px-6 py-2 text-sm text-dark transition-colors ${
-              rating === 0
-                ? 'cursor-not-allowed bg-teal-300'
-                : 'bg-teal-400 hover:bg-teal-600'
-            }`}
-          >
-            Submit
-          </button>
-        </div>
-      </div>
-    </main>
-  );
-};

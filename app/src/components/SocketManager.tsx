@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { SocketContext } from '../utils/SocketContext';
 import { useRideEvent } from '../utils/useRideEvent';
-import { ROUTE_HOME, ROUTE_PROFILE } from '../constants/routes';
-import { USER_ROLE } from '../constants/enums';
 
 const SERVER_URL =
   import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:3001';
@@ -22,6 +20,24 @@ export const SocketManager = ({ children }) => {
   );
   const user = localStorage.getItem('user');
   const userId = user ? JSON.parse(user).id : null;
+
+  // Sync ride status with localStorage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const currentStatus = localStorage.getItem('rideStatus') || 'idle';
+      setRideStatus(currentStatus);
+    };
+
+    // Listen for storage changes (when localStorage is updated from other components)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check on component mount/update
+    handleStorageChange();
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) {
@@ -121,11 +137,9 @@ export const SocketManager = ({ children }) => {
         console.error('User not found or invalid user data');
         return;
       }
-      if (user.role.toLowerCase() === USER_ROLE.PASSENGER) {
-        setShowFeedbackPopup(true);
-      } else if (user.role.toLowerCase() === USER_ROLE.RIDER) {
-        window.location.href = ROUTE_PROFILE;
-      }
+
+      // Don't auto-show feedback popup, let user click "Provide Feedback" button
+      log(`✅ Ride completed! User can now provide feedback via the button`);
     });
   };
 

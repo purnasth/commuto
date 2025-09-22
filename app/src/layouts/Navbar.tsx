@@ -177,6 +177,18 @@ const Navbar = () => {
                   Active
                 </button>
               )}
+              {/* //TODO: use the RIDE_STATUS enums */}
+              {rideStatus === 'completed' && (
+                <button
+                  type="button"
+                  onClick={handleClick}
+                  aria-label="Feedback Pending"
+                  className="flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 font-medium text-amber-700"
+                >
+                  <span className="size-2.5 animate-pulse rounded-full bg-amber-600" />
+                  Feedback Pending
+                </button>
+              )}
               {userName ? (
                 <Link
                   to={ROUTE_PROFILE}

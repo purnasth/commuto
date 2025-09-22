@@ -31,6 +31,28 @@ export enum RIDE_STATUS {
   COMPLETED = 'COMPLETED',
 }
 
+/**
+ * Enum representing feedback emoji types in the application.
+ * Use this for type safety and to avoid hardcoded emoji values.
+ *
+ * Values are stored as index-based integers for better database performance
+ * and easier querying/sorting.
+ */
+export enum FEEDBACK_EMOJI {
+  SATISFIED = 0, // 😊 - Satisfied
+  NEUTRAL = 1, // 😐 - Neutral
+  DISSATISFIED = 2, // 😠 - Dissatisfied/Not satisfied
+}
+
+/**
+ * Mapping of feedback emoji indices to actual emoji characters
+ */
+export const FEEDBACK_EMOJI_CHARS = {
+  [FEEDBACK_EMOJI.SATISFIED]: '😊',
+  [FEEDBACK_EMOJI.NEUTRAL]: '😐',
+  [FEEDBACK_EMOJI.DISSATISFIED]: '😠',
+} as const;
+
 export const KARMA = 'karma';
 
 /**

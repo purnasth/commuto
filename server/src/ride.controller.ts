@@ -20,6 +20,8 @@ import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 import {
   RIDE_MATCH_WINDOW_MINUTES,
   RIDE_EXPIRATION_GRACE_MINUTES,
+  FEEDBACK_EMOJI,
+  FEEDBACK_POINTS,
 } from './constants/enums';
 import { USER_ROLE, RIDE_STATUS } from './constants/enums';
 
@@ -54,6 +56,15 @@ interface ConfirmRideDto {
   riderRideId?: number;
 }
 
+interface FeedbackDto {
+  rideId: number;
+  fromUserId: number;
+  toUserId: number;
+  role: USER_ROLE;
+  emoji: FEEDBACK_EMOJI; // 0=😊, 1=😐, 2=😠
+  comment?: string;
+}
+
 @Controller('rides')
 export class RideController {
   constructor(
@@ -86,6 +97,194 @@ export class RideController {
       throw new NotFoundException('User not found');
     }
     return { karmaPoints: user.karmaPoints };
+  }
+
+  @Post('/feedback')
+  /**
+   * Submit feedback for a completed ride
+   * Updates karma points for riders and credit score for passengers
+   */
+  async submitFeedback(@Body() body: FeedbackDto) {
+    this.logger.log({
+      level: 'info',
+      message: `Feedback submission attempt for ride ${body.rideId} from user ${body.fromUserId} to user ${body.toUserId}`,
+      tag: 'feedback',
+      rideId: body.rideId,
+      fromUserId: body.fromUserId,
+      toUserId: body.toUserId,
+      role: body.role,
+      emoji: body.emoji,
+    });
+
+    // Validate required fields
+    if (
+      !body.rideId ||
+      !body.fromUserId ||
+      !body.toUserId ||
+      !body.role ||
+      body.emoji === undefined ||
+      body.emoji === null
+    ) {
+      throw new BadRequestException('Missing required feedback fields');
+    }
+
+    // Validate emoji
+    const validEmojis = [
+      FEEDBACK_EMOJI.SATISFIED,
+      FEEDBACK_EMOJI.NEUTRAL,
+      FEEDBACK_EMOJI.DISSATISFIED,
+    ];
+    if (!validEmojis.includes(body.emoji)) {
+      throw new BadRequestException(
+        `Invalid emoji. Must be one of: ${validEmojis.join(', ')} (0=😊, 1=😐, 2=😠)`,
+      );
+    }
+
+    // Check if ride exists and is completed
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: body.rideId },
+      include: { rider: true, passengers: true },
+    });
+
+    if (!ride) {
+      throw new NotFoundException('Ride not found');
+    }
+
+    // Only allow feedback for completed rides
+    if (ride.status !== RIDE_STATUS.COMPLETED) {
+      throw new BadRequestException(
+        'Feedback can only be submitted for completed rides',
+      );
+    }
+
+    // Verify that fromUser is part of this ride
+    const isRider = ride.riderId === body.fromUserId;
+    const isPassenger = ride.passengerId === body.fromUserId;
+
+    if (!isRider && !isPassenger) {
+      throw new BadRequestException('User is not part of this ride');
+    }
+
+    // Check for duplicate feedback
+    let existingFeedback: any;
+    try {
+      existingFeedback = await this.prisma.feedback.findFirst({
+        where: {
+          rideId: body.rideId,
+          fromUserId: body.fromUserId,
+          toUserId: body.toUserId,
+        },
+      });
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        message: 'Error checking for existing feedback',
+        tag: 'feedback',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw new BadRequestException('Error checking feedback status');
+    }
+
+    if (existingFeedback) {
+      throw new BadRequestException('Feedback already submitted for this ride');
+    }
+
+    // Create feedback record
+    let feedback: any;
+    try {
+      feedback = await this.prisma.feedback.create({
+        data: {
+          rideId: body.rideId,
+          fromUserId: body.fromUserId,
+          toUserId: body.toUserId,
+          role: body.role,
+          emoji: body.emoji,
+          comment: body.comment,
+        },
+      });
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        message: 'Error creating feedback record',
+        tag: 'feedback',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw new BadRequestException('Error creating feedback');
+    }
+
+    // Calculate points based on emoji using enum system
+    const basePoints = FEEDBACK_POINTS.BASE_POINTS;
+    const bonusPoints = FEEDBACK_POINTS.BONUS_POINTS[body.emoji];
+    const totalPoints = basePoints + bonusPoints;
+
+    // Update user scores based on their role
+    if (body.role === USER_ROLE.RIDER) {
+      // Update rider's karma points
+      await this.prisma.user.update({
+        where: { id: body.fromUserId },
+        data: { karmaPoints: { increment: totalPoints } },
+      });
+
+      // Create karma transaction
+      await this.prisma.karmaTransaction.create({
+        data: {
+          userId: body.fromUserId,
+          points: totalPoints,
+          type: 'earned',
+          reason: `Ride feedback: emoji ${body.emoji} (${basePoints} base + ${bonusPoints} bonus)`,
+        },
+      });
+
+      this.logger.log({
+        level: 'info',
+        message: `Karma points awarded to rider ${body.fromUserId}: ${totalPoints} points`,
+        tag: 'feedback',
+        userId: body.fromUserId,
+        points: totalPoints,
+      });
+    } else if (body.role === USER_ROLE.PASSENGER) {
+      // Update passenger's credit score
+      await this.prisma.user.update({
+        where: { id: body.fromUserId },
+        data: { creditScore: { increment: totalPoints } },
+      });
+
+      this.logger.log({
+        level: 'info',
+        message: `Credit score awarded to passenger ${body.fromUserId}: ${totalPoints} points`,
+        tag: 'feedback',
+        userId: body.fromUserId,
+        points: totalPoints,
+      });
+    }
+
+    // Check if both users have submitted feedback to determine response
+    const allFeedback = await this.prisma.feedback.findMany({
+      where: { rideId: body.rideId },
+    });
+
+    const riderFeedback = allFeedback.find((f) => f.role === USER_ROLE.RIDER);
+    const passengerFeedback = allFeedback.find(
+      (f) => f.role === USER_ROLE.PASSENGER,
+    );
+
+    // Since ride is already completed, check if both users have now submitted feedback
+    const bothSubmitted = riderFeedback && passengerFeedback;
+
+    // Get updated user data to return
+    const updatedUser = await this.prisma.user.findUnique({
+      where: { id: body.fromUserId },
+      select: { id: true, karmaPoints: true, creditScore: true },
+    });
+
+    return {
+      message: 'Feedback submitted successfully',
+      feedback,
+      pointsAwarded: totalPoints,
+      user: updatedUser,
+      feedbackComplete: bothSubmitted,
+      waitingForOtherUser: !bothSubmitted,
+    };
   }
 
   /**
@@ -729,7 +928,10 @@ export class RideController {
   // }
 
   @Post(':id/complete')
-  async completeRide(@Param('id') id: string) {
+  async completeRide(
+    @Param('id') id: string,
+    @Body() body: { userId: number },
+  ) {
     const rideId = Number(id);
 
     const ride = await this.prisma.ride.findUnique({
@@ -747,17 +949,25 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
+    // Verify that the user is part of this ride
+    const isRider = ride.riderId === body.userId;
+    const isPassenger = ride.passengerId === body.userId;
+
+    if (!isRider && !isPassenger) {
+      throw new BadRequestException(
+        'You are not authorized to complete this ride',
+      );
+    }
+
     if (ride.status !== RIDE_STATUS.CONFIRMED) {
       this.logger.log({
         level: 'warn',
-        message: `Complete ride failed: Ride not confirmed or already completed`,
+        message: `Complete ride failed: Ride not confirmed`,
         tag: 'ride',
         rideId,
         status: ride.status,
       });
-      throw new BadRequestException(
-        'Ride is not confirmed or already completed',
-      );
+      throw new BadRequestException('Only confirmed rides can be completed');
     }
 
     let distance: number | null = null;
@@ -796,39 +1006,23 @@ export class RideController {
 
     this.logger.log({
       level: 'info',
-      message: `Ride completed`,
+      message: `Ride completed by user ${body.userId}`,
       tag: 'ride',
       rideId,
+      completedByUserId: body.userId,
+      isRider,
+      isPassenger,
       distance,
       co2Saved,
       peopleImpacted,
     });
 
-    // Award karma points to the rider if they exist
-    if (ride.rider) {
-      // TODO: create a constant for karma points and centralize it
-      const karmaPoints = 20;
-      await this.prisma.user.update({
-        where: { id: ride.rider.id },
-        data: {
-          karmaPoints: { increment: karmaPoints },
-        },
-      });
-
-      await this.prisma.karmaTransaction.create({
-        data: {
-          userId: ride.rider.id,
-          points: karmaPoints,
-          type: 'earned',
-          reason: 'Ride completed',
-        },
-      });
-    }
-
+    // Notify both users via socket that the ride is completed and they should show feedback modal
     this.rideGateway.notifyRideCompletion(updatedRide);
 
     return {
-      message: 'Ride completed and users notified.',
+      message:
+        'Ride completed successfully. Both users should now provide feedback.',
       ride: updatedRide,
     };
   }
