@@ -989,24 +989,51 @@ export class RideController {
       typeof distance === 'number' ? estimateCO2FromDistance(distance) : null;
     const peopleImpacted = ride.passengers.length;
 
-    const updatedRide = await this.prisma.ride.update({
-      where: { id: rideId },
-      data: {
-        status: RIDE_STATUS.COMPLETED,
-        distance,
-        co2Saved,
-        peopleImpacted,
-      },
-      include: {
-        passengers: true,
-        rider: true,
-        createdByUser: true,
-      },
-    });
+    // Update ALL rides in the same match group to COMPLETED status
+    let updatedRides: any[];
+    if (ride.matchGroupId) {
+      // Update all rides with the same matchGroupId
+      await this.prisma.ride.updateMany({
+        where: { matchGroupId: ride.matchGroupId },
+        data: {
+          status: RIDE_STATUS.COMPLETED,
+          distance,
+          co2Saved,
+          peopleImpacted,
+        },
+      });
+
+      // Fetch the updated rides for response
+      updatedRides = await this.prisma.ride.findMany({
+        where: { matchGroupId: ride.matchGroupId },
+        include: {
+          passengers: true,
+          rider: true,
+          createdByUser: true,
+        },
+      });
+    } else {
+      // Fallback: update only the current ride if no matchGroupId
+      const updatedRide = await this.prisma.ride.update({
+        where: { id: rideId },
+        data: {
+          status: RIDE_STATUS.COMPLETED,
+          distance,
+          co2Saved,
+          peopleImpacted,
+        },
+        include: {
+          passengers: true,
+          rider: true,
+          createdByUser: true,
+        },
+      });
+      updatedRides = [updatedRide];
+    }
 
     this.logger.log({
       level: 'info',
-      message: `Ride completed by user ${body.userId}`,
+      message: `Ride(s) completed by user ${body.userId}`,
       tag: 'ride',
       rideId,
       completedByUserId: body.userId,
@@ -1015,15 +1042,19 @@ export class RideController {
       distance,
       co2Saved,
       peopleImpacted,
+      matchGroupId: ride.matchGroupId,
+      updatedRideCount: updatedRides.length,
     });
 
     // Notify both users via socket that the ride is completed and they should show feedback modal
-    this.rideGateway.notifyRideCompletion(updatedRide);
+    // Use the first ride for notification (both should have same essential data)
+    this.rideGateway.notifyRideCompletion(updatedRides[0]);
 
     return {
       message:
         'Ride completed successfully. Both users should now provide feedback.',
-      ride: updatedRide,
+      ride: updatedRides[0], // Return the first ride (both should have same essential data)
+      totalRidesUpdated: updatedRides.length,
     };
   }
 

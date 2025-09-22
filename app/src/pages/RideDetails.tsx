@@ -1,3 +1,4 @@
+import { toast } from 'react-toastify';
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
@@ -21,7 +22,6 @@ import { formatFullDate } from '../utils/functions';
 import { determineMatchedUser } from '../utils/utils';
 
 import FeedbackModal from '../components/FeedbackModal';
-import { toast } from 'react-toastify';
 
 /**
  * Component to display matched user information
@@ -134,6 +134,7 @@ const RideActionButton: React.FC<{
       : 'bg-teal-400 hover:bg-green-500';
 
   return (
+    // TODO: add the confirm modal here rather than directly calling onCompleteRide (only for the complete ride action)
     <button
       type="button"
       onClick={handleClick}

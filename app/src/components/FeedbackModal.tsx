@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 import { RideFormData } from '../interfaces/types';
 
@@ -34,6 +35,8 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   rideDetails,
   user,
 }) => {
+  const navigate = useNavigate();
+
   const [selectedEmoji, setSelectedEmoji] = useState<FEEDBACK_EMOJI | null>(
     null,
   );
@@ -195,20 +198,29 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         // Clear ride status since both feedbacks are complete
         localStorage.setItem('rideStatus', 'idle');
 
-        // Close modal and redirect
-        onClose();
-        window.location.href = ROUTE_PROFILE;
-      } else if (response.waitingForOtherUser) {
-        // Current user submitted feedback, clear their status and redirect immediately
-        localStorage.setItem('rideStatus', 'idle');
-
+        // Show success message and navigate
+        toast.success('Thank you for your feedback!');
         toast.info(
-          `Thank you for your feedback! You earned ${response.pointsAwarded} ${userRole === USER_ROLE.RIDER ? 'karma' : 'credit score'} points. `,
+          `You earned ${response.pointsAwarded} ${userRole === USER_ROLE.RIDER ? 'karma' : 'credit score'} points!`,
+          { autoClose: 10000 }, // 10 seconds
         );
 
-        // Close modal and redirect to profile page immediately
+        // Close modal and navigate
         onClose();
-        window.location.href = ROUTE_PROFILE;
+        navigate(ROUTE_PROFILE);
+      } else if (response.waitingForOtherUser) {
+        // Current user submitted feedback, clear their status and navigate after showing toast
+        localStorage.setItem('rideStatus', 'idle');
+
+        toast.success('Thank you for your feedback!');
+        toast.info(
+          `You earned ${response.pointsAwarded} ${userRole === USER_ROLE.RIDER ? 'karma' : 'credit score'} points!`,
+          { autoClose: 10000 }, // 10 seconds
+        );
+
+        // Close modal and navigate immediately
+        onClose();
+        navigate(ROUTE_PROFILE);
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);
