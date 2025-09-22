@@ -8,9 +8,10 @@ import useDisableScroll from '../../hooks/useDisableScroll';
 interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
+  className?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
+const Modal: React.FC<ModalProps> = ({ onClose, children, className }) => {
   useDisableScroll();
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -38,6 +39,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
         transition={{
           duration: 0.3,
         }}
+        className={className || ''}
       >
         {children}
       </motion.div>

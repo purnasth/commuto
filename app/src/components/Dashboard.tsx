@@ -34,6 +34,56 @@ import UserDisplay from './ui/UserDisplay';
 import NoRideFound from './ui/NoRideFound';
 import MobileDashboard from './MobileDashboard';
 
+const RideStatusBadge = ({ status }: { status: RIDE_STATUS }) => {
+  const statusMap: Record<RIDE_STATUS, { color: string; text: string }> = {
+    [RIDE_STATUS.ACTIVE]: {
+      color:
+        'border-blue-300 bg-gradient-to-br from-blue-300 via-blue-50 to-blue-200 text-blue-600',
+      text: 'bg-blue-600',
+    },
+    [RIDE_STATUS.CONFIRMED]: {
+      color:
+        'border-teal-300 bg-gradient-to-br from-teal-300 via-teal-50 to-teal-200 text-teal-600',
+      text: 'bg-teal-600',
+    },
+    [RIDE_STATUS.REJECTED]: {
+      color:
+        'border-red-300 bg-gradient-to-br from-red-300 via-red-50 to-red-200 text-red-600',
+      text: 'bg-red-600',
+    },
+    [RIDE_STATUS.EXPIRED]: {
+      color:
+        'border-gray-300 bg-gradient-to-br from-gray-300 via-gray-50 to-gray-200 text-gray-600',
+      text: 'bg-gray-600',
+    },
+    [RIDE_STATUS.CANCELLED]: {
+      color:
+        'border-amber-300 bg-gradient-to-br from-amber-300 via-amber-50 to-amber-200 text-amber-600',
+      text: 'bg-amber-600',
+    },
+    [RIDE_STATUS.COMPLETED]: {
+      color:
+        'border-green-300 bg-gradient-to-br from-green-300 via-green-50 to-green-200 text-green-600',
+      text: 'bg-green-600',
+    },
+  };
+
+  const s = statusMap[status];
+
+  if (!s) return null;
+
+  const label = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+
+  return (
+    <span
+      className={`transition-150 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-normal hover:scale-110 ${s.color}`}
+    >
+      <span className={`size-1.5 rounded-full ${s.text}`} />
+      {label}
+    </span>
+  );
+};
+
 interface DashboardProps {
   rides: RideHistory[];
 }
@@ -235,42 +285,7 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                     </Tooltip>
                   </td>
                   <td className="px-4 py-3">
-                    {ride.status === RIDE_STATUS.ACTIVE && (
-                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-100 px-2.5 py-1 text-xs font-normal text-blue-600 hover:scale-110">
-                        <span className="size-1.5 rounded-full bg-blue-600" />
-                        Active
-                      </span>
-                    )}
-                    {ride.status === RIDE_STATUS.CONFIRMED && (
-                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-100 px-2.5 py-1 text-xs font-normal text-teal-600 hover:scale-110">
-                        <span className="size-1.5 rounded-full bg-teal-600" />
-                        Confirmed
-                      </span>
-                    )}
-                    {ride.status === RIDE_STATUS.REJECTED && (
-                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2.5 py-1 text-xs font-normal text-red-600 hover:scale-110">
-                        <span className="size-1.5 rounded-full bg-red-600" />
-                        Rejected
-                      </span>
-                    )}
-                    {ride.status === RIDE_STATUS.EXPIRED && (
-                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-100 px-2.5 py-1 text-xs font-normal text-gray-600 hover:scale-110">
-                        <span className="size-1.5 rounded-full bg-gray-600" />
-                        Expired
-                      </span>
-                    )}
-                    {ride.status === RIDE_STATUS.CANCELLED && (
-                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-normal text-amber-600 hover:scale-110">
-                        <span className="size-1.5 rounded-full bg-amber-600" />
-                        Cancelled
-                      </span>
-                    )}
-                    {ride.status === RIDE_STATUS.COMPLETED && (
-                      <span className="transition-150 inline-flex items-center gap-1 rounded-full border border-green-300 bg-green-100 px-2.5 py-1 text-xs font-normal text-green-600 hover:scale-110">
-                        <span className="size-1.5 rounded-full bg-green-600" />
-                        Completed
-                      </span>
-                    )}
+                    <RideStatusBadge status={ride.status} />
                   </td>
                   <td className="px-4 py-3">
                     <UserDisplay

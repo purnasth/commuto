@@ -1,5 +1,4 @@
-import commuto from '../../assets/logo/commuto-icon-alt.svg';
-
+import { AVATAR_GRID_CONFIG } from '../../constants/enums';
 import Tooltip from './Tooltip';
 
 interface Person {
@@ -13,24 +12,18 @@ interface PeopleAvatarGridProps {
   className?: string;
 }
 
-const AVATAR_GRID_CONFIG = {
-  MAX_VISIBLE_SLOTS: 12,
-  DEFAULT_AVATAR_URL: commuto,
-  EMPTY_SLOT_MESSAGE: 'Ride more, impact more, unlock!',
-} as const;
-
 const AvatarSlot = ({ person, index }: { person?: Person; index: number }) => {
   const hasData = person !== undefined;
 
+  const { DEFAULT_AVATAR_URL, EMPTY_SLOT_MESSAGE } = AVATAR_GRID_CONFIG;
+
   return (
     <div
-      className={`relative ${index !== 0 ? '-ml-2.5' : ''} z-[${index}] transition-150 group hover:z-50`}
+      className={`relative ${index !== 0 ? '-ml-2.5' : ''} transition-150 group hover:z-50`}
     >
-      <Tooltip
-        content={hasData ? person.name : AVATAR_GRID_CONFIG.EMPTY_SLOT_MESSAGE}
-      >
+      <Tooltip content={hasData ? person.name : EMPTY_SLOT_MESSAGE}>
         <img
-          src={hasData ? person.img : AVATAR_GRID_CONFIG.DEFAULT_AVATAR_URL}
+          src={hasData ? person.img : DEFAULT_AVATAR_URL}
           alt={hasData ? person.name : 'Unlock slot'}
           className={`transition-150 inline-block aspect-square size-9 rounded-full object-cover group-hover:scale-110 md:size-11 ${
             hasData

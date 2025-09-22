@@ -9,7 +9,7 @@ import { getPeopleImpactedFromRides } from '../utils/reflectionUtils';
 
 import UserCard from './UserCard';
 import TitleBar from './ui/TitleBar';
-import PeopleAvatarGrid from './ui/PeopleAvatarGrid';
+import PeopleImpactedWithScore from './ui/PeopleImpactedWithScore';
 
 import tree1 from '../assets/trees/1.webp';
 
@@ -136,8 +136,9 @@ const ReflectionDashboard = ({
         </div>
       </div>
       <div className="col-span-1 rounded-3xl rounded-b-none bg-none dark:bg-teal-900 md:bg-teal-50">
-        <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white py-5 dark:bg-dark">
-          <PeopleAvatarGrid people={people} />
+        <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white pt-1 pb-4 dark:bg-dark">
+          {/* <PeopleAvatarGrid people={people} /> */}
+          <PeopleImpactedWithScore people={people} />
           <TitleBar
             // content={
             //   people.length > 0

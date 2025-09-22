@@ -1,41 +1,43 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 interface UseCountdownOptions {
   totalSeconds: number;
   onExpiry?: () => void;
   originalDuration?: number;
-  rideTimestamp?: string;
+  rideCreationTimestamp?: string;
 }
-
 export function useCountdown({
   totalSeconds,
   onExpiry,
   originalDuration,
-  rideTimestamp,
+  rideCreationTimestamp,
 }: UseCountdownOptions) {
   const [remaining, setRemaining] = useState(totalSeconds);
+  const expiryCalledRef = useRef(false);
 
   const calculateRealRemainingTime = useCallback(() => {
-    if (!rideTimestamp || !originalDuration) {
+    if (!rideCreationTimestamp || !originalDuration) {
       return totalSeconds;
     }
 
-    const rideCreatedAt = new Date(rideTimestamp).getTime();
+    const rideCreatedAt = new Date(rideCreationTimestamp).getTime();
     const now = Date.now();
     const elapsedSeconds = Math.floor((now - rideCreatedAt) / 1000);
     const calculatedRemaining = Math.max(originalDuration - elapsedSeconds, 0);
 
     return calculatedRemaining;
-  }, [rideTimestamp, originalDuration, totalSeconds]);
+  }, [rideCreationTimestamp, originalDuration, totalSeconds]);
 
   useEffect(() => {
     const realRemaining = calculateRealRemainingTime();
     setRemaining(realRemaining);
+    expiryCalledRef.current = false; // Reset expiry flag if timer restarts
   }, [calculateRealRemainingTime]);
 
   useEffect(() => {
     if (remaining <= 0) {
-      if (onExpiry) {
+      if (onExpiry && !expiryCalledRef.current) {
+        expiryCalledRef.current = true;
         onExpiry();
       }
       return;
@@ -45,7 +47,8 @@ export function useCountdown({
       const realRemaining = calculateRealRemainingTime();
       setRemaining(realRemaining);
 
-      if (realRemaining <= 0 && onExpiry) {
+      if (realRemaining <= 0 && onExpiry && !expiryCalledRef.current) {
+        expiryCalledRef.current = true;
         onExpiry();
       }
     }, 1000);

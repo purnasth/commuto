@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { TbAlertCircle, TbRotateClockwise2 } from 'react-icons/tb';
 
 import { useCountdown } from '../../hooks/useCountdown';
@@ -6,29 +7,29 @@ interface RideExpiryTimerProps {
   expiryTime: number;
   originalDuration?: number;
   onExpiry?: () => void;
-  rideTimestamp?: string;
+  rideCreationTimestamp?: string;
 }
 
 export function RideExpiryTimer({
   expiryTime: totalSeconds,
   originalDuration,
   onExpiry,
-  rideTimestamp,
+  rideCreationTimestamp,
 }: RideExpiryTimerProps) {
   const { remaining, progress } = useCountdown({
     totalSeconds,
     onExpiry,
     originalDuration,
-    rideTimestamp,
+    rideCreationTimestamp,
   });
 
-  const getProgressGradient = () => {
+  const progressGradient = useMemo(() => {
     const duration = originalDuration || totalSeconds;
     if (remaining > duration * (2 / 3)) return 'from-green-600 to-green-400';
     if (remaining > duration * (1 / 3)) return 'from-orange-400 to-orange-300';
 
     return 'from-red-600 to-red-400';
-  };
+  }, [remaining, originalDuration, totalSeconds]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -54,7 +55,7 @@ export function RideExpiryTimer({
 
       <div className="w-full overflow-hidden rounded-full bg-gradient-to-l from-gray-300 to-gray-200">
         <div
-          className={`h-2 bg-gradient-to-r transition-[width] duration-1000 ease-linear ${getProgressGradient()}`}
+          className={`h-2 bg-gradient-to-r transition-[width] duration-1000 ease-linear ${progressGradient}`}
           style={{ width: `${100 - progress}%` }}
         />
       </div>

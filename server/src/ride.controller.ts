@@ -905,13 +905,15 @@ export class RideController {
     // Calculate expiry information
     const now = getNow();
     const rideCreationTime = new Date(activeRide.timestamp);
+
+    const remainingTimeSeconds =
+      this.calculateRemainingTimeSeconds(rideCreationTime);
+
+    // Calculate the exact expiry time for logging purposes
     const expiryTime = new Date(
       rideCreationTime.getTime() + RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000,
     );
-    const remainingMs = expiryTime.getTime() - now.getTime();
-    const remainingTimeSeconds = Math.max(0, Math.floor(remainingMs / 1000));
 
-    // Add expiry information
     const rideWithExpiry = {
       ...activeRide,
       expiryTimeSeconds: this.calculateExpiryTimeSeconds(),
@@ -980,26 +982,29 @@ export class RideController {
 
   /**
    * Calculate total expiry time in seconds for a ride
-   * This represents how long the ride will be active from its scheduled time
+   * This represents the grace period (in seconds) after which a ride is considered expired.
    * @returns Total expiry time in seconds
    */
   private calculateExpiryTimeSeconds(): number {
-    // Rides expire RIDE_EXPIRATION_GRACE_MINUTES after their scheduled time
+    // Rides expire RIDE_EXPIRATION_GRACE_MINUTES after their creation time
     return RIDE_EXPIRATION_GRACE_MINUTES * 60; // Convert minutes to seconds
   }
 
   /**
    * Calculate remaining time in seconds before ride expires
-   * @param rideTimestamp The ride's creation timestamp
+   * @param rideCreationTimestamp The ride's creation timestamp
    * @returns Remaining seconds until expiry (0 if expired)
    */
-  private calculateRemainingTimeSeconds(rideTimestamp: Date): number {
+  private calculateRemainingTimeSeconds(rideCreationTimestamp: Date): number {
     const now = getNow();
     // Rides expire RIDE_EXPIRATION_GRACE_MINUTES after their CREATION time, not scheduled time
     const expiryTime = new Date(
-      rideTimestamp.getTime() + RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000,
+      rideCreationTimestamp.getTime() +
+        RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000,
     );
+
     const remainingMs = expiryTime.getTime() - now.getTime();
+
     return Math.max(0, Math.floor(remainingMs / 1000)); // Return 0 if expired
   }
 }

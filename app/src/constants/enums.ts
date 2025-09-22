@@ -1,3 +1,5 @@
+import { DEFAULT_AVATAR_URL } from './app-assets';
+
 /**
  * Enum representing user roles in the application.
  * Use this for type safety and to avoid hardcoded role strings.
@@ -42,3 +44,13 @@ export const KARMA = 'karma';
  * TODO: Refactor all usages of the string 'rideFormData' in the codebase to use this centralized key (LS_RIDE_FORM_DATA_KEY) for consistency and maintainability.
  */
 export const LS_RIDE_FORM_DATA_KEY = 'rideFormData';
+
+/**
+ * Configuration for avatar grid display.
+ * Use this constant to manage avatar grid settings in one place.
+ */
+export const AVATAR_GRID_CONFIG = {
+  MAX_VISIBLE_SLOTS: 4,
+  EMPTY_SLOT_MESSAGE: 'Ride more, impact more, unlock!',
+  DEFAULT_AVATAR_URL,
+} as const;

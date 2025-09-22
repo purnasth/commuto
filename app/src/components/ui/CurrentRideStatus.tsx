@@ -42,7 +42,7 @@ const CurrentRideStatus: React.FC<CurrentRideStatusProps> = ({
               expiryTime={details.expiryTime}
               originalDuration={details.originalDuration}
               onExpiry={onExpiry}
-              rideTimestamp={details.timestamp}
+              rideCreationTimestamp={details.timestamp}
             />
           )}
 
@@ -89,7 +89,7 @@ const CurrentRideStatus: React.FC<CurrentRideStatusProps> = ({
               disabled={details.status === RIDE_STATUS.EXPIRED}
               className="transition-150 w-full rounded-lg border border-teal-300 bg-teal-600 px-4 py-2 text-sm font-medium tracking-wide text-light hover:border-teal-500 hover:bg-teal-500 hover:text-light disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-teal-500"
             >
-              Request Again
+              Search Again
             </button>
             <button
               type="button"
