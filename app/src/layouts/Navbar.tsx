@@ -183,10 +183,10 @@ const Navbar = () => {
                   type="button"
                   onClick={handleClick}
                   aria-label="Feedback Pending"
-                  className="flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 font-medium text-amber-700"
+                  className="flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 text-sm font-medium text-amber-700 sm:text-base"
                 >
-                  <span className="size-2.5 animate-pulse rounded-full bg-amber-600" />
-                  Feedback Pending
+                  <span className="size-2 animate-pulse rounded-full bg-amber-600 sm:size-2.5" />
+                  Feedback
                 </button>
               )}
               {userName ? (

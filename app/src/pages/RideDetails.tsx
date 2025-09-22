@@ -22,6 +22,7 @@ import { formatFullDate } from '../utils/functions';
 import { determineMatchedUser } from '../utils/utils';
 
 import FeedbackModal from '../components/FeedbackModal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 /**
  * Component to display matched user information
@@ -91,6 +92,9 @@ const RideActionButton: React.FC<{
   onFeedback: () => void;
   onCompleteRide: (ride: RideFormData) => void;
 }> = ({ rideDetails, user, onFeedback, onCompleteRide }) => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+
   // Check if ride is completed
   const isCompleted = rideDetails.status === 'COMPLETED';
 
@@ -107,15 +111,28 @@ const RideActionButton: React.FC<{
     }
 
     if (isCompleted || hasFeedbackPending) {
-      // Show feedback modal if ride is completed
       onFeedback();
     } else {
-      // Complete the ride first
-      await onCompleteRide(rideDetails);
+      setShowConfirmModal(true);
     }
   };
 
-  // Don't show button if feedback already submitted
+  const handleConfirmComplete = async () => {
+    setIsCompleting(true);
+    try {
+      await onCompleteRide(rideDetails);
+      setShowConfirmModal(false);
+    } catch (error) {
+      console.error('Error completing ride:', error);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
+  const handleCancelComplete = () => {
+    setShowConfirmModal(false);
+  };
+
   if (hasSubmittedFeedback) {
     return (
       <div className="rounded-full border border-green-200 bg-green-100 px-7 py-3 text-sm text-green-700">
@@ -130,23 +147,34 @@ const RideActionButton: React.FC<{
       : 'Complete the ride';
   const buttonColor =
     isCompleted || hasFeedbackPending
-      ? 'bg-amber-400 hover:bg-amber-500'
+      ? 'bg-teal-400 hover:bg-amber-500'
       : 'bg-teal-400 hover:bg-green-500';
 
   return (
-    // TODO: add the confirm modal here rather than directly calling onCompleteRide (only for the complete ride action)
-    <button
-      type="button"
-      onClick={handleClick}
-      className={`group relative overflow-hidden rounded-full border border-teal-200 px-7 py-3 text-sm text-light dark:text-dark ${buttonColor}`}
-    >
-      <span
-        className={`absolute inset-0 z-0 animate-slide ${isCompleted || hasFeedbackPending ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-green-500 to-green-400'} group-hover:animate-none`}
-      ></span>
-      <span className="relative z-10 font-medium tracking-wide">
-        {buttonText}
-      </span>
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        className={`group relative overflow-hidden rounded-full border border-teal-200 px-7 py-3 text-sm text-light dark:text-dark ${buttonColor}`}
+      >
+        <span
+          className={`absolute inset-0 z-0 animate-slide ${isCompleted || hasFeedbackPending ? 'bg-gradient-to-r from-amber-400 to-amber-500 dark:to-amber-300' : 'bg-gradient-to-r from-green-500 to-green-400'} group-hover:animate-none`}
+        ></span>
+        <span className="relative z-10 font-medium tracking-wide">
+          {buttonText}
+        </span>
+      </button>
+
+      <ConfirmDialog
+        open={showConfirmModal}
+        title="Complete the ride?"
+        description="This will mark the ride as complete and prompt you to leave feedback."
+        confirmText="Complete Ride"
+        onConfirm={handleConfirmComplete}
+        onCancel={handleCancelComplete}
+        loading={isCompleting}
+      />
+    </>
   );
 };
 
@@ -238,11 +266,13 @@ const RideDetails: React.FC = () => {
       // Clean up local storage and trigger status update
       localStorage.removeItem('activeRide');
       localStorage.setItem('rideStatus', 'completed');
-      
+
       // Trigger a custom event to notify other components of the status change
-      window.dispatchEvent(new CustomEvent('rideStatusChanged', { 
-        detail: { status: 'completed' } 
-      }));
+      window.dispatchEvent(
+        new CustomEvent('rideStatusChanged', {
+          detail: { status: 'completed' },
+        }),
+      );
     } catch (error) {
       console.error('Error completing ride:', error);
     }

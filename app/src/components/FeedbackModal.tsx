@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
 import { toast } from 'react-toastify';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { RideFormData } from '../interfaces/types';
@@ -14,6 +14,7 @@ import { ROUTE_PROFILE } from '../constants/routes';
 
 import { apiFetch } from '../utils/api';
 import { capitalize } from '../utils/functions';
+import Modal from './ui/Modal';
 
 interface FeedbackModalProps {
   onClose: () => void;
@@ -47,7 +48,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const [feedbackAlreadySubmitted, setFeedbackAlreadySubmitted] =
     useState(false);
 
-  // Check on component mount
   React.useEffect(() => {
     const checkExistingFeedback = async () => {
       const feedbackKey = `feedback_${rideDetails.id}_${user?.id}`;
@@ -60,7 +60,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
     checkExistingFeedback();
   }, [rideDetails.id, user?.id]);
 
-  // Determine user's role in this ride - riderId and passengerId are numbers from backend
   const userRole =
     user?.id === Number(rideDetails.riderId)
       ? USER_ROLE.RIDER
@@ -100,15 +99,15 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const getRoleBasedPrompt = () => {
     if (userRole === USER_ROLE.RIDER) {
       return {
-        title: 'Complete Your Feedback to Earn Karma Points!',
+        title: 'Share your experience!',
         description:
-          'Your feedback helps improve the ride experience. Complete this to earn your karma points and unlock achievements!',
+          'Your experience will not shown to the rider, but it impacts the ride experience. Complete this to unlock achievements!',
       };
     } else {
       return {
-        title: 'Complete Your Feedback to Improve Your Credit Score!',
+        title: 'Share your experience!',
         description:
-          'Your feedback helps improve the ride experience. Complete this to boost your credit score and unlock priority matching!',
+          'Your experience will not shown to the passenger, but it impacts the ride experience. Complete this to unlock priority matching!',
       };
     }
   };
@@ -131,7 +130,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Prepare feedback data
       const feedbackData: FeedbackSubmissionData = {
         rideId: Number(rideDetails.id),
         fromUserId: user.id,
@@ -141,7 +139,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         comment: comment.trim() || undefined,
       };
 
-      // Submit feedback to backend
       const response = await apiFetch<{
         message: string;
         feedback: {
@@ -208,11 +205,9 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
           { autoClose: 10000 }, // 10 seconds
         );
 
-        // Close modal and navigate
         onClose();
         navigate(ROUTE_PROFILE);
       } else if (response.waitingForOtherUser) {
-        // Current user submitted feedback, clear their status and navigate after showing toast
         updateStatusAndTriggerSync('idle');
 
         toast.success('Thank you for your feedback!');
@@ -221,13 +216,11 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
           { autoClose: 10000 }, // 10 seconds
         );
 
-        // Close modal and navigate immediately
         onClose();
         navigate(ROUTE_PROFILE);
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      // You might want to show an error toast here
       toast.error('Failed to submit feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -235,61 +228,46 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex size-full min-h-screen items-center justify-center bg-black bg-opacity-50">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-teal-300 bg-white p-10 shadow-lg">
-        <div className="pointer-events-none absolute -left-[20%] top-1/2 -z-10 size-48 rounded-full bg-teal-300 blur-[80px]" />
-        <div className="pointer-events-none absolute -right-10 -top-12 -z-10 size-40 rounded-full bg-teal-300 blur-[50px]" />
+    <Modal onClose={onClose}>
+      <div className="relative w-full max-w-lg overflow-hidden border border-teal-300 bg-white p-8 shadow-xl dark:border-teal-300/50 dark:bg-dark">
+        <div className="top-1/5 pointer-events-none absolute -right-[20%] z-auto size-48 rounded-full bg-teal-300 blur-[80px]" />
+        <div className="pointer-events-none absolute -bottom-0 -left-20 z-auto size-52 rounded-full bg-teal-300 blur-[50px] dark:opacity-70" />
 
-        {feedbackAlreadySubmitted ? (
-          // Show feedback already submitted message
-          <div className="text-center">
-            <h2 className="mb-4 text-xl font-semibold text-gray-800">
-              Feedback Already Submitted
-            </h2>
-            <p className="mb-6 text-gray-600">
-              You have already provided feedback for this ride. Thank you for
-              your input!
-            </p>
-            <button
-              onClick={onClose}
-              className="rounded-full bg-teal-500 px-6 py-2 text-white hover:bg-teal-600"
-            >
-              Close
-            </button>
-          </div>
-        ) : (
-          // Show feedback form
-          <>
-            <h2 className="mb-2 text-xl font-semibold text-gray-800">
-              {promptData.title}
-            </h2>
-            <p className="mb-6 text-sm text-gray-600">
-              {promptData.description}
-            </p>
+        {!feedbackAlreadySubmitted && (
+          <div className="relative">
+            <h2 className="mb-2 text-xl font-semibold">{promptData.title}</h2>
+            <p className="text-xs opacity-70">{promptData.description}</p>
+
+            <hr className="my-6 dark:opacity-20" />
 
             <div className="mb-8">
-              <p className="mb-3 text-sm font-medium text-gray-700">
+              <p className="mb-3 text-sm font-medium">
                 How was your ride experience?{' '}
                 <span className="text-red-500">*</span>
               </p>
-              <div className="flex justify-center gap-3">
+              <div className="flex justify-start gap-3">
                 {emojiOptions.map((option) => {
                   const isSelected = selectedEmoji === option.value;
                   return (
                     <button
                       key={option.value}
                       onClick={() => setSelectedEmoji(option.value)}
-                      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-400 ${
+                      className={`group relative z-auto flex w-full flex-col items-center gap-2 overflow-hidden rounded-xl border p-4 transition-all duration-150 hover:shadow-lg focus:outline-none focus:ring-1 focus:ring-teal-400 ${
                         isSelected
-                          ? 'scale-105 border-teal-400 bg-teal-50 shadow-lg'
-                          : 'hover:bg-teal-25 border-gray-200 bg-white hover:border-teal-200'
+                          ? 'border-teal-300 bg-teal-200 dark:bg-teal-300'
+                          : 'border-teal-300/50 bg-white ring-teal-300 hover:border-teal-300 hover:bg-teal-100/50 hover:ring-1 dark:bg-teal-950 dark:hover:bg-teal-300/30'
                       }`}
                       aria-label={`Rate ${option.label}`}
                     >
-                      <span className="text-3xl">{option.char}</span>
+                      <span className="pointer-events-none absolute left-0 z-auto size-16 -translate-x-1/2 rounded-full bg-teal-300 opacity-30 blur-[10px]"></span>
+                      <span className="pointer-events-none absolute right-0 top-1/2 z-auto size-24 translate-x-1/2 rounded-full bg-teal-300 opacity-60 blur-[20px]"></span>
+
+                      <span className="transition-300 text-3xl group-hover:scale-125">
+                        {option.char}
+                      </span>
                       <span
                         className={`text-xs font-medium ${
-                          isSelected ? 'text-teal-600' : 'text-gray-500'
+                          isSelected ? 'text-dark' : 'opacity-70'
                         }`}
                       >
                         {option.label}
@@ -303,7 +281,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
             <div className="mb-6">
               <label
                 htmlFor="feedback-comment"
-                className="mb-2 block text-sm font-medium text-gray-700"
+                className="mb-2 block text-sm font-medium"
               >
                 Additional Comments (Optional)
               </label>
@@ -313,22 +291,15 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Share more about your experience..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                maxLength={500}
+                className="block w-full resize-none rounded-md bg-transparent px-4 py-2.5 text-sm font-normal text-dark outline outline-1 -outline-offset-1 outline-teal-500/50 placeholder:font-light placeholder:text-dark/40 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-teal-400 active:bg-teal-50 dark:text-white dark:placeholder:text-light/60 active:dark:bg-teal-950"
+                maxLength={150}
               />
-              <p className="mt-1 text-xs text-gray-500">
-                {comment.length}/500 characters
+              <p className="mt-1 text-right text-xs">
+                {comment.length}/150 characters
               </p>
             </div>
 
-            <div className="flex justify-between gap-3">
-              <button
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="rounded-full border border-gray-300 px-6 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
+            <div className="flex justify-end gap-3">
               <button
                 onClick={handleSubmit}
                 disabled={
@@ -336,27 +307,29 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   selectedEmoji === undefined ||
                   isSubmitting
                 }
-                className={`rounded-full px-6 py-2 text-sm font-medium text-white transition-colors ${
+                className={`rounded-full px-6 py-3 text-sm font-medium transition-colors dark:text-dark ${
                   selectedEmoji === null || selectedEmoji === undefined
-                    ? 'cursor-not-allowed bg-gray-400'
+                    ? 'cursor-not-allowed bg-teal-400 text-white'
                     : isSubmitting
-                      ? 'cursor-not-allowed bg-teal-400 opacity-75'
-                      : 'bg-teal-500 hover:bg-teal-600'
+                      ? 'cursor-not-allowed bg-teal-400 text-light opacity-75'
+                      : 'bg-teal-300 text-dark hover:bg-teal-400'
                 }`}
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
               </button>
             </div>
 
-            {(selectedEmoji === null || selectedEmoji === undefined) && (
-              <p className="mt-3 text-center text-xs text-red-500">
-                Please select an emoji rating to continue
-              </p>
-            )}
-          </>
+            <hr className="my-6 dark:opacity-20" />
+
+            <span className="mt-2 text-xs">
+              <strong className="uppercase">Note:</strong> Complete this
+              feedback form to receive your{' '}
+              {userRole === USER_ROLE.RIDER ? 'karma points.' : 'credit score.'}
+            </span>
+          </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };
 
