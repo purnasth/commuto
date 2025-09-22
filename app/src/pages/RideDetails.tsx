@@ -235,9 +235,14 @@ const RideDetails: React.FC = () => {
         },
       );
 
-      // Clean up local storage
+      // Clean up local storage and trigger status update
       localStorage.removeItem('activeRide');
       localStorage.setItem('rideStatus', 'completed');
+      
+      // Trigger a custom event to notify other components of the status change
+      window.dispatchEvent(new CustomEvent('rideStatusChanged', { 
+        detail: { status: 'completed' } 
+      }));
     } catch (error) {
       console.error('Error completing ride:', error);
     }

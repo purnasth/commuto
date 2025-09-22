@@ -6,6 +6,7 @@ import { RideFormData } from '../interfaces/types';
 
 import {
   USER_ROLE,
+  RIDE_STATUS,
   FEEDBACK_EMOJI,
   FEEDBACK_EMOJI_CHARS,
 } from '../constants/enums';
@@ -191,12 +192,25 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         localStorage.setItem('user', JSON.stringify(userData));
       }
 
+      // Helper function to update status and trigger UI updates
+      const updateStatusAndTriggerSync = (status: string) => {
+        localStorage.setItem('rideStatus', status);
+        // Trigger a custom event to notify other components of the status change
+        window.dispatchEvent(
+          new CustomEvent('rideStatusChanged', {
+            detail: { status },
+          }),
+        );
+      };
+
       if (response.feedbackComplete) {
-        // Both users have submitted feedback, complete the ride
-        await handleCompleteRide(rideDetails);
+        // Both users have submitted feedback - no need to call complete API again if already completed
+        if (rideDetails.status !== RIDE_STATUS.COMPLETED) {
+          await handleCompleteRide(rideDetails);
+        }
 
         // Clear ride status since both feedbacks are complete
-        localStorage.setItem('rideStatus', 'idle');
+        updateStatusAndTriggerSync('idle');
 
         // Show success message and navigate
         toast.success('Thank you for your feedback!');
@@ -210,7 +224,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         navigate(ROUTE_PROFILE);
       } else if (response.waitingForOtherUser) {
         // Current user submitted feedback, clear their status and navigate after showing toast
-        localStorage.setItem('rideStatus', 'idle');
+        updateStatusAndTriggerSync('idle');
 
         toast.success('Thank you for your feedback!');
         toast.info(

@@ -28,14 +28,26 @@ export const SocketManager = ({ children }) => {
       setRideStatus(currentStatus);
     };
 
+    const handleCustomStatusChange = (event) => {
+      setRideStatus(event.detail.status);
+    };
+
     // Listen for storage changes (when localStorage is updated from other components)
     window.addEventListener('storage', handleStorageChange);
-    
-    // Also check on component mount/update
+
+    // Listen for custom status change events
+    window.addEventListener('rideStatusChanged', handleCustomStatusChange);
+
+    // Also check on component mount/update and set up interval for local changes
     handleStorageChange();
+
+    // Check for localStorage changes every 100ms to catch same-tab updates
+    const interval = setInterval(handleStorageChange, 100);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('rideStatusChanged', handleCustomStatusChange);
+      clearInterval(interval);
     };
   }, []);
 
