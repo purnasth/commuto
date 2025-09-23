@@ -14,7 +14,7 @@ import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
 
 import { RideFormData, UserDetails } from '../interfaces/types';
 
-import { USER_ROLE } from '../constants/enums';
+import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
 
 import { apiFetch } from '../utils/api';
 import { useSocket } from '../utils/useSocket';
@@ -96,10 +96,11 @@ const RideActionButton: React.FC<{
   const [isCompleting, setIsCompleting] = useState(false);
 
   // Check if ride is completed
-  const isCompleted = rideDetails.status === 'COMPLETED';
+  const isCompleted = rideDetails.status === RIDE_STATUS.COMPLETED;
 
   // Check if user has already provided feedback
-  const hasFeedbackPending = localStorage.getItem('rideStatus') === 'completed';
+  const hasFeedbackPending =
+    localStorage.getItem('rideStatus') === RIDE_STATUS.COMPLETED;
   const feedbackKey = `feedback_${rideDetails.id}_${user?.id}`;
   const hasSubmittedFeedback = localStorage.getItem(feedbackKey) === 'true';
 
@@ -265,12 +266,12 @@ const RideDetails: React.FC = () => {
 
       // Clean up local storage and trigger status update
       localStorage.removeItem('activeRide');
-      localStorage.setItem('rideStatus', 'completed');
+      localStorage.setItem('rideStatus', RIDE_STATUS.COMPLETED);
 
       // Trigger a custom event to notify other components of the status change
       window.dispatchEvent(
         new CustomEvent('rideStatusChanged', {
-          detail: { status: 'completed' },
+          detail: { status: RIDE_STATUS.COMPLETED },
         }),
       );
     } catch (error) {

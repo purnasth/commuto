@@ -116,13 +116,20 @@ const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
                 {getRemainingEmojis(averageScoreData.averageScore).join('')}
               </span>
               <p className="text-xs">
-                Over{' '}
-                <strong className="font-bold">
-                  {averageScoreData.totalFeedback - 1}+
-                </strong>{' '}
-                {averageScoreData.totalFeedback === 1
-                  ? 'feedback'
-                  : 'feedbacks'}
+                {averageScoreData.totalFeedback === 1 ? (
+                  <>
+                    <strong className="font-bold">1</strong> feedback
+                  </>
+                ) : (
+                  <>
+                    Over
+                    <strong className="font-bold">
+                      {' '}
+                      {averageScoreData.totalFeedback - 1}+
+                    </strong>{' '}
+                    feedbacks
+                  </>
+                )}
               </p>
             </div>
           </div>

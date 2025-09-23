@@ -114,15 +114,12 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   const promptData = getRoleBasedPrompt();
 
+  // Helper to check if form data is valid for submission
+  const isFormValid =
+    selectedEmoji != null && user?.id && toUserId && toUserId !== 0;
+
   const handleSubmit = async () => {
-    // Fix: Check for null/undefined specifically, not falsy values (since SATISFIED = 0)
-    if (
-      selectedEmoji === null ||
-      selectedEmoji === undefined ||
-      !user?.id ||
-      !toUserId ||
-      toUserId === 0
-    ) {
+    if (!isFormValid) {
       console.log('Validation failed - missing required data');
       return;
     }
@@ -302,13 +299,9 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
             <div className="flex justify-end gap-3">
               <button
                 onClick={handleSubmit}
-                disabled={
-                  selectedEmoji === null ||
-                  selectedEmoji === undefined ||
-                  isSubmitting
-                }
+                disabled={!isFormValid || isSubmitting}
                 className={`rounded-full px-6 py-3 text-sm font-medium transition-colors dark:text-dark ${
-                  selectedEmoji === null || selectedEmoji === undefined
+                  !isFormValid
                     ? 'cursor-not-allowed bg-teal-400 text-white'
                     : isSubmitting
                       ? 'cursor-not-allowed bg-teal-400 text-light opacity-75'

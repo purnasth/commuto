@@ -1,5 +1,6 @@
 import { API_USER_AVERAGE_SCORE } from '../constants/api';
 import { AverageScoreResult } from '../interfaces/types';
+import { createEmptyEmojiBreakdown } from './utils';
 
 export async function apiFetch<T>(
   url: string,
@@ -40,7 +41,7 @@ export const fetchUserAverageScore = async (
     return {
       averageScore: null,
       totalFeedback: 0,
-      emojiBreakdown: {},
+      emojiBreakdown: createEmptyEmojiBreakdown(),
     };
   }
 };

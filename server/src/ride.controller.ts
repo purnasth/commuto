@@ -13,7 +13,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { Ride, User } from 'generated/prisma';
+import { Ride, User, Feedback } from 'generated/prisma';
 import { PrismaService } from './prisma.service';
 import { RideGateway } from './rides/rides.gateway';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
@@ -144,7 +144,7 @@ export class RideController {
     }
 
     // Check for duplicate feedback
-    let existingFeedback: any;
+    let existingFeedback: Feedback | null;
     try {
       existingFeedback = await this.prisma.feedback.findFirst({
         where: {
@@ -168,7 +168,7 @@ export class RideController {
     }
 
     // Create feedback record
-    let feedback: any;
+    let feedback: Feedback;
     try {
       feedback = await this.prisma.feedback.create({
         data: {
@@ -192,7 +192,18 @@ export class RideController {
 
     // Calculate points based on emoji using enum system
     const basePoints = FEEDBACK_POINTS.BASE_POINTS;
-    const bonusPoints = FEEDBACK_POINTS.BONUS_POINTS[body.emoji];
+    const bonusPoints = FEEDBACK_POINTS.BONUS_POINTS[body.emoji] ?? 0;
+
+    if (FEEDBACK_POINTS.BONUS_POINTS[body.emoji] === undefined) {
+      this.logger.warn({
+        level: 'warn',
+        message: `Invalid emoji key for bonus points calculation: ${body.emoji}. Using fallback value 0.`,
+        tag: 'feedback',
+        emoji: body.emoji,
+        rideId: body.rideId,
+      });
+    }
+
     const totalPoints = basePoints + bonusPoints;
 
     // Update user scores based on their role
@@ -1208,11 +1219,10 @@ export class RideController {
 
     try {
       // Get all feedback received by this user
-      const feedbackReceived: Array<{ emoji: number }> =
-        (await this.prisma.feedback.findMany({
-          where: { toUserId: userId },
-          select: { emoji: true },
-        })) as Array<{ emoji: number }>;
+      const feedbackReceived = await this.prisma.feedback.findMany({
+        where: { toUserId: userId },
+        select: { emoji: true },
+      });
 
       // Use utility function to process the feedback data
       const result = processFeedbackData(feedbackReceived);

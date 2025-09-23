@@ -3,6 +3,15 @@ import { FEEDBACK_EMOJI } from '../constants/enums';
 import { AverageScoreResult, EmojiBreakdown } from '../interfaces/types';
 
 /**
+ * Type guard to check if a value is a valid FEEDBACK_EMOJI
+ * @param value - The value to check
+ * @returns True if the value is a valid FEEDBACK_EMOJI
+ */
+const isValidFeedbackEmoji = (value: number): value is FEEDBACK_EMOJI => {
+  return Object.values(FEEDBACK_EMOJI).includes(value as FEEDBACK_EMOJI);
+};
+
+/**
  * Creates an empty emoji breakdown with all values set to 0
  * @returns Empty emoji breakdown object
  */
@@ -33,8 +42,12 @@ export const calculateEmojiBreakdown = (
   const breakdown = createEmptyEmojiBreakdown();
 
   feedbackList.forEach((feedback) => {
-    if (feedback.emoji in breakdown) {
-      breakdown[feedback.emoji as FEEDBACK_EMOJI]++;
+    if (isValidFeedbackEmoji(feedback.emoji)) {
+      breakdown[feedback.emoji]++;
+    } else {
+      console.warn(
+        `Invalid feedback emoji value: ${feedback.emoji}. Skipping.`,
+      );
     }
   });
 

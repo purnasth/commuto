@@ -33,20 +33,6 @@ export const determineMatchedUser = (
 };
 
 /**
- * Converts a string to title case (first letter uppercase, rest lowercase)
- * @param str - The string to capitalize
- * @returns The capitalized string
- * @example
- * capitalize('SATISFIED') // returns 'Satisfied'
- * capitalize('neutral') // returns 'Neutral'
- */
-export const capitalize = (str: string): string => {
-  if (!str) return '';
-
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-};
-
-/**
  * Maps an average score to the most appropriate emoji
  * Server calculates the score, frontend just maps it to emoji
  * @param averageScore - The average score (0-2 range where 0=best, 2=worst)
@@ -92,4 +78,16 @@ export const getScoreDescription = (averageScore: number): string => {
   }
 
   return FEEDBACK_EMOJI_LABELS[FEEDBACK_EMOJI.DISSATISFIED];
+};
+
+/**
+ * Creates an empty emoji breakdown object with all emoji types initialized to 0
+ * @returns Object with keys for each emoji type (0, 1, 2) set to 0
+ */
+export const createEmptyEmojiBreakdown = (): { [key: number]: number } => {
+  return {
+    [FEEDBACK_EMOJI.SATISFIED]: 0,
+    [FEEDBACK_EMOJI.NEUTRAL]: 0,
+    [FEEDBACK_EMOJI.DISSATISFIED]: 0,
+  };
 };

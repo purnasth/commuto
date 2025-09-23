@@ -1,6 +1,9 @@
+import { io } from 'socket.io-client';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
+
+import { RIDE_STATUS } from '../constants/enums';
+
 import { SocketContext } from '../utils/SocketContext';
 import { useRideEvent } from '../utils/useRideEvent';
 
@@ -123,8 +126,8 @@ export const SocketManager = ({ children }) => {
         localStorage.removeItem('lastSearchParams');
       }
 
-      localStorage.setItem('rideStatus', 'confirmed');
-      setRideStatus('confirmed');
+      localStorage.setItem('rideStatus', RIDE_STATUS.CONFIRMED);
+      setRideStatus(RIDE_STATUS.CONFIRMED);
 
       console.log('[SocketManager] triggerRideConfirmed');
       triggerRideConfirmed(ride);
@@ -141,8 +144,8 @@ export const SocketManager = ({ children }) => {
 
     socket.on('rideCompleted', (ride) => {
       console.log('ride', ride);
-      localStorage.setItem('rideStatus', 'completed');
-      setRideStatus('completed');
+      localStorage.setItem('rideStatus', RIDE_STATUS.COMPLETED);
+      setRideStatus(RIDE_STATUS.COMPLETED);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
 
       if (!user || !user.id) {

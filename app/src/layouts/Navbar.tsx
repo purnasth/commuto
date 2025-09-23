@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TbMenu2, TbPlus, TbSearch } from 'react-icons/tb';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import logo from '../assets/logo/commuto.svg';
 import logoAlt from '../assets/logo/commuto-alt.svg';
 
-import SideNav from './SideNav';
-import { useTheme } from '../contexts/ThemeProvider';
-import { getUserGreeting } from '../utils/functions';
-import ThemeToggle from '../components/ui/ThemeToggle';
+import { RIDE_STATUS } from '../constants/enums';
 import { ROUTE_HOME, ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
-import { useRideEvent } from '../utils/useRideEvent';
+
 import { useSocket } from '../utils/useSocket';
+import { useRideEvent } from '../utils/useRideEvent';
+import { getUserGreeting } from '../utils/functions';
+
+import { useTheme } from '../contexts/ThemeProvider';
+
+import SideNav from './SideNav';
+import ThemeToggle from '../components/ui/ThemeToggle';
 
 const navLinks = [
   {
@@ -166,7 +170,7 @@ const Navbar = () => {
               ))}
             </ul>
             <div className="flex items-center gap-2">
-              {rideStatus === 'confirmed' && (
+              {rideStatus === RIDE_STATUS.CONFIRMED && (
                 <button
                   type="button"
                   onClick={handleClick}
@@ -177,8 +181,7 @@ const Navbar = () => {
                   Active
                 </button>
               )}
-              {/* //TODO: use the RIDE_STATUS enums */}
-              {rideStatus === 'completed' && (
+              {rideStatus === RIDE_STATUS.COMPLETED && (
                 <button
                   type="button"
                   onClick={handleClick}
