@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TbPlus } from 'react-icons/tb';
 
 import { AVATAR_GRID_CONFIG } from '../../constants/enums';
@@ -33,6 +33,14 @@ const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
 
   const { DEFAULT_AVATAR_URL, MAX_VISIBLE_SLOTS, EMPTY_SLOT_MESSAGE } =
     AVATAR_GRID_CONFIG;
+
+  // Memoize remaining emojis calculation to avoid recalculating on every render
+  const remainingEmojis = useMemo(() => {
+    return averageScoreData?.averageScore !== null &&
+      averageScoreData?.averageScore !== undefined
+      ? getRemainingEmojis(averageScoreData.averageScore)
+      : [];
+  }, [averageScoreData?.averageScore]);
 
   // Fetch average score on component mount
   useEffect(() => {
@@ -113,7 +121,7 @@ const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
             </Tooltip>
             <div className="text-sm">
               <span className="opacity-80 grayscale">
-                {getRemainingEmojis(averageScoreData.averageScore).join('')}
+                {remainingEmojis.join('')}
               </span>
               <p className="text-xs">
                 {averageScoreData.totalFeedback === 1 ? (

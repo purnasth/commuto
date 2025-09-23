@@ -77,6 +77,98 @@ export class RideController {
   // IMPACT: All user data is potentially exposed to any API consumer
   // TIMELINE: Should be fixed before production deployment
   //
+
+  // TODO (authentication_security): CRITICAL AUTHENTICATION SYSTEM MISSING
+  //
+  // PROBLEM: This application lacks proper JWT authentication, causing severe security vulnerabilities.
+  // Multiple endpoints trust client-provided userId values without any authentication verification.
+  //
+  // MISSING AUTHENTICATION AFFECTS:
+  // - POST /rides/:id/complete - trusts body.userId for ride completion authorization
+  // - POST /rides/:id/reject - trusts body.userId for ride rejection authorization
+  // - POST /rides/:id/cancel - trusts body.userId for ride cancellation authorization
+  // - POST /rides/feedback - trusts body.fromUserId for feedback submission authorization
+  //
+  // SECURITY IMPACT:
+  // - Any user can perform actions on behalf of other users
+  // - Complete bypass of user authorization for critical ride management operations
+  // - Manipulation of karma points, credit scores, and ride statistics
+  // - Fraudulent feedback and rating manipulation
+  //
+  // REQUIRED IMPLEMENTATION:
+  //
+  // 1. INSTALL JWT AUTHENTICATION:
+  //    npm install @nestjs/jwt @nestjs/passport passport passport-jwt
+  //    npm install -D @types/passport-jwt
+  //
+  // 2. CREATE JWT MODULE (auth/jwt.module.ts):
+  //    ```typescript
+  //    import { Module } from '@nestjs/common';
+  //    import { JwtModule } from '@nestjs/jwt';
+  //    import { PassportModule } from '@nestjs/passport';
+  //    import { JwtStrategy } from './jwt.strategy';
+  //    import { JwtAuthGuard } from './jwt-auth.guard';
+  //
+  //    @Module({
+  //      imports: [
+  //        PassportModule,
+  //        JwtModule.register({
+  //          secret: process.env.JWT_SECRET,
+  //          signOptions: { expiresIn: '24h' },
+  //        }),
+  //      ],
+  //      providers: [JwtStrategy, JwtAuthGuard],
+  //      exports: [JwtAuthGuard],
+  //    })
+  //    export class JwtAuthModule {}
+  //    ```
+  //
+  // 3. CREATE JWT STRATEGY (auth/jwt.strategy.ts):
+  //    ```typescript
+  //    import { Injectable } from '@nestjs/common';
+  //    import { PassportStrategy } from '@nestjs/passport';
+  //    import { ExtractJwt, Strategy } from 'passport-jwt';
+  //
+  //    @Injectable()
+  //    export class JwtStrategy extends PassportStrategy(Strategy) {
+  //      constructor() {
+  //        super({
+  //          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  //          ignoreExpiration: false,
+  //          secretOrKey: process.env.JWT_SECRET,
+  //        });
+  //      }
+  //
+  //      async validate(payload: any) {
+  //        return { userId: payload.sub, email: payload.email };
+  //      }
+  //    }
+  //    ```
+  //
+  // 4. UPDATE AUTH CONTROLLER to issue JWT tokens on login/signup
+  //
+  // 5. PROTECT VULNERABLE ENDPOINTS:
+  //    ```typescript
+  //    import { UseGuards, Request } from '@nestjs/common';
+  //    import { JwtAuthGuard } from './auth/jwt-auth.guard';
+  //
+  //    @UseGuards(JwtAuthGuard)
+  //    @Post(':id/complete')
+  //    async completeRide(@Param('id') id: string, @Request() req: any) {
+  //      const authenticatedUserId = req.user.userId; // From JWT token
+  //      // Remove body.userId parameter completely
+  //      // Use authenticatedUserId for all authorization checks
+  //    }
+  //    ```
+  //
+  // 6. REMOVE userId FROM REQUEST BODIES:
+  //    - Remove { userId: number } from all @Body() parameters
+  //    - Extract user ID from JWT authentication context only
+  //    - Update frontend to send JWT tokens in Authorization header
+  //
+  // PRIORITY: CRITICAL - Must be implemented before production deployment
+  // ESTIMATED EFFORT: 1-2 days for complete authentication system implementation
+  //
   constructor(
     private prisma: PrismaService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
@@ -110,6 +202,20 @@ export class RideController {
   }
 
   @Post('/feedback')
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts fromUserId from request body,
+  // allowing any user to submit feedback on behalf of others by changing the fromUserId.
+  // This bypasses authorization and enables manipulation of karma/credit systems.
+  //
+  // SECURITY RISKS:
+  // - User A can submit feedback as User B without permission
+  // - Manipulation of karma points and credit scores
+  // - Fraudulent feedback submissions affecting user ratings
+  //
+  // REQUIRED FIX: Extract authenticated userId from JWT context instead of fromUserId in request body
+  // The fromUserId should be replaced with the authenticated user's ID from the JWT token.
+  //
   /**
    * Submit feedback for a completed ride
    * Updates karma points for riders and credit score for passengers
@@ -138,12 +244,8 @@ export class RideController {
       throw new BadRequestException('Missing required feedback fields');
     }
 
-    // Validate emoji
-    const validEmojis = [
-      FEEDBACK_EMOJI.SATISFIED,
-      FEEDBACK_EMOJI.NEUTRAL,
-      FEEDBACK_EMOJI.DISSATISFIED,
-    ];
+    const validEmojis = Object.values(FEEDBACK_EMOJI);
+
     if (!validEmojis.includes(body.emoji)) {
       throw new BadRequestException(
         `Invalid emoji. Must be one of: ${validEmojis.join(', ')} (0=😊, 1=😐, 2=😠)`,
@@ -225,17 +327,6 @@ export class RideController {
     // Calculate points based on emoji using enum system
     const basePoints = FEEDBACK_POINTS.BASE_POINTS;
     const bonusPoints = FEEDBACK_POINTS.BONUS_POINTS[body.emoji] ?? 0;
-
-    if (FEEDBACK_POINTS.BONUS_POINTS[body.emoji] === undefined) {
-      this.logger.warn({
-        level: 'warn',
-        message: `Invalid emoji key for bonus points calculation: ${body.emoji}. Using fallback value 0.`,
-        tag: 'feedback',
-        emoji: body.emoji,
-        rideId: body.rideId,
-      });
-    }
-
     const totalPoints = basePoints + bonusPoints;
 
     // Update user scores based on their role
@@ -888,99 +979,43 @@ export class RideController {
     // Fix: Create ConfirmedRideDto that maps only safe fields from confirmed rides
   }
 
-  // @Post(':id/confirm')
-  // async confirmRide(@Param('id') id: string) {
-  //   const rideId = Number(id);
-  //   const baseRide = await this.prisma.ride.findUnique({
-  //     where: { id: rideId },
-  //     include: { passengers: true, rider: true },
-  //   });
-  //   if (!baseRide) {
-  //     throw new NotFoundException('Ride not found');
-  //   }
-  //   const timeWindowMs = 2 * 60 * 1000;
-  //   const baseTime = new Date(baseRide.timestamp);
-  //   const matchedRides = await this.prisma.ride.findMany({
-  //     where: {
-  //       from: baseRide.from,
-  //       to: baseRide.to,
-  //       timestamp: {
-  //         gte: new Date(baseTime.getTime() - timeWindowMs),
-  //         lte: new Date(baseTime.getTime() + timeWindowMs),
-  //       },
-  //       status: RIDE_STATUS.ACTIVE,
-  //     },
-  //     include: {
-  //       rider: true,
-  //       passengers: true,
-  //     },
-  //   });
-  //   if (!matchedRides.length) {
-  //     return { message: 'No active rides matched to confirm.', rides: [] };
-  //   }
-  //   // Calculate and update distance, co2Saved, peopleImpacted, and award karma points
-  //   for (const ride of matchedRides) {
-  //     let distance: null | number = null;
-  //     if (
-  //       typeof ride.fromLat === 'number' &&
-  //       typeof ride.fromLng === 'number' &&
-  //       typeof ride.toLat === 'number' &&
-  //       typeof ride.toLng === 'number'
-  //     ) {
-  //       distance = this.haversineDistance(
-  //         ride.fromLat,
-  //         ride.fromLng,
-  //         ride.toLat,
-  //         ride.toLng,
-  //       );
-  //     }
-  //     const co2Saved = distance ? distance * 0.17 : null; // 0.17kg per km
-  //     const peopleImpacted = ride.passengers ? ride.passengers.length : 0;
-  //     // Update ride
-  //     await this.prisma.ride.update({
-  //       where: { id: ride.id },
-  //       data: {
-  //         status: RIDE_STATUS.CONFIRMED,
-  //         distance,
-  //         co2Saved,
-  //         peopleImpacted,
-  //       },
-  //     });
-  //     // Award karma points to the rider
-  //     const karmaPoints = 20;
-  //     await this.prisma.user.update({
-  //       where: { id: ride.rider.id },
-  //       data: {
-  //         karmaPoints: { increment: karmaPoints },
-  //       },
-  //     });
-  //     // Create a KarmaTransaction record
-  //     await this.prisma.karmaTransaction.create({
-  //       data: {
-  //         userId: ride.rider.id,
-  //         points: karmaPoints,
-  //         type: 'earned',
-  //         reason: 'Ride completed',
-  //       },
-  //     });
-  //   }
-  //   // Notify clients
-  //   for (const ride of matchedRides) {
-  //     this.rideGateway.notifyRideConfirmationForPassenger(ride, ride.rider.id);
-  //     this.rideGateway.notifyRideConfirmation(ride);
-  //   }
-  //   // Return updated rides
-  //   const updatedRides = await this.prisma.ride.findMany({
-  //     where: { id: { in: matchedRides.map((r) => r.id) } },
-  //     include: { rider: true, passengers: true },
-  //   });
-  //   return {
-  //     message: 'All matched rides confirmed',
-  //     rides: updatedRides,
-  //   };
-  // }
-
   @Post(':id/complete')
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // PROBLEM: This endpoint accepts userId from the request body, creating a major security flaw
+  // where any user can complete rides on behalf of other users by simply changing the userId
+  // in their request. This bypasses all authorization checks and allows unauthorized ride completion.
+  //
+  // CURRENT FLOW:
+  // 1. Client sends POST /rides/:id/complete with { userId: X } in body
+  // 2. Server trusts this userId without any authentication verification
+  // 3. Any malicious user can set userId to any other user's ID
+  // 4. Result: User A can complete User B's rides without permission
+  //
+  // SECURITY RISKS:
+  // - Unauthorized ride completion on behalf of others
+  // - Manipulation of ride statistics (distance, CO2 savings, etc.)
+  // - Triggering of unintended notifications and feedback flows
+  // - Potential impact on user karma/credit systems
+  //
+  // AFFECTED ENDPOINTS WITH SAME VULNERABILITY:
+  // - POST /rides/:id/complete (this endpoint)
+  // - POST /rides/:id/reject
+  // - POST /rides/:id/cancel
+  //
+  // REQUIRED SOLUTION:
+  // 1. Implement JWT authentication with @UseGuards(JwtAuthGuard) decorator
+  // 2. Extract authenticated userId from JWT token via @Request() or custom decorator
+  // 3. Remove userId from request body - get it from authentication context instead
+  // 4. Example fix:
+  //    async completeRide(@Param('id') id: string, @Request() req: any) {
+  //      const authenticatedUserId = req.user.id; // From JWT token
+  //      // Use authenticatedUserId instead of body.userId
+  //    }
+  //
+  // PRIORITY: CRITICAL - Must be fixed before production deployment
+  // IMPACT: Complete bypass of user authorization for ride management actions
+  //
   async completeRide(
     @Param('id') id: string,
     @Body() body: { userId: number },
@@ -1120,6 +1155,15 @@ export class RideController {
 
   // Reject a ride (mark as rejected)
   @Post(':id/reject')
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts userId from request body,
+  // allowing any user to reject rides on behalf of others by changing the userId.
+  // This bypasses authorization and enables unauthorized ride management actions.
+  //
+  // SECURITY RISK: User A can reject User B's rides without permission
+  // REQUIRED FIX: Extract userId from JWT authentication context instead of request body
+  //
   async rejectRide(@Param('id') id: string, @Body() body: { userId: number }) {
     // Mark ride as rejected
     const ride = await this.prisma.ride.update({
@@ -1146,6 +1190,15 @@ export class RideController {
 
   // Cancel a ride (mark as cancelled)
   @Post(':id/cancel')
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts userId from request body,
+  // allowing any user to cancel rides on behalf of others by changing the userId.
+  // This bypasses authorization and enables unauthorized ride management actions.
+  //
+  // SECURITY RISK: User A can cancel User B's rides without permission
+  // REQUIRED FIX: Extract userId from JWT authentication context instead of request body
+  //
   async cancelRide(@Param('id') id: string, @Body() body: { userId: number }) {
     // Mark ride as cancelled
     const ride = await this.prisma.ride.update({
@@ -1299,7 +1352,7 @@ export class RideController {
       });
 
       // Use utility function to process the feedback data
-      const result = processFeedbackData(feedbackReceived);
+      const result = processFeedbackData(feedbackReceived, this.logger);
 
       this.logger.log({
         level: 'info',

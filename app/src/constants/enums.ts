@@ -63,6 +63,32 @@ export const FEEDBACK_EMOJI_LABELS = {
   [FEEDBACK_EMOJI.DISSATISFIED]: 'Dissatisfied',
 } as const;
 
+/**
+ * Pre-computed emoji options for UI components.
+ * Avoids runtime enum processing and reverse mapping filtering issues.
+ * Use this instead of processing FEEDBACK_EMOJI enum at runtime.
+ */
+export const EMOJI_OPTIONS = [
+  {
+    value: FEEDBACK_EMOJI.SATISFIED,
+    char: FEEDBACK_EMOJI_CHARS[FEEDBACK_EMOJI.SATISFIED],
+    label: FEEDBACK_EMOJI_LABELS[FEEDBACK_EMOJI.SATISFIED],
+  },
+  {
+    value: FEEDBACK_EMOJI.NEUTRAL,
+    char: FEEDBACK_EMOJI_CHARS[FEEDBACK_EMOJI.NEUTRAL],
+    label: FEEDBACK_EMOJI_LABELS[FEEDBACK_EMOJI.NEUTRAL],
+  },
+  {
+    value: FEEDBACK_EMOJI.DISSATISFIED,
+    char: FEEDBACK_EMOJI_CHARS[FEEDBACK_EMOJI.DISSATISFIED],
+    label: FEEDBACK_EMOJI_LABELS[FEEDBACK_EMOJI.DISSATISFIED],
+  },
+] as const;
+
+/**
+ * Key for storing and retrieving karma points from localStorage
+ */
 export const KARMA = 'karma';
 
 /**
@@ -98,3 +124,11 @@ export const SCORE_CONFIG = {
     // 1.34 - 2.0 = 😠 Dissatisfied
   },
 } as const;
+
+/**
+ * Configuration constants for ride completion locking mechanism
+ *
+ * How long to wait before considering a completion lock stale and automatically clearing it.
+ * This prevents permanent deadlocks if a completion process fails unexpectedly.
+ */
+export const COMPLETION_LOCK_TIMEOUT_MS = 30000; // 30 seconds

@@ -7,13 +7,14 @@ import { RideFormData } from '../interfaces/types';
 import {
   USER_ROLE,
   RIDE_STATUS,
+  EMOJI_OPTIONS,
   FEEDBACK_EMOJI,
-  FEEDBACK_EMOJI_CHARS,
+  COMPLETION_LOCK_TIMEOUT_MS,
 } from '../constants/enums';
 import { ROUTE_PROFILE } from '../constants/routes';
+import { API_RIDES_FEEDBACK } from '../constants/api';
 
 import { apiFetch } from '../utils/api';
-import { capitalize } from '../utils/functions';
 import Modal from './ui/Modal';
 
 interface FeedbackModalProps {
@@ -40,6 +41,13 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  // Helper function to generate consistent completion keys
+  const getCompletionKeys = (rideId: number) => {
+    const completionKey = `completing_ride_${rideId}`;
+    const timestampKey = `${completionKey}_timestamp`;
+    return { completionKey, timestampKey };
+  };
+
   const [selectedEmoji, setSelectedEmoji] = useState<FEEDBACK_EMOJI | null>(
     null,
   );
@@ -47,6 +55,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackAlreadySubmitted, setFeedbackAlreadySubmitted] =
     useState(false);
+  const [isCompletingRide, setIsCompletingRide] = useState(false);
 
   React.useEffect(() => {
     const checkExistingFeedback = async () => {
@@ -59,6 +68,19 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
     checkExistingFeedback();
   }, [rideDetails.id, user?.id]);
+
+  // Cleanup completion flag on unmount to prevent stale locks
+  React.useEffect(() => {
+    return () => {
+      if (isCompletingRide) {
+        const { completionKey, timestampKey } = getCompletionKeys(
+          Number(rideDetails.id),
+        );
+        localStorage.removeItem(completionKey);
+        localStorage.removeItem(timestampKey);
+      }
+    };
+  }, [rideDetails.id, isCompletingRide]);
 
   const userRole =
     user?.id === Number(rideDetails.riderId)
@@ -87,14 +109,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
     // Fallback: try rider object
     toUserId = rideDetails.rider.id;
   }
-
-  const emojiOptions = Object.entries(FEEDBACK_EMOJI)
-    .filter(([, value]) => typeof value === 'number') // Filter out reverse mappings
-    .map(([key, value]) => ({
-      value: value as FEEDBACK_EMOJI,
-      char: FEEDBACK_EMOJI_CHARS[value as FEEDBACK_EMOJI],
-      label: capitalize(key),
-    }));
 
   const getRoleBasedPrompt = () => {
     if (userRole === USER_ROLE.RIDER) {
@@ -152,7 +166,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         user: { id: number; karmaPoints: number; creditScore: number };
         feedbackComplete: boolean;
         waitingForOtherUser: boolean;
-      }>(`${import.meta.env.VITE_API_BASE_URL}/rides/feedback`, {
+      }>(`${import.meta.env.VITE_API_BASE_URL}${API_RIDES_FEEDBACK}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,9 +201,48 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       };
 
       if (response.feedbackComplete) {
-        // Both users have submitted feedback - no need to call complete API again if already completed
-        if (rideDetails.status !== RIDE_STATUS.COMPLETED) {
-          await handleCompleteRide(rideDetails);
+        // Both users have submitted feedback - prevent race condition when both users
+        // submit feedback simultaneously by using localStorage locks with timestamp expiry
+        const { completionKey, timestampKey } = getCompletionKeys(
+          Number(rideDetails.id),
+        );
+        const completionTimestamp = localStorage.getItem(timestampKey);
+
+        // Check if completion is stale (older than configured timeout) and clear it
+        const isStaleCompletion =
+          completionTimestamp &&
+          Date.now() - parseInt(completionTimestamp) >
+            COMPLETION_LOCK_TIMEOUT_MS;
+
+        if (isStaleCompletion) {
+          localStorage.removeItem(completionKey);
+          localStorage.removeItem(timestampKey);
+        }
+
+        const isAlreadyCompleting =
+          localStorage.getItem(completionKey) && !isStaleCompletion;
+
+        if (
+          rideDetails.status !== RIDE_STATUS.COMPLETED &&
+          !isAlreadyCompleting &&
+          !isCompletingRide
+        ) {
+          try {
+            // Mark completion as in progress with timestamp to prevent race conditions
+            setIsCompletingRide(true);
+            localStorage.setItem(completionKey, 'true');
+            localStorage.setItem(timestampKey, Date.now().toString());
+
+            await handleCompleteRide(rideDetails);
+          } catch (error) {
+            console.error('Error completing ride:', error);
+            throw error; // Re-throw to be handled by outer catch block
+          } finally {
+            // Always clean up completion flag
+            localStorage.removeItem(completionKey);
+            localStorage.removeItem(timestampKey);
+            setIsCompletingRide(false);
+          }
         }
 
         // Clear ride status since both feedbacks are complete
@@ -243,7 +296,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 <span className="text-red-500">*</span>
               </p>
               <div className="flex justify-start gap-3">
-                {emojiOptions.map((option) => {
+                {EMOJI_OPTIONS.map((option) => {
                   const isSelected = selectedEmoji === option.value;
                   return (
                     <button
