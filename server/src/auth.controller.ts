@@ -37,6 +37,25 @@ interface SignupDto {
 
 @Controller('auth')
 export class AuthController {
+  // TODO (data_exposure_security): MEDIUM-HIGH SECURITY REVIEW NEEDED
+  //
+  // CURRENT ISSUE: userWithoutPassword removes only the password field but still exposes:
+  // - Internal database IDs (id, createdAt, updatedAt)
+  // - Potentially sensitive data: phone numbers, addresses, exact karma/credit scores
+  // - Email addresses (which might not always be appropriate for all API responses)
+  //
+  // RECOMMENDATION: Create proper UserDto/PublicUserDto that only exposes safe fields:
+  // - For login/signup: id, fullname, email, role (essential for auth)
+  // - For public profiles: id, fullname, role, ratings (no email, phone, address)
+  //
+  // AFFECTED ENDPOINTS:
+  // - POST /auth/login - exposes user object with all fields except password
+  // - POST /auth/signup - exposes complete user object except password
+  // - GET /auth/me - exposes all user data except password
+  // - PUT /auth/user - exposes updated user object except password
+  //
+  // PRIORITY: MEDIUM-HIGH (less critical than ride controller but still important)
+  //
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
