@@ -101,13 +101,13 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       return {
         title: 'Share your experience!',
         description:
-          'Your experience will not shown to the rider, but it impacts the ride experience. Complete this to unlock achievements!',
+          'Your experience will not be shown to the passenger, but it impacts the ride experience. Complete this to unlock achievements!',
       };
     } else {
       return {
         title: 'Share your experience!',
         description:
-          'Your experience will not shown to the passenger, but it impacts the ride experience. Complete this to unlock priority matching!',
+          'Your experience will not be shown to the rider, but it impacts the ride experience. Complete this to unlock priority matching!',
       };
     }
   };

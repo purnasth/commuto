@@ -120,12 +120,19 @@ const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
                   <>
                     <strong className="font-bold">1</strong> feedback
                   </>
+                ) : averageScoreData.totalFeedback <= 10 ? (
+                  <>
+                    <strong className="font-bold">
+                      {averageScoreData.totalFeedback}
+                    </strong>{' '}
+                    feedbacks
+                  </>
                 ) : (
                   <>
                     Over
                     <strong className="font-bold">
                       {' '}
-                      {averageScoreData.totalFeedback - 1}+
+                      {Math.floor(averageScoreData.totalFeedback / 10) * 10}+
                     </strong>{' '}
                     feedbacks
                   </>
