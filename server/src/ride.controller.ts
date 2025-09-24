@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 import {
   Get,
   Put,
@@ -12,19 +14,24 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
-import { Ride, User, Feedback } from 'generated/prisma';
-import { PrismaService } from './prisma.service';
-import { RideGateway } from './rides/rides.gateway';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
+import { Ride, User, Feedback } from 'generated/prisma';
+
+import { PrismaService } from './prisma.service';
+
+import { RideGateway } from './rides/rides.gateway';
+
+import { UpdateRideDto } from './dto/update-ride.dto';
+
 import {
+  USER_ROLE,
+  RIDE_STATUS,
   FEEDBACK_EMOJI,
   FEEDBACK_POINTS,
   RIDE_MATCH_WINDOW_MINUTES,
   RIDE_EXPIRATION_GRACE_MINUTES,
 } from './constants/enums';
-import { USER_ROLE, RIDE_STATUS } from './constants/enums';
 
 import {
   RideDto,
@@ -804,7 +811,7 @@ export class RideController {
   }
 
   @Put(':id')
-  async updateRide(@Param('id') id: string, @Body() updates: Partial<RideDto>) {
+  async updateRide(@Param('id') id: string, @Body() updates: UpdateRideDto) {
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
       data: updates,
