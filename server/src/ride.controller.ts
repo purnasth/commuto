@@ -13,15 +13,25 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { Ride, User, Feedback } from 'generated/prisma';
 import { PrismaService } from './prisma.service';
 import { RideGateway } from './rides/rides.gateway';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import {
+  FEEDBACK_EMOJI,
+  FEEDBACK_POINTS,
   RIDE_MATCH_WINDOW_MINUTES,
   RIDE_EXPIRATION_GRACE_MINUTES,
 } from './constants/enums';
 import { USER_ROLE, RIDE_STATUS } from './constants/enums';
+
+import {
+  RideDto,
+  FeedbackDto,
+  ConfirmRideDto,
+  AverageScoreResult,
+} from './interfaces/types';
 
 import {
   calculateETA,
@@ -31,31 +41,134 @@ import {
 } from './utils/rideStats.util';
 import { getNow } from './utils/date.util';
 import { getTimeWindow } from './utils/timeWindow.util';
-
-interface RideDto {
-  from: string;
-  fromLat?: number;
-  fromLng?: number;
-  to: string;
-  toLat?: number;
-  toLng?: number;
-  message?: string;
-  role: USER_ROLE;
-  createdBy: number; // user id of the creator
-  estimatedTimeOfArrival?: number;
-  timestamp?: string;
-  status?: RIDE_STATUS;
-}
-
-interface ConfirmRideDto {
-  passengerId?: number;
-  passengerRideId?: number;
-  riderId?: number;
-  riderRideId?: number;
-}
+import { processFeedbackData } from './utils/feedback.util';
 
 @Controller('rides')
 export class RideController {
+  // TODO (data_exposure_security): CRITICAL SECURITY AUDIT REQUIRED
+  //
+  // PROBLEM: Most endpoints in this controller return raw Prisma objects which expose
+  // sensitive database fields and complete user relations to the frontend/API consumers.
+  //
+  // EXPOSED DATA INCLUDES:
+  // - Database internal IDs (id, createdAt, updatedAt)
+  // - Complete User objects with: emails, password hashes, phone numbers, addresses
+  // - Internal karma/credit scores, transaction history
+  // - Private ride messages, ratings, requests
+  // - System timestamps and audit trails
+  //
+  // AFFECTED ENDPOINTS:
+  // - GET /rides (public ride listings) - exposes all user data in ride relations
+  // - GET /rides/match - exposes user data in matched rides
+  // - GET /rides/history - exposes complete user history with all relations
+  // - GET /rides/:id - exposes everything including messages, ratings, requests
+  // - POST /rides - exposes full ride object after creation
+  // - POST /rides/:id/confirm - exposes full user objects in confirmed rides
+  // - POST /rides/:id/complete - exposes complete ride data
+  // - GET /rides/user/:userId/current - exposes full current ride with all user data
+  //
+  // SOLUTION: Create proper DTOs for each endpoint that map only safe, public fields:
+  // - PublicRideDto (for listings) - basic ride info + safe user fields (name, rating only)
+  // - RideDetailDto (for single ride) - more details but still filtered
+  // - RideHistoryDto (for history) - historical data without sensitive fields
+  // - CurrentRideDto (for current ride) - essential fields only
+  //
+  // PRIORITY: CRITICAL - This is a major security vulnerability
+  // IMPACT: All user data is potentially exposed to any API consumer
+  // TIMELINE: Should be fixed before production deployment
+  //
+
+  // TODO (authentication_security): CRITICAL AUTHENTICATION SYSTEM MISSING
+  //
+  // PROBLEM: This application lacks proper JWT authentication, causing severe security vulnerabilities.
+  // Multiple endpoints trust client-provided userId values without any authentication verification.
+  //
+  // MISSING AUTHENTICATION AFFECTS:
+  // - POST /rides/:id/complete - trusts body.userId for ride completion authorization
+  // - POST /rides/:id/reject - trusts body.userId for ride rejection authorization
+  // - POST /rides/:id/cancel - trusts body.userId for ride cancellation authorization
+  // - POST /rides/feedback - trusts body.fromUserId for feedback submission authorization
+  //
+  // SECURITY IMPACT:
+  // - Any user can perform actions on behalf of other users
+  // - Complete bypass of user authorization for critical ride management operations
+  // - Manipulation of karma points, credit scores, and ride statistics
+  // - Fraudulent feedback and rating manipulation
+  //
+  // REQUIRED IMPLEMENTATION:
+  //
+  // 1. INSTALL JWT AUTHENTICATION:
+  //    npm install @nestjs/jwt @nestjs/passport passport passport-jwt
+  //    npm install -D @types/passport-jwt
+  //
+  // 2. CREATE JWT MODULE (auth/jwt.module.ts):
+  //    ```typescript
+  //    import { Module } from '@nestjs/common';
+  //    import { JwtModule } from '@nestjs/jwt';
+  //    import { PassportModule } from '@nestjs/passport';
+  //    import { JwtStrategy } from './jwt.strategy';
+  //    import { JwtAuthGuard } from './jwt-auth.guard';
+  //
+  //    @Module({
+  //      imports: [
+  //        PassportModule,
+  //        JwtModule.register({
+  //          secret: process.env.JWT_SECRET,
+  //          signOptions: { expiresIn: '24h' },
+  //        }),
+  //      ],
+  //      providers: [JwtStrategy, JwtAuthGuard],
+  //      exports: [JwtAuthGuard],
+  //    })
+  //    export class JwtAuthModule {}
+  //    ```
+  //
+  // 3. CREATE JWT STRATEGY (auth/jwt.strategy.ts):
+  //    ```typescript
+  //    import { Injectable } from '@nestjs/common';
+  //    import { PassportStrategy } from '@nestjs/passport';
+  //    import { ExtractJwt, Strategy } from 'passport-jwt';
+  //
+  //    @Injectable()
+  //    export class JwtStrategy extends PassportStrategy(Strategy) {
+  //      constructor() {
+  //        super({
+  //          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  //          ignoreExpiration: false,
+  //          secretOrKey: process.env.JWT_SECRET,
+  //        });
+  //      }
+  //
+  //      async validate(payload: any) {
+  //        return { userId: payload.sub, email: payload.email };
+  //      }
+  //    }
+  //    ```
+  //
+  // 4. UPDATE AUTH CONTROLLER to issue JWT tokens on login/signup
+  //
+  // 5. PROTECT VULNERABLE ENDPOINTS:
+  //    ```typescript
+  //    import { UseGuards, Request } from '@nestjs/common';
+  //    import { JwtAuthGuard } from './auth/jwt-auth.guard';
+  //
+  //    @UseGuards(JwtAuthGuard)
+  //    @Post(':id/complete')
+  //    async completeRide(@Param('id') id: string, @Request() req: any) {
+  //      const authenticatedUserId = req.user.userId; // From JWT token
+  //      // Remove body.userId parameter completely
+  //      // Use authenticatedUserId for all authorization checks
+  //    }
+  //    ```
+  //
+  // 6. REMOVE userId FROM REQUEST BODIES:
+  //    - Remove { userId: number } from all @Body() parameters
+  //    - Extract user ID from JWT authentication context only
+  //    - Update frontend to send JWT tokens in Authorization header
+  //
+  // PRIORITY: CRITICAL - Must be implemented before production deployment
+  // ESTIMATED EFFORT: 1-2 days for complete authentication system implementation
+  //
   constructor(
     private prisma: PrismaService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
@@ -86,6 +199,214 @@ export class RideController {
       throw new NotFoundException('User not found');
     }
     return { karmaPoints: user.karmaPoints };
+  }
+
+  @Post('/feedback')
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts fromUserId from request body,
+  // allowing any user to submit feedback on behalf of others by changing the fromUserId.
+  // This bypasses authorization and enables manipulation of karma/credit systems.
+  //
+  // SECURITY RISKS:
+  // - User A can submit feedback as User B without permission
+  // - Manipulation of karma points and credit scores
+  // - Fraudulent feedback submissions affecting user ratings
+  //
+  // REQUIRED FIX: Extract authenticated userId from JWT context instead of fromUserId in request body
+  // The fromUserId should be replaced with the authenticated user's ID from the JWT token.
+  //
+  /**
+   * Submit feedback for a completed ride
+   * Updates karma points for riders and credit score for passengers
+   */
+  async submitFeedback(@Body() body: FeedbackDto) {
+    this.logger.log({
+      level: 'info',
+      message: `Feedback submission attempt for ride ${body.rideId} from user ${body.fromUserId} to user ${body.toUserId}`,
+      tag: 'feedback',
+      rideId: body.rideId,
+      fromUserId: body.fromUserId,
+      toUserId: body.toUserId,
+      role: body.role,
+      emoji: body.emoji,
+    });
+
+    // Validate required fields
+    if (
+      !body.rideId ||
+      !body.fromUserId ||
+      !body.toUserId ||
+      !body.role ||
+      body.emoji === undefined ||
+      body.emoji === null
+    ) {
+      throw new BadRequestException('Missing required feedback fields');
+    }
+
+    const validEmojis = Object.values(FEEDBACK_EMOJI);
+
+    if (!validEmojis.includes(body.emoji)) {
+      throw new BadRequestException(
+        `Invalid emoji. Must be one of: ${validEmojis.join(', ')} (0=😊, 1=😐, 2=😠)`,
+      );
+    }
+
+    // Check if ride exists and is completed
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: body.rideId },
+      include: { rider: true, passengers: true },
+    });
+
+    if (!ride) {
+      throw new NotFoundException('Ride not found');
+    }
+
+    // Only allow feedback for completed rides
+    if (ride.status !== RIDE_STATUS.COMPLETED) {
+      throw new BadRequestException(
+        'Feedback can only be submitted for completed rides',
+      );
+    }
+
+    // Verify that fromUser is part of this ride
+    const isRider = ride.riderId === body.fromUserId;
+    const isPassenger = ride.passengerId === body.fromUserId;
+
+    if (!isRider && !isPassenger) {
+      throw new BadRequestException('User is not part of this ride');
+    }
+
+    // Check for duplicate feedback
+    let existingFeedback: Feedback | null;
+    try {
+      existingFeedback = await this.prisma.feedback.findFirst({
+        where: {
+          rideId: body.rideId,
+          fromUserId: body.fromUserId,
+          toUserId: body.toUserId,
+        },
+      });
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        message: 'Error checking for existing feedback',
+        tag: 'feedback',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw new BadRequestException('Error checking feedback status');
+    }
+
+    if (existingFeedback) {
+      throw new BadRequestException('Feedback already submitted for this ride');
+    }
+
+    // Create feedback record
+    let feedback: Feedback;
+    try {
+      feedback = await this.prisma.feedback.create({
+        data: {
+          rideId: body.rideId,
+          fromUserId: body.fromUserId,
+          toUserId: body.toUserId,
+          role: body.role,
+          emoji: body.emoji,
+          comment: body.comment,
+        },
+      });
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        message: 'Error creating feedback record',
+        tag: 'feedback',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw new BadRequestException('Error creating feedback');
+    }
+
+    // Calculate points based on emoji using enum system
+    const basePoints = FEEDBACK_POINTS.BASE_POINTS;
+    const bonusPoints = FEEDBACK_POINTS.BONUS_POINTS[body.emoji] ?? 0;
+    const totalPoints = basePoints + bonusPoints;
+
+    // Update user scores based on their role
+    if (body.role === USER_ROLE.RIDER) {
+      // Update rider's karma points
+      await this.prisma.user.update({
+        where: { id: body.fromUserId },
+        data: { karmaPoints: { increment: totalPoints } },
+      });
+
+      // Create karma transaction
+      await this.prisma.karmaTransaction.create({
+        data: {
+          userId: body.fromUserId,
+          points: totalPoints,
+          type: 'earned',
+          reason: `Ride feedback: emoji ${body.emoji} (${basePoints} base + ${bonusPoints} bonus)`,
+        },
+      });
+
+      this.logger.log({
+        level: 'info',
+        message: `Karma points awarded to rider ${body.fromUserId}: ${totalPoints} points`,
+        tag: 'feedback',
+        userId: body.fromUserId,
+        points: totalPoints,
+      });
+    } else if (body.role === USER_ROLE.PASSENGER) {
+      // Update passenger's credit score
+      await this.prisma.user.update({
+        where: { id: body.fromUserId },
+        data: { creditScore: { increment: totalPoints } },
+      });
+
+      this.logger.log({
+        level: 'info',
+        message: `Credit score awarded to passenger ${body.fromUserId}: ${totalPoints} points`,
+        tag: 'feedback',
+        userId: body.fromUserId,
+        points: totalPoints,
+      });
+    }
+
+    // Check if both users have submitted feedback to determine response
+    const allFeedback = await this.prisma.feedback.findMany({
+      where: { rideId: body.rideId },
+    });
+
+    const riderFeedback = allFeedback.find(
+      (f) => (f.role as USER_ROLE) === USER_ROLE.RIDER,
+    );
+    const passengerFeedback = allFeedback.find(
+      (f) => (f.role as USER_ROLE) === USER_ROLE.PASSENGER,
+    );
+
+    // Since ride is already completed, check if both users have now submitted feedback
+    const bothSubmitted = riderFeedback && passengerFeedback;
+
+    // Get updated user data to return
+    const updatedUser = await this.prisma.user.findUnique({
+      where: { id: body.fromUserId },
+      select: { id: true, karmaPoints: true, creditScore: true },
+    });
+
+    return {
+      message: 'Feedback submitted successfully',
+      // Explicitly map Prisma Feedback model to FeedbackDto to ensure only expose intended fields (exclude id, createdAt, user objects, etc.)
+      feedback: {
+        rideId: feedback.rideId,
+        fromUserId: feedback.fromUserId,
+        toUserId: feedback.toUserId,
+        role: feedback.role as USER_ROLE,
+        emoji: feedback.emoji as FEEDBACK_EMOJI,
+        comment: feedback.comment,
+      } as FeedbackDto,
+      pointsAwarded: totalPoints,
+      user: updatedUser,
+      feedbackComplete: bothSubmitted,
+      waitingForOtherUser: !bothSubmitted,
+    };
   }
 
   /**
@@ -187,6 +508,9 @@ export class RideController {
     });
 
     return { rides: matchedRides };
+    // TODO (data_exposure_security): CRITICAL - matchedRides contains full Prisma objects with sensitive data
+    // Potential exposure: user emails, passwords (if included), internal IDs, timestamps, etc.
+    // Fix: Create proper RideDto mapping that only exposes safe fields
   }
 
   @Post()
@@ -293,6 +617,9 @@ export class RideController {
       rideId: ride.id,
     });
     return { message: 'Ride created', ride };
+    // TODO (data_exposure_security): CRITICAL - Full Prisma Ride object exposed
+    // Potential exposure: internal database IDs, creation timestamps, user objects with sensitive data
+    // Fix: Map to safe RideDto fields only
   }
 
   @Get()
@@ -337,6 +664,9 @@ export class RideController {
       rideCount: rides.length,
     });
     return { rides: ridesWithExpiry };
+    // TODO (data_exposure_security): CRITICAL - ridesWithExpiry contains full Prisma objects with sensitive data
+    // Potential exposure: user emails, passwords, phone numbers, addresses, internal IDs, etc.
+    // Fix: Create proper RideDto mapping for public ride listings
   }
 
   // Get all ride history for a user (as rider or passenger)
@@ -411,6 +741,9 @@ export class RideController {
       originalRideCount: rides.length,
     });
     return { rides: uniqueRides };
+    // TODO (data_exposure_security): CRITICAL - uniqueRides contains full Prisma objects with ALL user data
+    // Potential exposure: user emails, passwords, phone, addresses, karma points, credit scores, etc.
+    // Fix: Create RideHistoryDto with only safe fields for ride history
   }
 
   @Get(':id')
@@ -464,6 +797,10 @@ export class RideController {
         role: userRole, // Override the role based on current user's perspective
       },
     };
+    // TODO (data_exposure_security): CRITICAL - Full Prisma Ride object with ALL included relations exposed
+    // Potential exposure: Complete user objects (rider, passengers, createdByUser) with emails, passwords, etc.
+    // Also exposes: requests, ratings, messages which may contain sensitive data
+    // Fix: Create detailed RideDetailDto that maps only safe fields from relations
   }
 
   @Put(':id')
@@ -480,6 +817,9 @@ export class RideController {
       updates,
     });
     return { message: 'Ride updated', ride };
+    // TODO (data_exposure_security): CRITICAL - Full updated Prisma Ride object exposed
+    // Potential exposure: internal database fields, timestamps, related user data
+    // Fix: Map to safe RideDto fields only
   }
 
   @Delete(':id')
@@ -634,102 +974,52 @@ export class RideController {
       message: 'Rides confirmed successfully',
       rides: updatedRides,
     };
+    // TODO (data_exposure_security): CRITICAL - updatedRides contains full Prisma objects with ALL user data
+    // Potential exposure: Complete user objects (rider, passengers, createdByUser) with sensitive information
+    // Fix: Create ConfirmedRideDto that maps only safe fields from confirmed rides
   }
 
-  // @Post(':id/confirm')
-  // async confirmRide(@Param('id') id: string) {
-  //   const rideId = Number(id);
-  //   const baseRide = await this.prisma.ride.findUnique({
-  //     where: { id: rideId },
-  //     include: { passengers: true, rider: true },
-  //   });
-  //   if (!baseRide) {
-  //     throw new NotFoundException('Ride not found');
-  //   }
-  //   const timeWindowMs = 2 * 60 * 1000;
-  //   const baseTime = new Date(baseRide.timestamp);
-  //   const matchedRides = await this.prisma.ride.findMany({
-  //     where: {
-  //       from: baseRide.from,
-  //       to: baseRide.to,
-  //       timestamp: {
-  //         gte: new Date(baseTime.getTime() - timeWindowMs),
-  //         lte: new Date(baseTime.getTime() + timeWindowMs),
-  //       },
-  //       status: RIDE_STATUS.ACTIVE,
-  //     },
-  //     include: {
-  //       rider: true,
-  //       passengers: true,
-  //     },
-  //   });
-  //   if (!matchedRides.length) {
-  //     return { message: 'No active rides matched to confirm.', rides: [] };
-  //   }
-  //   // Calculate and update distance, co2Saved, peopleImpacted, and award karma points
-  //   for (const ride of matchedRides) {
-  //     let distance: null | number = null;
-  //     if (
-  //       typeof ride.fromLat === 'number' &&
-  //       typeof ride.fromLng === 'number' &&
-  //       typeof ride.toLat === 'number' &&
-  //       typeof ride.toLng === 'number'
-  //     ) {
-  //       distance = this.haversineDistance(
-  //         ride.fromLat,
-  //         ride.fromLng,
-  //         ride.toLat,
-  //         ride.toLng,
-  //       );
-  //     }
-  //     const co2Saved = distance ? distance * 0.17 : null; // 0.17kg per km
-  //     const peopleImpacted = ride.passengers ? ride.passengers.length : 0;
-  //     // Update ride
-  //     await this.prisma.ride.update({
-  //       where: { id: ride.id },
-  //       data: {
-  //         status: RIDE_STATUS.CONFIRMED,
-  //         distance,
-  //         co2Saved,
-  //         peopleImpacted,
-  //       },
-  //     });
-  //     // Award karma points to the rider
-  //     const karmaPoints = 20;
-  //     await this.prisma.user.update({
-  //       where: { id: ride.rider.id },
-  //       data: {
-  //         karmaPoints: { increment: karmaPoints },
-  //       },
-  //     });
-  //     // Create a KarmaTransaction record
-  //     await this.prisma.karmaTransaction.create({
-  //       data: {
-  //         userId: ride.rider.id,
-  //         points: karmaPoints,
-  //         type: 'earned',
-  //         reason: 'Ride completed',
-  //       },
-  //     });
-  //   }
-  //   // Notify clients
-  //   for (const ride of matchedRides) {
-  //     this.rideGateway.notifyRideConfirmationForPassenger(ride, ride.rider.id);
-  //     this.rideGateway.notifyRideConfirmation(ride);
-  //   }
-  //   // Return updated rides
-  //   const updatedRides = await this.prisma.ride.findMany({
-  //     where: { id: { in: matchedRides.map((r) => r.id) } },
-  //     include: { rider: true, passengers: true },
-  //   });
-  //   return {
-  //     message: 'All matched rides confirmed',
-  //     rides: updatedRides,
-  //   };
-  // }
-
   @Post(':id/complete')
-  async completeRide(@Param('id') id: string) {
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // PROBLEM: This endpoint accepts userId from the request body, creating a major security flaw
+  // where any user can complete rides on behalf of other users by simply changing the userId
+  // in their request. This bypasses all authorization checks and allows unauthorized ride completion.
+  //
+  // CURRENT FLOW:
+  // 1. Client sends POST /rides/:id/complete with { userId: X } in body
+  // 2. Server trusts this userId without any authentication verification
+  // 3. Any malicious user can set userId to any other user's ID
+  // 4. Result: User A can complete User B's rides without permission
+  //
+  // SECURITY RISKS:
+  // - Unauthorized ride completion on behalf of others
+  // - Manipulation of ride statistics (distance, CO2 savings, etc.)
+  // - Triggering of unintended notifications and feedback flows
+  // - Potential impact on user karma/credit systems
+  //
+  // AFFECTED ENDPOINTS WITH SAME VULNERABILITY:
+  // - POST /rides/:id/complete (this endpoint)
+  // - POST /rides/:id/reject
+  // - POST /rides/:id/cancel
+  //
+  // REQUIRED SOLUTION:
+  // 1. Implement JWT authentication with @UseGuards(JwtAuthGuard) decorator
+  // 2. Extract authenticated userId from JWT token via @Request() or custom decorator
+  // 3. Remove userId from request body - get it from authentication context instead
+  // 4. Example fix:
+  //    async completeRide(@Param('id') id: string, @Request() req: any) {
+  //      const authenticatedUserId = req.user.id; // From JWT token
+  //      // Use authenticatedUserId instead of body.userId
+  //    }
+  //
+  // PRIORITY: CRITICAL - Must be fixed before production deployment
+  // IMPACT: Complete bypass of user authorization for ride management actions
+  //
+  async completeRide(
+    @Param('id') id: string,
+    @Body() body: { userId: number },
+  ) {
     const rideId = Number(id);
 
     const ride = await this.prisma.ride.findUnique({
@@ -747,17 +1037,25 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
+    // Verify that the user is part of this ride
+    const isRider = ride.riderId === body.userId;
+    const isPassenger = ride.passengerId === body.userId;
+
+    if (!isRider && !isPassenger) {
+      throw new BadRequestException(
+        'You are not authorized to complete this ride',
+      );
+    }
+
     if (ride.status !== RIDE_STATUS.CONFIRMED) {
       this.logger.log({
         level: 'warn',
-        message: `Complete ride failed: Ride not confirmed or already completed`,
+        message: `Complete ride failed: Ride not confirmed`,
         tag: 'ride',
         rideId,
         status: ride.status,
       });
-      throw new BadRequestException(
-        'Ride is not confirmed or already completed',
-      );
+      throw new BadRequestException('Only confirmed rides can be completed');
     }
 
     let distance: number | null = null;
@@ -779,62 +1077,93 @@ export class RideController {
       typeof distance === 'number' ? estimateCO2FromDistance(distance) : null;
     const peopleImpacted = ride.passengers.length;
 
-    const updatedRide = await this.prisma.ride.update({
-      where: { id: rideId },
-      data: {
-        status: RIDE_STATUS.COMPLETED,
-        distance,
-        co2Saved,
-        peopleImpacted,
-      },
-      include: {
-        passengers: true,
-        rider: true,
-        createdByUser: true,
-      },
-    });
+    // Update ALL rides in the same match group to COMPLETED status
+    let updatedRides: (Ride & {
+      passengers: User[];
+      rider: User | null;
+      createdByUser: User | null;
+    })[];
+    if (ride.matchGroupId) {
+      // Update all rides with the same matchGroupId
+      await this.prisma.ride.updateMany({
+        where: { matchGroupId: ride.matchGroupId },
+        data: {
+          status: RIDE_STATUS.COMPLETED,
+          distance,
+          co2Saved,
+          peopleImpacted,
+        },
+      });
+
+      // Fetch the updated rides for response
+      updatedRides = await this.prisma.ride.findMany({
+        where: { matchGroupId: ride.matchGroupId },
+        include: {
+          passengers: true,
+          rider: true,
+          createdByUser: true,
+        },
+      });
+    } else {
+      // Fallback: update only the current ride if no matchGroupId
+      const updatedRide = await this.prisma.ride.update({
+        where: { id: rideId },
+        data: {
+          status: RIDE_STATUS.COMPLETED,
+          distance,
+          co2Saved,
+          peopleImpacted,
+        },
+        include: {
+          passengers: true,
+          rider: true,
+          createdByUser: true,
+        },
+      });
+      updatedRides = [updatedRide];
+    }
 
     this.logger.log({
       level: 'info',
-      message: `Ride completed`,
+      message: `Ride(s) completed by user ${body.userId}`,
       tag: 'ride',
       rideId,
+      completedByUserId: body.userId,
+      isRider,
+      isPassenger,
       distance,
       co2Saved,
       peopleImpacted,
+      matchGroupId: ride.matchGroupId,
+      updatedRideCount: updatedRides.length,
     });
 
-    // Award karma points to the rider if they exist
-    if (ride.rider) {
-      // TODO: create a constant for karma points and centralize it
-      const karmaPoints = 20;
-      await this.prisma.user.update({
-        where: { id: ride.rider.id },
-        data: {
-          karmaPoints: { increment: karmaPoints },
-        },
-      });
-
-      await this.prisma.karmaTransaction.create({
-        data: {
-          userId: ride.rider.id,
-          points: karmaPoints,
-          type: 'earned',
-          reason: 'Ride completed',
-        },
-      });
-    }
-
-    this.rideGateway.notifyRideCompletion(updatedRide);
+    // Notify both users via socket that the ride is completed and they should show feedback modal
+    // Use the first ride for notification (both should have same essential data)
+    this.rideGateway.notifyRideCompletion(updatedRides[0] as Ride);
 
     return {
-      message: 'Ride completed and users notified.',
-      ride: updatedRide,
+      message:
+        'Ride completed successfully. Both users should now provide feedback.',
+      ride: updatedRides[0], // Return the first ride (both should have same essential data)
+      totalRidesUpdated: updatedRides.length,
     };
+    // TODO (data_exposure_security): CRITICAL - updatedRides[0] contains full Prisma object with ALL user data
+    // Potential exposure: Complete user objects (passengers, rider, createdByUser) with sensitive data
+    // Fix: Create CompletedRideDto that maps only safe fields
   }
 
   // Reject a ride (mark as rejected)
   @Post(':id/reject')
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts userId from request body,
+  // allowing any user to reject rides on behalf of others by changing the userId.
+  // This bypasses authorization and enables unauthorized ride management actions.
+  //
+  // SECURITY RISK: User A can reject User B's rides without permission
+  // REQUIRED FIX: Extract userId from JWT authentication context instead of request body
+  //
   async rejectRide(@Param('id') id: string, @Body() body: { userId: number }) {
     // Mark ride as rejected
     const ride = await this.prisma.ride.update({
@@ -854,10 +1183,22 @@ export class RideController {
       userId: body.userId,
       ride,
     };
+    // TODO (data_exposure_security): MEDIUM - ride object contains Prisma fields that may not be needed
+    // Potential exposure: internal database fields, timestamps
+    // Fix: Return minimal ride info or just confirmation message
   }
 
   // Cancel a ride (mark as cancelled)
   @Post(':id/cancel')
+  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
+  //
+  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts userId from request body,
+  // allowing any user to cancel rides on behalf of others by changing the userId.
+  // This bypasses authorization and enables unauthorized ride management actions.
+  //
+  // SECURITY RISK: User A can cancel User B's rides without permission
+  // REQUIRED FIX: Extract userId from JWT authentication context instead of request body
+  //
   async cancelRide(@Param('id') id: string, @Body() body: { userId: number }) {
     // Mark ride as cancelled
     const ride = await this.prisma.ride.update({
@@ -877,6 +1218,9 @@ export class RideController {
       userId: body.userId,
       ride,
     };
+    // TODO (data_exposure_security): MEDIUM - ride object contains Prisma fields that may not be needed
+    // Potential exposure: internal database fields, timestamps
+    // Fix: Return minimal ride info or just confirmation message
   }
 
   // Get current user's active ride with expiry information
@@ -934,6 +1278,9 @@ export class RideController {
     });
 
     return { hasActiveRide: true, ride: rideWithExpiry };
+    // TODO (data_exposure_security): CRITICAL - rideWithExpiry contains full Prisma object with ALL user data
+    // Potential exposure: Complete user objects (rider, createdByUser, passengers) with emails, passwords, etc.
+    // Fix: Create CurrentRideDto that maps only essential fields for current ride display
   }
 
   /**
@@ -978,6 +1325,55 @@ export class RideController {
       },
       data: { status: RIDE_STATUS.EXPIRED },
     });
+  }
+
+  @Get('/user/:userId/average-score')
+  /**
+   * Get average feedback score for a user
+   * Calculates the average emoji feedback received by a user across all rides
+   * @param userId The user ID to calculate average score for
+   * @returns Object containing average score, total feedback count, and emoji breakdown
+   */
+  async getUserAverageScore(
+    @Param('userId', ParseIntPipe) userId: number,
+  ): Promise<AverageScoreResult> {
+    this.logger.log({
+      level: 'info',
+      message: `Getting average score for user ${userId}`,
+      tag: 'average-score',
+      userId,
+    });
+
+    try {
+      // Get all feedback received by this user
+      const feedbackReceived = await this.prisma.feedback.findMany({
+        where: { toUserId: userId },
+        select: { emoji: true },
+      });
+
+      // Use utility function to process the feedback data
+      const result = processFeedbackData(feedbackReceived, this.logger);
+
+      this.logger.log({
+        level: 'info',
+        message: `Average score calculated for user ${userId}: ${result.averageScore}`,
+        tag: 'average-score',
+        userId,
+        averageScore: result.averageScore,
+        totalFeedback: result.totalFeedback,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        message: `Error calculating average score for user ${userId}`,
+        tag: 'average-score',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId,
+      });
+      throw new BadRequestException('Error calculating average score');
+    }
   }
 
   /**

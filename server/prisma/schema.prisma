@@ -34,35 +34,39 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   karmaPoints    Int      @default(0) // Total karma points
+  creditScore    Int      @default(0) // Total credit score for passengers
   karmaTransactions KarmaTransaction[]
+  feedbackGiven     Feedback[]         @relation("FromUser")
+  feedbackReceived  Feedback[]         @relation("ToUser")
 }
 
 model Ride {
-  id          Int           @id @default(autoincrement())
-  from        String
-  fromLat     Float?
-  fromLng     Float?
-  to          String
-  toLat       Float?
-  toLng       Float?
-  message     String?
-  role        String
-  timestamp   DateTime      @default(now())
-  createdBy   Int           // ID of user who created the ride (could be passenger or rider)
-  createdByUser User        @relation("CreatedUser", fields: [createdBy], references: [id])
-  rider       User?         @relation("RiderRides", fields: [riderId], references: [id])
-  estimatedTimeOfArrival Int?   // ETA in minutes
-  riderId     Int?          // Made optional since it can be null for passenger-created rides
-  passengerId Int?          // ID of the passenger who requested the ride (if applicable)
-  requests    RideRequest[]
-  passengers  User[]        @relation("RidePassengers")
-  ratings     Rating[]
-  messages    Message[]
-  status      RideStatus    @default(ACTIVE)
-  distance     Float?        // Distance in kilometers, calculated when ride is confirmed
-  co2Saved     Float?        // CO2 saved in kg
-  peopleImpacted Int?        // Number of people impacted (passengers)
-  matchGroupId String?       // UUID to group matched rides together
+  id                     Int           @id @default(autoincrement())
+  from                   String
+  fromLat                Float?
+  fromLng                Float?
+  to                     String
+  toLat                  Float?
+  toLng                  Float?
+  message                String?
+  role                   String
+  timestamp              DateTime      @default(now())
+  createdBy              Int // ID of user who created the ride (could be passenger or rider)
+  createdByUser          User          @relation("CreatedUser", fields: [createdBy], references: [id])
+  rider                  User?         @relation("RiderRides", fields: [riderId], references: [id])
+  estimatedTimeOfArrival Int? // ETA in minutes
+  riderId                Int? // Made optional since it can be null for passenger-created rides
+  passengerId            Int? // ID of the passenger who requested the ride (if applicable)
+  requests               RideRequest[]
+  passengers             User[]        @relation("RidePassengers")
+  ratings                Rating[]
+  messages               Message[]
+  feedback               Feedback[]
+  status                 RideStatus    @default(ACTIVE)
+  distance               Float? // Distance in kilometers, calculated when ride is confirmed
+  co2Saved               Float? // CO2 saved in kg
+  peopleImpacted         Int? // Number of people impacted (passengers)
+  matchGroupId           String? // UUID to group matched rides together
 }
 
 enum RideStatus {
@@ -70,31 +74,31 @@ enum RideStatus {
   CONFIRMED
   REJECTED
   EXPIRED
-  CANCELLED 
+  CANCELLED
   COMPLETED
 }
 
 model RideRequest {
-  id         Int      @id @default(autoincrement())
-  ride       Ride     @relation(fields: [rideId], references: [id])
-  rideId     Int
-  passenger  User     @relation(fields: [passengerId], references: [id])
+  id          Int      @id @default(autoincrement())
+  ride        Ride     @relation(fields: [rideId], references: [id])
+  rideId      Int
+  passenger   User     @relation(fields: [passengerId], references: [id])
   passengerId Int
-  status     String   // pending, accepted, rejected
-  createdAt  DateTime @default(now())
+  status      String // pending, accepted, rejected
+  createdAt   DateTime @default(now())
 }
 
 model Rating {
-  id        Int      @id @default(autoincrement())
-  ride      Ride     @relation(fields: [rideId], references: [id])
-  rideId    Int
-  fromUser  User     @relation("FromUser", fields: [fromUserId], references: [id])
+  id         Int      @id @default(autoincrement())
+  ride       Ride     @relation(fields: [rideId], references: [id])
+  rideId     Int
+  fromUser   User     @relation("FromUser", fields: [fromUserId], references: [id])
   fromUserId Int
-  toUser    User     @relation("ToUser", fields: [toUserId], references: [id])
-  toUserId  Int
-  score     Int
-  comment   String?
-  createdAt DateTime @default(now())
+  toUser     User     @relation("ToUser", fields: [toUserId], references: [id])
+  toUserId   Int
+  score      Int
+  comment    String?
+  createdAt  DateTime @default(now())
 }
 
 model Message {
@@ -111,8 +115,24 @@ model KarmaTransaction {
   id        Int      @id @default(autoincrement())
   user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  points    Int      // points earned or redeemed
-  type      String   // 'earned' or 'redeemed'
+  points    Int // points earned or redeemed
+  type      String // 'earned' or 'redeemed'
   reason    String?
   createdAt DateTime @default(now())
+}
+
+model Feedback {
+  id         Int      @id @default(autoincrement())
+  ride       Ride     @relation(fields: [rideId], references: [id])
+  rideId     Int
+  fromUser   User     @relation("FromUser", fields: [fromUserId], references: [id])
+  fromUserId Int
+  toUser     User     @relation("ToUser", fields: [toUserId], references: [id])
+  toUserId   Int
+  role       String // role of the person giving feedback (rider/passenger)
+  emoji      Int    // emoji reaction index: 0=😊, 1=😐, 2=😠
+  comment    String? // optional comment
+  createdAt  DateTime @default(now())
+
+  @@unique([rideId, fromUserId, toUserId]) // Prevent duplicate feedback
 }

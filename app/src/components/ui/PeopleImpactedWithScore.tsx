@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TbPlus } from 'react-icons/tb';
 
 import { AVATAR_GRID_CONFIG } from '../../constants/enums';
+import { AverageScoreResult } from '../../interfaces/types';
+
+import {
+  getRemainingEmojis,
+  getScoreDescription,
+  getAverageScoreEmoji,
+} from '../../utils/utils';
+import { fetchUserAverageScore } from '../../utils/api';
 
 import Tooltip from './Tooltip';
 import PeopleImpactedModal from '../PeopleImpactedModal';
@@ -14,14 +22,40 @@ interface Person {
 
 interface PeopleAvatarGridProps {
   people: Person[];
+  userId: number;
   className?: string;
 }
 
-const PeopleImpactedWithScore = ({ people }: PeopleAvatarGridProps) => {
+const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
   const [showModal, setShowModal] = useState(false);
+  const [averageScoreData, setAverageScoreData] =
+    useState<AverageScoreResult | null>(null);
 
   const { DEFAULT_AVATAR_URL, MAX_VISIBLE_SLOTS, EMPTY_SLOT_MESSAGE } =
     AVATAR_GRID_CONFIG;
+
+  // Memoize remaining emojis calculation to avoid recalculating on every render
+  const remainingEmojis = useMemo(() => {
+    return averageScoreData?.averageScore !== null &&
+      averageScoreData?.averageScore !== undefined
+      ? getRemainingEmojis(averageScoreData.averageScore)
+      : [];
+  }, [averageScoreData?.averageScore]);
+
+  // Fetch average score on component mount
+  useEffect(() => {
+    const fetchScore = async () => {
+      try {
+        const scoreData = await fetchUserAverageScore(userId);
+        setAverageScoreData(scoreData);
+      } catch (error) {
+        console.error('Error fetching average score:', error);
+        // API utility already handles error fallbacks
+      }
+    };
+
+    fetchScore();
+  }, [userId]);
 
   const slots = Array.from(
     { length: MAX_VISIBLE_SLOTS },
@@ -76,19 +110,45 @@ const PeopleImpactedWithScore = ({ people }: PeopleAvatarGridProps) => {
           )}
         </div>
 
-        {/* //TODO: Implement actual average score calculation from server */}
-        <div className="relative flex items-center gap-0.5 rounded-full border border-teal-300 bg-gradient-to-bl from-teal-200 via-teal-100 to-teal-300 py-2 pl-1.5 pr-4">
-          <Tooltip content="Your average score">
-            <span className="text-4xl">😀</span>
-          </Tooltip>
-          <div className="text-sm">
-            <span className="opacity-80 grayscale">😊😐😞😠</span>
-            <p className="text-xs">
-              Over <strong className="font-bold">{people.length}+</strong>{' '}
-              contributions
-            </p>
+        {averageScoreData && averageScoreData.averageScore !== null && (
+          <div className="relative flex items-center gap-0.5 rounded-full border border-teal-300 bg-gradient-to-bl from-teal-200 via-teal-100 to-teal-300 py-2 pl-1.5 pr-4">
+            <Tooltip
+              content={`Your average score: ${getScoreDescription(averageScoreData.averageScore)}`}
+            >
+              <span className="text-4xl">
+                {getAverageScoreEmoji(averageScoreData.averageScore)}
+              </span>
+            </Tooltip>
+            <div className="text-sm">
+              <span className="opacity-80 grayscale">
+                {remainingEmojis.join('')}
+              </span>
+              <p className="text-xs">
+                {averageScoreData.totalFeedback === 1 ? (
+                  <>
+                    <strong className="font-bold">1</strong> feedback
+                  </>
+                ) : averageScoreData.totalFeedback <= 10 ? (
+                  <>
+                    <strong className="font-bold">
+                      {averageScoreData.totalFeedback}
+                    </strong>{' '}
+                    feedbacks
+                  </>
+                ) : (
+                  <>
+                    Over
+                    <strong className="font-bold">
+                      {' '}
+                      {Math.floor(averageScoreData.totalFeedback / 10) * 10}+
+                    </strong>{' '}
+                    feedbacks
+                  </>
+                )}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       {showModal && (

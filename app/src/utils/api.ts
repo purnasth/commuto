@@ -1,3 +1,7 @@
+import { API_USER_AVERAGE_SCORE } from '../constants/api';
+import { AverageScoreResult } from '../interfaces/types';
+import { createEmptyEmojiBreakdown } from './utils';
+
 export async function apiFetch<T>(
   url: string,
   options?: RequestInit,
@@ -16,3 +20,28 @@ export async function apiFetch<T>(
   }
   return response.json();
 }
+
+/**
+ * Fetches the average score for a user from the server
+ * @param userId - The user ID to fetch the score for
+ * @returns Promise resolving to the average score result
+ */
+export const fetchUserAverageScore = async (
+  userId: number,
+): Promise<AverageScoreResult> => {
+  try {
+    const url = API_USER_AVERAGE_SCORE.replace(':userId', userId.toString());
+    const fullUrl = `${import.meta.env.VITE_API_BASE_URL}${url}`;
+
+    const response = await apiFetch<AverageScoreResult>(fullUrl);
+    return response;
+  } catch (error) {
+    console.error('Error fetching user average score:', error);
+
+    return {
+      averageScore: null,
+      totalFeedback: 0,
+      emojiBreakdown: createEmptyEmojiBreakdown(),
+    };
+  }
+};
