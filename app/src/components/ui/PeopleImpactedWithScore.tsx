@@ -2,32 +2,25 @@ import { useState, useEffect, useMemo } from 'react';
 import { TbPlus } from 'react-icons/tb';
 
 import { AVATAR_GRID_CONFIG } from '../../constants/enums';
-import { AverageScoreResult } from '../../interfaces/types';
+import { AverageScoreResult, Person } from '../../interfaces/types';
 
 import {
   getRemainingEmojis,
   getScoreDescription,
   getAverageScoreEmoji,
 } from '../../utils/utils';
-import { fetchUserAverageScore } from '../../utils/api';
+import { fetchUserAverageScore, fetchPeopleImpacted } from '../../utils/api';
 
 import Tooltip from './Tooltip';
 import PeopleImpactedModal from '../PeopleImpactedModal';
 
-interface Person {
-  id: number;
-  name: string;
-  img: string;
-}
-
 interface PeopleAvatarGridProps {
-  people: Person[];
   userId: number;
-  className?: string;
 }
 
-const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
+const PeopleImpactedWithScore = ({ userId }: PeopleAvatarGridProps) => {
   const [showModal, setShowModal] = useState(false);
+  const [people, setPeople] = useState<Person[]>([]);
   const [averageScoreData, setAverageScoreData] =
     useState<AverageScoreResult | null>(null);
 
@@ -42,19 +35,23 @@ const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
       : [];
   }, [averageScoreData?.averageScore]);
 
-  // Fetch average score on component mount
+  // Fetch average score and people impacted data on component mount
   useEffect(() => {
-    const fetchScore = async () => {
+    const fetchData = async () => {
       try {
-        const scoreData = await fetchUserAverageScore(userId);
+        const [scoreData, peopleData] = await Promise.all([
+          fetchUserAverageScore(userId),
+          fetchPeopleImpacted(userId),
+        ]);
+
         setAverageScoreData(scoreData);
+        setPeople(peopleData.people);
       } catch (error) {
-        console.error('Error fetching average score:', error);
-        // API utility already handles error fallbacks
+        console.error('Error fetching user data:', error);
       }
     };
 
-    fetchScore();
+    fetchData();
   }, [userId]);
 
   const slots = Array.from(
@@ -87,7 +84,7 @@ const PeopleImpactedWithScore = ({ people, userId }: PeopleAvatarGridProps) => {
                   <img
                     src={hasData ? person!.img : DEFAULT_AVATAR_URL}
                     alt={hasData ? person!.name : 'Unlock slot'}
-                    className={`transition-150 inline-block aspect-square size-9 rounded-full object-cover group-hover:scale-110 md:size-11 ${
+                    className={`transition-150 inline-block aspect-square size-9 rounded-full bg-white object-cover group-hover:scale-110 dark:bg-dark md:size-11 ${
                       hasData
                         ? 'border-2 border-teal-300 group-hover:border-teal-400 dark:border-teal-700 dark:group-hover:border-teal-600'
                         : 'transition-150 border-2 border-teal-300 bg-light p-1 grayscale hover:grayscale-0 group-hover:border-teal-400 dark:border-0 dark:border-teal-700 dark:bg-dark dark:group-hover:border-teal-600'

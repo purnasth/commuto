@@ -13,6 +13,7 @@ import {
   ParseIntPipe,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
@@ -1380,6 +1381,135 @@ export class RideController {
         userId,
       });
       throw new BadRequestException('Error calculating average score');
+    }
+  }
+
+  @Get('/user/:userId/people-impacted')
+  /**
+   * Get people impacted by a user (users they've ridden with and ride counts)
+   * Returns users ranked by number of rides completed together
+   * Properly handles matchGroupId to avoid double-counting matched rides
+   * @param userId The user ID to get people impacted data for
+   * @returns Object containing people array and total count
+   */
+  async getPeopleImpacted(
+    @Param('userId', ParseIntPipe) userId: number,
+  ): Promise<{
+    people: Array<{
+      id: number;
+      name: string;
+      img: string;
+      rideCount: number;
+    }>;
+    totalImpacted: number;
+  }> {
+    try {
+      // Get all completed rides where user was involved (as rider or passenger)
+      const allRides = await this.prisma.ride.findMany({
+        where: {
+          status: RIDE_STATUS.COMPLETED,
+          OR: [{ riderId: userId }, { passengerId: userId }],
+        },
+        select: {
+          id: true,
+          riderId: true,
+          passengerId: true,
+          matchGroupId: true,
+        },
+      });
+
+      // Deduplicate rides by matchGroupId to avoid counting matched rides twice
+      const uniqueRides = new Map<string, (typeof allRides)[0]>();
+
+      allRides.forEach((ride) => {
+        if (ride.matchGroupId) {
+          // If ride has matchGroupId, use it as key to deduplicate
+          if (!uniqueRides.has(ride.matchGroupId)) {
+            uniqueRides.set(ride.matchGroupId, ride);
+          }
+        } else {
+          // If no matchGroupId, use ride ID as unique key
+          uniqueRides.set(`ride_${ride.id}`, ride);
+        }
+      });
+
+      // Count partners from deduplicated rides
+      const partnerCounts = new Map<number, number>();
+
+      Array.from(uniqueRides.values()).forEach((ride) => {
+        let partnerId: number | null = null;
+
+        if (ride.riderId === userId && ride.passengerId) {
+          // User was rider, partner is passenger
+          partnerId = ride.passengerId;
+        } else if (ride.passengerId === userId && ride.riderId) {
+          // User was passenger, partner is rider
+          partnerId = ride.riderId;
+        }
+
+        if (partnerId) {
+          const current = partnerCounts.get(partnerId) || 0;
+          partnerCounts.set(partnerId, current + 1);
+        }
+      });
+
+      // Get user details for all partners
+      const partnerIds = Array.from(partnerCounts.keys());
+
+      if (partnerIds.length === 0) {
+        return { people: [], totalImpacted: 0 };
+      }
+
+      const partnerUsers = await this.prisma.user.findMany({
+        where: {
+          id: { in: partnerIds },
+        },
+        select: {
+          id: true,
+          fullname: true,
+          profilePicture: true,
+        },
+      });
+
+      // Combine user data with ride counts and sort
+      const people = partnerUsers
+        .map((user) => ({
+          id: user.id,
+          name: user.fullname,
+          img: user.profilePicture || '',
+          rideCount: partnerCounts.get(user.id) || 0,
+        }))
+        .sort((a, b) => b.rideCount - a.rideCount);
+
+      this.logger.log({
+        level: 'info',
+        message: `People impacted data fetched for user ${userId}`,
+        tag: 'ride',
+        userId,
+        totalRidesFound: allRides.length,
+        uniqueRidesAfterDedup: uniqueRides.size,
+        totalImpacted: people.length,
+        topPartners: people.slice(0, 3).map((p) => ({
+          name: p.name,
+          rides: p.rideCount,
+        })),
+      });
+
+      return {
+        people,
+        totalImpacted: people.length,
+      };
+    } catch (error) {
+      this.logger.error({
+        level: 'error',
+        message: `Failed to fetch people impacted for user ${userId}`,
+        tag: 'ride',
+        userId,
+        error: (error as Error).message,
+      });
+      throw new InternalServerErrorException(
+        'Failed to fetch people impacted data',
+      );
     }
   }
 

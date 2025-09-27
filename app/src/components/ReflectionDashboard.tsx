@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { ReflectionStats, RideHistory } from '../interfaces/types';
 import { ROUTE_REDEEM } from '../constants/routes';
-import { getPeopleImpactedFromRides } from '../utils/reflectionUtils';
 
 import UserCard from './UserCard';
 import TitleBar from './ui/TitleBar';
@@ -21,12 +20,9 @@ interface ReflectionDashboardProps {
 
 const ReflectionDashboard = ({
   stats,
-  completedRides,
   currentUserId,
 }: ReflectionDashboardProps) => {
   const navigate = useNavigate();
-
-  const people = getPeopleImpactedFromRides(completedRides, currentUserId);
 
   return (
     <div className="grid grid-cols-1 rounded-3xl border-t-0 shadow-sm md:border md:border-t-0 lg:grid-cols-3">
@@ -138,7 +134,7 @@ const ReflectionDashboard = ({
       <div className="col-span-1 rounded-3xl rounded-b-none bg-none dark:bg-teal-900 md:bg-teal-50">
         <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white pb-4 pt-1 dark:bg-dark">
           {/* <PeopleAvatarGrid people={people} /> */}
-          <PeopleImpactedWithScore people={people} userId={currentUserId} />
+          <PeopleImpactedWithScore userId={currentUserId} />
           <TitleBar
             // content={
             //   people.length > 0

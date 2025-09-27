@@ -1,5 +1,12 @@
 import { RIDE_STATUS, USER_ROLE } from '../constants/enums';
 
+export interface Person {
+  id: number;
+  name: string;
+  img: string;
+  rideCount: number;
+}
+
 export interface RideFormData {
   id?: string;
   from: string;
