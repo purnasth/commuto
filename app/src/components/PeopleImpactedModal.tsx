@@ -1,11 +1,6 @@
 import Modal from './ui/Modal';
 import { AVATAR_GRID_CONFIG } from '../constants/enums';
-
-interface Person {
-  id: number;
-  name: string;
-  img: string;
-}
+import { Person } from '../interfaces/types';
 
 interface PeopleImpactedModalProps {
   onClose: () => void;
@@ -17,7 +12,6 @@ const PeopleImpactedModal = ({ onClose, people }: PeopleImpactedModalProps) => {
 
   return (
     <>
-      {/* // TODO: Filter ride based on maximum ride made */}
       <Modal onClose={onClose} className="w-full">
         <div className="mx-auto w-full max-w-md overflow-hidden border border-dark/20 bg-white shadow dark:border-light/20 dark:bg-dark md:rounded-xl">
           <h3
@@ -37,7 +31,7 @@ const PeopleImpactedModal = ({ onClose, people }: PeopleImpactedModalProps) => {
                   <img
                     src={person.img || DEFAULT_AVATAR_URL}
                     alt={person.name}
-                    className="size-12 rounded-full border-2 border-teal-200 object-cover dark:border-teal-600"
+                    className="size-12 rounded-full border-2 border-teal-200 bg-white object-cover dark:border-teal-600 dark:bg-dark"
                   />
                   {index < MAX_VISIBLE_SLOTS && (
                     <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-teal-500 text-xs font-medium text-white">
@@ -48,9 +42,7 @@ const PeopleImpactedModal = ({ onClose, people }: PeopleImpactedModalProps) => {
                 <div className="flex-1">
                   <h3 className="font-medium">{person.name}</h3>
                   <p className="text-xs opacity-80">
-                    Total rides completed:{' '}
-                    {/* // TODO: Add total number of ride made with that person */}
-                    <strong>{Math.floor(Math.random() * 20) + 1}</strong>
+                    Total rides completed: <strong>{person.rideCount}</strong>
                   </p>
                 </div>
               </div>

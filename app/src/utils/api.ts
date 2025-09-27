@@ -1,5 +1,10 @@
-import { API_USER_AVERAGE_SCORE } from '../constants/api';
+import {
+  API_USER_AVERAGE_SCORE,
+  API_USER_PEOPLE_IMPACTED,
+} from '../constants/api';
+
 import { AverageScoreResult } from '../interfaces/types';
+
 import { createEmptyEmojiBreakdown } from './utils';
 
 export async function apiFetch<T>(
@@ -22,6 +27,26 @@ export async function apiFetch<T>(
 }
 
 /**
+ * Helper function to build full API URL with parameter substitution
+ * @param apiEndpoint - The API endpoint constant (e.g., API_USER_AVERAGE_SCORE)
+ * @param params - Object containing parameter replacements (e.g., { userId: '123' })
+ * @returns Full API URL ready for fetch
+ */
+function buildApiUrl(
+  apiEndpoint: string,
+  params: Record<string, string>,
+): string {
+  let url = apiEndpoint;
+
+  // Replace all parameters in the endpoint (e.g., :userId -> actual ID)
+  Object.entries(params).forEach(([key, value]) => {
+    url = url.replace(`:${key}`, value);
+  });
+
+  return `${import.meta.env.VITE_API_BASE_URL}${url}`;
+}
+
+/**
  * Fetches the average score for a user from the server
  * @param userId - The user ID to fetch the score for
  * @returns Promise resolving to the average score result
@@ -30,9 +55,9 @@ export const fetchUserAverageScore = async (
   userId: number,
 ): Promise<AverageScoreResult> => {
   try {
-    const url = API_USER_AVERAGE_SCORE.replace(':userId', userId.toString());
-    const fullUrl = `${import.meta.env.VITE_API_BASE_URL}${url}`;
-
+    const fullUrl = buildApiUrl(API_USER_AVERAGE_SCORE, {
+      userId: userId.toString(),
+    });
     const response = await apiFetch<AverageScoreResult>(fullUrl);
     return response;
   } catch (error) {
@@ -42,6 +67,49 @@ export const fetchUserAverageScore = async (
       averageScore: null,
       totalFeedback: 0,
       emojiBreakdown: createEmptyEmojiBreakdown(),
+    };
+  }
+};
+
+/**
+ * Fetches people impacted data for a user (users they've ridden with and ride counts)
+ * @param userId - The user ID to fetch people impacted data for
+ * @returns Promise resolving to array of people with ride counts
+ */
+export const fetchPeopleImpacted = async (
+  userId: number,
+): Promise<{
+  people: Array<{
+    id: number;
+    name: string;
+    img: string;
+    rideCount: number;
+  }>;
+  totalImpacted: number;
+}> => {
+  try {
+    const fullUrl = buildApiUrl(API_USER_PEOPLE_IMPACTED, {
+      userId: userId.toString(),
+    });
+
+    const response = await apiFetch<{
+      people: Array<{
+        id: number;
+        name: string;
+        img: string;
+        rideCount: number;
+      }>;
+      totalImpacted: number;
+    }>(fullUrl);
+
+    return response;
+  } catch (error) {
+    console.error('Error fetching people impacted data:', error);
+
+    // Return empty data as fallback
+    return {
+      people: [],
+      totalImpacted: 0,
     };
   }
 };
