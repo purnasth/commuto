@@ -1,3 +1,4 @@
+import { RideFormData } from '../interfaces/types';
 import type { UserDetails } from '../interfaces/types';
 
 import { KARMA } from '../constants/enums';
@@ -299,3 +300,13 @@ export const capitalize = (str: string): string => {
 
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
+
+/**
+ * Generate feedback key for localStorage based on ride and user
+ */
+export function getFeedbackKey(
+  ride: Pick<RideFormData, 'id'>,
+  userId: number | null | undefined,
+): string {
+  return `feedback_${ride.id}_${userId ?? ''}`;
+}

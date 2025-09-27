@@ -146,3 +146,9 @@ export interface AverageScoreResult {
     [key: number]: number;
   };
 }
+
+export interface RideStatusChangedEventDetail {
+  status: RIDE_STATUS;
+  ride?: RideFormData;
+  role?: USER_ROLE;
+}

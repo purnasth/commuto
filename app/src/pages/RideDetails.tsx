@@ -10,16 +10,27 @@ import {
 } from 'react-icons/md';
 import { IoClose } from 'react-icons/io5';
 import { FaWalking } from 'react-icons/fa';
-import { TbAlarm, TbCircleDashed, TbMapPin, TbMapSearch } from 'react-icons/tb';
+import {
+  TbAlarm,
+  TbMapPin,
+  TbMapSearch,
+  TbCircleDashed,
+  TbInfoCircleFilled,
+} from 'react-icons/tb';
 
-import { RideFormData, UserDetails } from '../interfaces/types';
+import {
+  UserDetails,
+  RideFormData,
+  RideStatusChangedEventDetail,
+} from '../interfaces/types';
 
-import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
+import { CUSTOM_EVENTS, RIDE_STATUS, USER_ROLE } from '../constants/enums';
 
 import { apiFetch } from '../utils/api';
 import { useSocket } from '../utils/useSocket';
-import { formatFullDate } from '../utils/functions';
 import { determineMatchedUser } from '../utils/utils';
+import { dispatchRideStatusChanged } from '../utils/customEvents';
+import { formatFullDate, getFeedbackKey } from '../utils/functions';
 
 import FeedbackModal from '../components/FeedbackModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -69,14 +80,12 @@ const MatchedUserCard: React.FC<{ matchedUser: UserDetails }> = ({
           className="transition-150 rounded-full border bg-green-600 px-6 py-2.5 text-lg text-green-50 transition hover:bg-green-400 hover:text-green-900 dark:bg-green-500 dark:text-green-950 dark:hover:bg-green-700 dark:hover:text-green-100"
         >
           <MdLocalPhone className="scale-125" />
-          {/* {matchedUser.phone} */}
         </Link>
         <Link
           to={`mailto:${matchedUser.email}`}
           className="transition-150 rounded-full border bg-amber-400 px-6 py-2.5 text-lg text-amber-50 transition hover:bg-amber-200 hover:text-amber-600 dark:bg-amber-300 dark:text-amber-900 dark:hover:bg-amber-400 dark:hover:text-amber-950"
         >
           <MdEmail className="scale-125" />
-          {/* {matchedUser.email} */}
         </Link>
       </div>
     </div>
@@ -101,12 +110,11 @@ const RideActionButton: React.FC<{
   // Check if user has already provided feedback
   const hasFeedbackPending =
     localStorage.getItem('rideStatus') === RIDE_STATUS.COMPLETED;
-  const feedbackKey = `feedback_${rideDetails.id}_${user?.id}`;
-  const hasSubmittedFeedback = localStorage.getItem(feedbackKey) === 'true';
+  const feedbackKey = getFeedbackKey(rideDetails, user?.id);
+  const HAS_SUBMITTED_FEEDBACK = localStorage.getItem(feedbackKey) === 'true';
 
   const handleClick = async () => {
-    if (hasSubmittedFeedback) {
-      // User already submitted feedback, don't show modal
+    if (HAS_SUBMITTED_FEEDBACK) {
       toast.info('You have already submitted feedback for this ride.');
       return;
     }
@@ -133,14 +141,6 @@ const RideActionButton: React.FC<{
   const handleCancelComplete = () => {
     setShowConfirmModal(false);
   };
-
-  if (hasSubmittedFeedback) {
-    return (
-      <div className="rounded-full border border-green-200 bg-green-100 px-7 py-3 text-sm text-green-700">
-        <span className="font-medium">✓ Feedback Submitted</span>
-      </div>
-    );
-  }
 
   const buttonText =
     isCompleted || hasFeedbackPending
@@ -185,11 +185,6 @@ const RideDetails: React.FC = () => {
   const { showFeedbackPopup, setShowFeedbackPopup } = useSocket();
   const [user, setUser] = useState<{ id: number } | null>(null);
   const [matchedUser, setMatchedUser] = useState<UserDetails | null>(null);
-  // const from = searchParams.get('from');
-  // const to = searchParams.get('to');
-  // const message = searchParams.get('message');
-  // const role = searchParams.get('role');
-  // const timestamp = searchParams.get('timestamp');
 
   const [rideDetails, setRideDetails] = useState(() => {
     const savedRide = localStorage.getItem('activeRide');
@@ -207,6 +202,40 @@ const RideDetails: React.FC = () => {
     if (userStr) {
       setUser(JSON.parse(userStr));
     }
+  }, []);
+
+  // Listen for ride status changes from socket events
+  useEffect(() => {
+    const handleStatusChange = (event: Event) => {
+      const customEvent = event as CustomEvent<RideStatusChangedEventDetail>;
+
+      if (customEvent.detail.status === RIDE_STATUS.COMPLETED) {
+        // Update ride details if ride data is provided
+        if (customEvent.detail.ride) {
+          setRideDetails((prev: RideFormData) => ({
+            ...prev,
+            ...customEvent.detail.ride,
+          }));
+        } else {
+          setRideDetails((prev: RideFormData) => ({
+            ...prev,
+            status: RIDE_STATUS.COMPLETED,
+          }));
+        }
+      }
+    };
+
+    window.addEventListener(
+      CUSTOM_EVENTS.RIDE_STATUS_CHANGED,
+      handleStatusChange,
+    );
+
+    return () => {
+      window.removeEventListener(
+        CUSTOM_EVENTS.RIDE_STATUS_CHANGED,
+        handleStatusChange,
+      );
+    };
   }, []);
 
   // Fetch full ride details with matched user information
@@ -246,6 +275,13 @@ const RideDetails: React.FC = () => {
     return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(rideDetails.from)}%3B${encodeURIComponent(rideDetails.to)}`;
   };
 
+  // Check if feedback is pending and user hasn't submitted feedback
+  const feedbackKey = getFeedbackKey(rideDetails, user?.id);
+  const HAS_SUBMITTED_FEEDBACK = localStorage.getItem(feedbackKey) === 'true';
+  const showFeedbackBanner =
+    rideDetails.status === RIDE_STATUS.COMPLETED && !HAS_SUBMITTED_FEEDBACK;
+
+  // Handle ride completion - SocketManager will handle toast notifications
   const handleCompleteRide = async (ride: RideFormData) => {
     if (!user?.id) {
       console.error('User not found');
@@ -264,16 +300,16 @@ const RideDetails: React.FC = () => {
         },
       );
 
-      // Clean up local storage and trigger status update
+      // Update local state - SocketManager will handle toast notifications for both users
+      setRideDetails((prev: RideFormData) => ({
+        ...prev,
+        status: RIDE_STATUS.COMPLETED,
+      }));
       localStorage.removeItem('activeRide');
       localStorage.setItem('rideStatus', RIDE_STATUS.COMPLETED);
 
-      // Trigger a custom event to notify other components of the status change
-      window.dispatchEvent(
-        new CustomEvent('rideStatusChanged', {
-          detail: { status: RIDE_STATUS.COMPLETED },
-        }),
-      );
+      // Dispatch event for other components
+      dispatchRideStatusChanged({ status: RIDE_STATUS.COMPLETED });
     } catch (error) {
       console.error('Error completing ride:', error);
     }
@@ -281,7 +317,7 @@ const RideDetails: React.FC = () => {
 
   return (
     <>
-      <main>
+      <main className="relative z-30">
         <h1 className="mb-5 text-center text-xl font-semibold text-teal-500 md:text-2xl">
           Ride Details
         </h1>
@@ -394,7 +430,19 @@ const RideDetails: React.FC = () => {
             )}
           </div>
         </div>
+
+        {showFeedbackBanner && (
+          <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-amber-300/50 bg-gradient-to-br from-amber-300 via-amber-50 to-amber-200 py-2 pl-3 pr-4 text-sm font-medium text-amber-900 backdrop-blur-sm transition-all duration-300">
+            <TbInfoCircleFilled className="mr-2 inline-block scale-150 text-base text-amber-700" />
+            {`Complete this feedback form to redeem your ${
+              rideDetails.role === USER_ROLE.RIDER
+                ? 'karma points.'
+                : 'credit score.'
+            }`}
+          </div>
+        )}
       </main>
+
       {showFeedbackPopup && (
         <FeedbackModal
           onClose={() => setShowFeedbackPopup(false)}

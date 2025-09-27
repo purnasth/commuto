@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 
-import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import { useForm } from 'react-hook-form';
 import 'react-toastify/dist/ReactToastify.css';
@@ -22,6 +21,7 @@ import { findRideFormFields } from '../constants/data';
 import { rideFormSchema } from '../schemas/formSchema';
 
 import { apiFetch } from '../utils/api';
+import { useSocket } from '../utils/useSocket';
 import { useRideEvent } from '../utils/useRideEvent';
 
 import { RideFormData, RideBarProps, UserDetails } from '../interfaces/types';
@@ -49,10 +49,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [ridesFound, setRidesFound] = useState<RideFormData[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showRideStatusModal, setShowRideStatusModal] = useState(false);
-  const [socket] = useState(() => io(import.meta.env.VITE_SOCKET_URL));
-  const [, setNotifications] = useState<string[]>([]);
   const [user, setUser] = useState<{ id: number } | null>(null);
+
   const navigate = useNavigate();
+  const { socket } = useSocket();
   const showRideBar = useScrollVisibility(100);
 
   // Use the new hook to get real backend ride data
@@ -317,8 +317,11 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   }, []);
 
   useEffect(() => {
+    // Only set up socket listeners if socket is available
+    if (!socket) return;
+
     const registerUserOnConnect = () => {
-      if (user?.id) {
+      if (user?.id && socket) {
         socket.emit('registerUser', user.id.toString());
       }
     };
@@ -329,39 +332,22 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       registerUserOnConnect();
     }
 
-    socket.on('rideConfirmed', (payload) => {
-      console.log('Ride confirmed notification received:', payload);
-
-      let notificationMessage = `Ride ${payload.id} from ${payload.from} to ${payload.to} has been confirmed!`;
-
-      if (payload.riderId === user?.id || payload.passengerId === user?.id) {
-        notificationMessage = `Your ride (${payload.id}) has been confirmed!`;
-      } else {
-        notificationMessage = `A ride you requested/are interested in (${payload.id}) has been confirmed!`;
-      }
-      setNotifications((prev) => [...prev, notificationMessage]);
-
-      // Update the status of the specific ride(s) in your local state
-      setRidesFound((prevRides) =>
-        prevRides.map((ride) =>
-          ride.id === payload.id ? { ...ride, status: payload.status } : ride,
-        ),
-      );
-    });
-
     // Listen for ride status updates (including expiry)
-    socket.on('rideStatusUpdate', (payload) => {
-      if (payload.userId === user?.id) {
-        if (payload.status === RIDE_STATUS.EXPIRED) {
-          // Handle ride expiry
-          setShowRideStatusModal(false);
-          setLastSearchParams(null);
-        }
+    socket.on(
+      'rideStatusUpdate',
+      (payload: { userId: number; status: string }) => {
+        if (payload.userId === user?.id) {
+          if (payload.status === RIDE_STATUS.EXPIRED) {
+            // Handle ride expiry
+            setShowRideStatusModal(false);
+            setLastSearchParams(null);
+          }
 
-        // Refetch current ride data to get updated status
-        refetchCurrentRide();
-      }
-    });
+          // Refetch current ride data to get updated status
+          refetchCurrentRide();
+        }
+      },
+    );
 
     socket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
@@ -369,7 +355,6 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
     return () => {
       socket.off('connect', registerUserOnConnect);
-      socket.off('rideConfirmed');
       socket.off('rideStatusUpdate');
       socket.off('disconnect');
     };
@@ -485,7 +470,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
           status: RIDE_STATUS.CONFIRMED,
           riderId: ride.riderId,
         });
-        toast.success('Congratulations! Your ride has been confirmed!');
+        // Toast notification will be handled by SocketManager for both users
         setShowModal(false);
       } catch (apiError) {
         console.error('Failed to fetch user rides or confirm:', apiError);

@@ -104,6 +104,18 @@ export const KARMA = 'karma';
 export const LS_RIDE_FORM_DATA_KEY = 'rideFormData';
 
 /**
+ * Custom event names used throughout the application.
+ * Use these constants to avoid hardcoded event strings and typos.
+ * 
+ * Example usage:
+ *   window.addEventListener(CUSTOM_EVENTS.RIDE_STATUS_CHANGED, handler);
+ *   window.dispatchEvent(new CustomEvent(CUSTOM_EVENTS.RIDE_STATUS_CHANGED, { detail: { status } }));
+ */
+export const CUSTOM_EVENTS = {
+  RIDE_STATUS_CHANGED: 'rideStatusChanged',
+} as const;
+
+/**
  * Configuration for avatar grid display.
  * Use this constant to manage avatar grid settings in one place.
  */
