@@ -15,6 +15,8 @@ import { ROUTE_PROFILE } from '../constants/routes';
 import { API_RIDES_FEEDBACK } from '../constants/api';
 
 import { apiFetch } from '../utils/api';
+import { dispatchRideStatusChanged } from '../utils/customEvents';
+
 import Modal from './ui/Modal';
 
 interface FeedbackModalProps {
@@ -193,11 +195,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       const updateStatusAndTriggerSync = (status: string) => {
         localStorage.setItem('rideStatus', status);
         // Trigger a custom event to notify other components of the status change
-        window.dispatchEvent(
-          new CustomEvent('rideStatusChanged', {
-            detail: { status },
-          }),
-        );
+        dispatchRideStatusChanged({ status });
       };
 
       if (response.feedbackComplete) {
