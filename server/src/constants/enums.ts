@@ -47,19 +47,17 @@ export const RIDE_EXPIRATION_GRACE_MINUTES = 5;
  * and easier querying/sorting.
  */
 export enum FEEDBACK_EMOJI {
-  SATISFIED = 0, // 😊 - Satisfied
-  NEUTRAL = 1, // 😐 - Neutral
-  DISSATISFIED = 2, // 😠 - Dissatisfied/Not satisfied
+  SATISFIED = 0,
+  NEUTRAL = 1,
+  DISSATISFIED = 2,
 }
 
 /**
- * Feedback system points configuration
+ * Distance tiers for karma multipliers (in kilometers)
  */
-export const FEEDBACK_POINTS = {
-  BASE_POINTS: 20,
-  BONUS_POINTS: {
-    [FEEDBACK_EMOJI.SATISFIED]: 5,
-    [FEEDBACK_EMOJI.NEUTRAL]: 2,
-    [FEEDBACK_EMOJI.DISSATISFIED]: 0,
-  },
-} as const;
+export enum DISTANCE_TIER {
+  SHORT = 'short',
+  MEDIUM = 'medium',
+  LONG = 'long',
+  VERY_LONG = 'very_long',
+}

@@ -20,6 +20,7 @@ import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 import { Ride, User, Feedback } from 'generated/prisma';
 
 import { PrismaService } from './prisma.service';
+import { KarmaCalculationService } from './services/karma-calculation.service';
 
 import { RideGateway } from './rides/rides.gateway';
 
@@ -29,16 +30,17 @@ import {
   USER_ROLE,
   RIDE_STATUS,
   FEEDBACK_EMOJI,
-  FEEDBACK_POINTS,
   RIDE_MATCH_WINDOW_MINUTES,
   RIDE_EXPIRATION_GRACE_MINUTES,
 } from './constants/enums';
+import { TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING } from './constants/constants';
 
 import {
   RideDto,
   FeedbackDto,
   ConfirmRideDto,
   AverageScoreResult,
+  KarmaCalculationResult,
 } from './interfaces/types';
 
 import {
@@ -252,11 +254,11 @@ export class RideController {
       throw new BadRequestException('Missing required feedback fields');
     }
 
-    const validEmojis = Object.values(FEEDBACK_EMOJI);
+    const validFeedbackRatings = Object.values(FEEDBACK_EMOJI);
 
-    if (!validEmojis.includes(body.emoji)) {
+    if (!validFeedbackRatings.includes(body.emoji)) {
       throw new BadRequestException(
-        `Invalid emoji. Must be one of: ${validEmojis.join(', ')} (0=😊, 1=😐, 2=😠)`,
+        `Invalid feedback rating. Must be one of: ${validFeedbackRatings.join(', ')} (0=Satisfied, 1=Neutral, 2=Dissatisfied)`,
       );
     }
 
@@ -332,10 +334,46 @@ export class RideController {
       throw new BadRequestException('Error creating feedback');
     }
 
-    // Calculate points based on emoji using enum system
-    const basePoints = FEEDBACK_POINTS.BASE_POINTS;
-    const bonusPoints = FEEDBACK_POINTS.BONUS_POINTS[body.emoji] ?? 0;
-    const totalPoints = basePoints + bonusPoints;
+    const rideDistance = ride.distance;
+
+    if (!rideDistance) {
+      this.logger.log({
+        level: 'warn',
+        message: `Distance not found for completed ride (rideId=${body.rideId}, status=${ride.status})`,
+        tag: 'feedback',
+        rideId: body.rideId,
+        rideStatus: ride.status,
+      });
+    }
+
+    const karmaResult: KarmaCalculationResult =
+      KarmaCalculationService.calculateKarmaPoints({
+        distance: rideDistance,
+        feedbackRating: body.emoji,
+      });
+
+    const totalPoints = karmaResult.totalPoints;
+
+    this.logger.log({
+      level: 'info',
+      message: `Karma calculation completed using ${TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING} algorithm`,
+      tag: 'feedback',
+      rideId: body.rideId,
+      fromUserId: body.fromUserId,
+      algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
+      calculation: {
+        distance: rideDistance,
+        rating: body.emoji,
+        ratingDescription: KarmaCalculationService.getFeedbackRatingDescription(
+          body.emoji,
+        ),
+        distanceTier: karmaResult.distanceTier,
+        distanceMultiplier: karmaResult.distanceMultiplier,
+        sentimentBonus: karmaResult.sentimentBonus,
+        totalPoints: karmaResult.totalPoints,
+        formula: karmaResult.formula,
+      },
+    });
 
     // Update user scores based on their role
     if (body.role === USER_ROLE.RIDER) {
@@ -351,16 +389,27 @@ export class RideController {
           userId: body.fromUserId,
           points: totalPoints,
           type: 'earned',
-          reason: `Ride feedback: emoji ${body.emoji} (${basePoints} base + ${bonusPoints} bonus)`,
+          reason: `Ride feedback: ${KarmaCalculationService.getFeedbackRatingDescription(body.emoji)} | Distance: ${rideDistance || 'N/A'}km | Points: ${totalPoints}`,
         },
       });
 
       this.logger.log({
         level: 'info',
-        message: `Karma points awarded to rider ${body.fromUserId}: ${totalPoints} points`,
+        message: `Karma points awarded to rider using distance-based algorithm`,
         tag: 'feedback',
         userId: body.fromUserId,
+        role: 'rider',
+        rideId: body.rideId,
+        algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
         points: totalPoints,
+        calculation: {
+          distance: rideDistance,
+          distanceTier: karmaResult.distanceTier,
+          basePoints: karmaResult.basePoints,
+          distanceMultiplier: karmaResult.distanceMultiplier,
+          sentimentBonus: karmaResult.sentimentBonus,
+          formula: karmaResult.formula,
+        },
       });
     } else if (body.role === USER_ROLE.PASSENGER) {
       // Update passenger's credit score
@@ -371,10 +420,21 @@ export class RideController {
 
       this.logger.log({
         level: 'info',
-        message: `Credit score awarded to passenger ${body.fromUserId}: ${totalPoints} points`,
+        message: `Credit score awarded to passenger using distance-based algorithm`,
         tag: 'feedback',
         userId: body.fromUserId,
+        role: 'passenger',
+        rideId: body.rideId,
+        algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
         points: totalPoints,
+        calculation: {
+          distance: rideDistance,
+          distanceTier: karmaResult.distanceTier,
+          basePoints: karmaResult.basePoints,
+          distanceMultiplier: karmaResult.distanceMultiplier,
+          sentimentBonus: karmaResult.sentimentBonus,
+          formula: karmaResult.formula,
+        },
       });
     }
 
@@ -411,6 +471,21 @@ export class RideController {
         comment: feedback.comment,
       } as FeedbackDto,
       pointsAwarded: totalPoints,
+      karmaCalculation: {
+        algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
+        distance: rideDistance,
+        distanceTier: karmaResult.distanceTier,
+        distanceTierDescription:
+          KarmaCalculationService.getDistanceTierDescription(
+            karmaResult.distanceTier,
+          ),
+        basePoints: karmaResult.basePoints,
+        distanceMultiplier: karmaResult.distanceMultiplier,
+        sentimentBonus: karmaResult.sentimentBonus,
+        totalPoints: karmaResult.totalPoints,
+        formula: karmaResult.formula,
+        breakdown: karmaResult.breakdown,
+      },
       user: updatedUser,
       feedbackComplete: bothSubmitted,
       waitingForOtherUser: !bothSubmitted,
