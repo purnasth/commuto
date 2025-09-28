@@ -84,10 +84,10 @@ const PeopleImpactedWithScore = ({ userId }: PeopleAvatarGridProps) => {
                   <img
                     src={hasData ? person!.img : DEFAULT_AVATAR_URL}
                     alt={hasData ? person!.name : 'Unlock slot'}
-                    className={`transition-150 inline-block aspect-square size-9 rounded-full bg-white object-cover group-hover:scale-110 dark:bg-dark md:size-11 ${
+                    className={`transition-150 inline-block aspect-square size-9 rounded-full bg-light object-cover group-hover:scale-110 dark:bg-dark md:size-11 ${
                       hasData
                         ? 'border-2 border-teal-300 group-hover:border-teal-400 dark:border-teal-700 dark:group-hover:border-teal-600'
-                        : 'transition-150 border-2 border-teal-300 bg-light p-1 grayscale hover:grayscale-0 group-hover:border-teal-400 dark:border-0 dark:border-teal-700 dark:bg-dark dark:group-hover:border-teal-600'
+                        : 'transition-150 border-2 border-teal-300 bg-light p-1 group-hover:border-teal-400 dark:border-0 dark:border-teal-700 dark:bg-dark dark:group-hover:border-teal-600'
                     }`}
                   />
                 </Tooltip>
