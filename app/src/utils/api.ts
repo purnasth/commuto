@@ -1,9 +1,11 @@
 import {
   API_USER_AVERAGE_SCORE,
+  API_USER_DETAILS,
+  API_USER_LOGOUT,
   API_USER_PEOPLE_IMPACTED,
 } from '../constants/api';
 
-import { AverageScoreResult } from '../interfaces/types';
+import { AverageScoreResult, UserDetails } from '../interfaces/types';
 
 import { createEmptyEmojiBreakdown } from './utils';
 
@@ -112,4 +114,29 @@ export const fetchPeopleImpacted = async (
       totalImpacted: 0,
     };
   }
+};
+
+/**
+ * Fetches user details from the server using email
+ * @param email - The user's email address
+ * @returns Promise resolving to user details
+ */
+export const getUserDetails = async (email: string) => {
+  const fullUrl = buildApiUrl(API_USER_DETAILS, { email });
+
+  return apiFetch<{ user: UserDetails }>(fullUrl);
+};
+
+/**
+ * Calls the logout API for the user
+ * @param email - The user's email address
+ * @returns Promise resolving when logout is complete
+ */
+export const logoutUser = async (email: string) => {
+  const fullUrl = buildApiUrl(API_USER_LOGOUT, {});
+
+  return apiFetch(fullUrl, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
 };
