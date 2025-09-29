@@ -8,8 +8,11 @@ import {
 } from 'react-icons/md';
 
 import { UserDetails } from '../interfaces/types';
-import { getStoredUser } from '../utils/functions';
+
 import { ROUTE_LOGIN } from '../constants/routes';
+
+import { getUserDetails } from '../utils/api';
+
 import ConfirmDialog from './ui/ConfirmDialog';
 
 const UserCard: React.FC = () => {
@@ -17,16 +20,25 @@ const UserCard: React.FC = () => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
-    const storedUser = getStoredUser();
+    //TODO:  Get user email from auth context or similar
 
-    if (storedUser) {
-      setUser(storedUser);
-    }
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const email = storedUser?.email;
+
+    if (!email) return;
+
+    getUserDetails(email)
+      .then((data) => {
+        if (data?.user) {
+          setUser(data.user);
+        } else {
+          toast.error('User not found');
+        }
+      })
+      .catch(() => {
+        toast.error('Failed to fetch user details from server');
+      });
   }, []);
-
-  // TODO: Use navigation for logout after state management is implemented
-  // Currently, we are using window.location.href to redirect after logout
-  // This is a temporary solution until we have a proper state management system in place
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
@@ -49,6 +61,7 @@ const UserCard: React.FC = () => {
     <>
       {user && (
         <div className="relative">
+          {/* ...existing code... */}
           <div className="pointer-events-none absolute -left-[20%] top-1/3 -z-10 size-48 rounded-full bg-teal-300 blur-[80px]" />
           <div className="pointer-events-none absolute -bottom-32 -right-10 -z-10 size-32 rounded-full bg-teal-300 blur-[50px]" />
 
