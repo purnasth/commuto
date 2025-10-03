@@ -15,12 +15,12 @@ import FAQPage from './pages/FAQPage';
 import Error404 from './pages/Error404';
 import AboutPage from './pages/AboutPage';
 import LegalPage from './pages/LegalPage';
+import RedeemPage from './pages/RedeemPage';
 import RideDetails from './pages/RideDetails';
 import RoleBasedPage from './pages/RoleBasedPage';
 import LogsDashboard from './pages/LogsDashboard';
 import SelfReflection from './pages/SelfReflection';
 import { SocketManager } from './components/SocketManager';
-import RedeemPage from './pages/RedeemPage';
 
 import {
   ROUTE_404,
@@ -31,12 +31,14 @@ import {
   ROUTE_LOGIN,
   ROUTE_BRAND,
   ROUTE_LEGAL,
+  ROUTE_REDEEM,
   ROUTE_PROFILE,
+  ROUTE_VIEW_SCORE,
   ROUTE_RIDE_DETAILS,
   ROUTE_LOGS_DASHBOARD,
-  ROUTE_REDEEM,
 } from './constants/routes';
 import { RideEventProvider } from './contexts/RideEventContext';
+import ViewScore from './pages/ViewScore';
 
 const App: React.FC = () => {
   const theme = useTheme();
@@ -60,6 +62,7 @@ const App: React.FC = () => {
               <Route path={ROUTE_LEGAL} element={<LegalPage />} />
               <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
               <Route path={ROUTE_REDEEM} element={<RedeemPage />} />
+              <Route path={ROUTE_VIEW_SCORE} element={<ViewScore />} />
               <Route path={ROUTE_404} element={<Error404 />} />
             </Routes>
             <Footer />
