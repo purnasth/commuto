@@ -1,9 +1,8 @@
-// TODO: add passenger perspective as this page is only designed for the rider self reflection
-
 import { FaAward } from 'react-icons/fa6';
 import { useNavigate } from 'react-router-dom';
 
 import { ReflectionStats, RideHistory } from '../interfaces/types';
+import { USER_ROLE } from '../constants/enums';
 import { ROUTE_REDEEM } from '../constants/routes';
 
 import UserCard from './UserCard';
@@ -16,11 +15,13 @@ interface ReflectionDashboardProps {
   stats: ReflectionStats;
   completedRides: RideHistory[];
   currentUserId: number;
+  userRole: USER_ROLE;
 }
 
 const ReflectionDashboard = ({
   stats,
   currentUserId,
+  userRole,
 }: ReflectionDashboardProps) => {
   const navigate = useNavigate();
 
@@ -42,16 +43,21 @@ const ReflectionDashboard = ({
             />
           </div>
 
-          {/* // TODO fix this on passenger profile it shows 0 */}
           <div className="relative flex flex-col items-center rounded-xl border border-teal-300 bg-gradient-to-br from-teal-200 via-teal-300 to-teal-400 p-4 text-center shadow dark:from-teal-300 dark:via-teal-400 dark:to-teal-500 md:p-6">
             <span className="text-base font-semibold text-teal-900 md:text-lg">
-              Ride Posted
+              {userRole === USER_ROLE.RIDER
+                ? 'Rides Posted'
+                : 'Rides Requested'}
             </span>
             <h3 className="text-5xl font-extrabold text-teal-800 drop-shadow">
               {stats.postedCount}
             </h3>
             <TitleBar
-              content="Total rides you have offered"
+              content={
+                userRole === USER_ROLE.RIDER
+                  ? 'Total rides you have offered'
+                  : 'Total rides you have requested'
+              }
               position="-top-2"
               color="teal"
             />
@@ -83,25 +89,33 @@ const ReflectionDashboard = ({
             </svg>
             <div className="text-center">
               <span className="text-5xl font-extrabold text-amber-600">
-                {stats.karmaPoints}
+                {userRole === USER_ROLE.RIDER
+                  ? stats.karmaPoints
+                  : stats.creditScore}
               </span>
-              <p className="font-semibold text-amber-700">Karma Points</p>
+              <p className="font-semibold text-amber-700">
+                {userRole === USER_ROLE.RIDER ? 'Karma Points' : 'Credit Score'}
+              </p>
             </div>
           </div>
           <p className="mt-4 text-center text-xs text-amber-900">
-            Karma Points are rewards you earn for sharing rides and helping
-            others reduce their carbon footprint. The more you contribute, the
-            more points you collect!
+            {userRole === USER_ROLE.RIDER
+              ? 'Karma Points are rewards you earn for sharing rides and helping others reduce their carbon footprint. The more you contribute, the more points you collect!'
+              : 'Credit Score reflects your reliability as a passenger. Higher scores are earned through positive feedback from riders and responsible ride behavior.'}
           </p>
 
           <button
             className="mt-5 rounded-full border border-dark/20 bg-amber-400 px-8 py-2 font-bold text-amber-900 shadow transition hover:bg-amber-500"
             onClick={() => navigate(ROUTE_REDEEM)}
           >
-            Redeem
+            {userRole === USER_ROLE.RIDER ? 'Redeem' : 'View Score'}
           </button>
           <TitleBar
-            content="Redeem your Karma Points for exclusive rewards"
+            content={
+              userRole === USER_ROLE.RIDER
+                ? 'Redeem your Karma Points for exclusive rewards'
+                : 'Build your reputation through positive ride experiences'
+            }
             position="top-2"
             color="amber"
           />
@@ -109,8 +123,9 @@ const ReflectionDashboard = ({
 
         <div className="relative flex w-full flex-col items-center rounded-2xl border border-sky-300 bg-gradient-to-br from-sky-200 to-blue-100 p-6 shadow-lg dark:from-sky-300 dark:to-blue-200">
           <p className="mb-2 text-center text-xs text-sky-900">
-            Total distance you have travelled by sharing rides. Every kilometer
-            counts towards a greener planet!
+            {userRole === USER_ROLE.RIDER
+              ? 'Total distance you have travelled by sharing rides. Every kilometer counts towards a greener planet!'
+              : 'Total distance you have travelled as a passenger. Every shared ride helps reduce carbon emissions!'}
           </p>
           <div className="flex w-full flex-col items-center">
             <div className="mb-1 flex w-full items-center justify-between">
@@ -125,7 +140,11 @@ const ReflectionDashboard = ({
           </div>
 
           <TitleBar
-            content="Keep going! More distance, more impact."
+            content={
+              userRole === USER_ROLE.RIDER
+                ? 'Keep going! More distance, more impact.'
+                : 'Every ride shared makes a difference!'
+            }
             position="-bottom-2"
             color="sky"
           />
@@ -202,12 +221,17 @@ const ReflectionDashboard = ({
               </span>
             </div>
             <p className="mt-4 text-center text-xs text-green-900">
-              You have helped reduce carbon emissions by sharing rides. Thank
-              you for your contribution to a cleaner environment!
+              {userRole === USER_ROLE.RIDER
+                ? 'You have helped reduce carbon emissions by sharing rides. Thank you for your contribution to a cleaner environment!'
+                : 'By choosing shared rides over individual transport, you have contributed to reducing carbon emissions. Every shared journey matters!'}
             </p>
 
             <TitleBar
-              content="Every ride you share makes the air cleaner!"
+              content={
+                userRole === USER_ROLE.RIDER
+                  ? 'Every ride you share makes the air cleaner!'
+                  : 'Your choice to share rides helps the planet!'
+              }
               position="-top-2"
               color="green"
             />
@@ -251,13 +275,17 @@ const ReflectionDashboard = ({
               Thank You!
             </span>
             <p className="mt-1 text-center text-xs text-amber-900">
-              Your positive impact is making the world a better place. We
-              appreciate your efforts in sharing rides and helping the
-              community!
+              {userRole === USER_ROLE.RIDER
+                ? 'Your positive impact is making the world a better place. We appreciate your efforts in sharing rides and helping the community!'
+                : 'Your participation in ridesharing is making a positive impact. Thank you for choosing sustainable transport and building community connections!'}
             </p>
 
             <TitleBar
-              content="Keep up the great work and collect more achievements!"
+              content={
+                userRole === USER_ROLE.RIDER
+                  ? 'Keep up the great work and collect more achievements!'
+                  : 'Continue building your reputation and making a difference!'
+              }
               position="-bottom-2"
               color="amber"
             />
