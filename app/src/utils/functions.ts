@@ -2,7 +2,7 @@ import { RideFormData } from '../interfaces/types';
 import type { UserDetails } from '../interfaces/types';
 
 import { KARMA } from '../constants/enums';
-import { API_USER_KARMA_POINTS } from '../constants/api';
+import { API_USER_KARMA_POINTS, API_USER_CREDIT_SCORE } from '../constants/api';
 
 /**
  * Truncates a location string to its first three comma-separated parts.
@@ -219,6 +219,29 @@ export async function fetchUserKarmaPoints(userId: number): Promise<number> {
   const data = await res.json();
 
   return typeof data.karmaPoints === 'number' ? data.karmaPoints : 0;
+}
+
+/**
+ * Fetches the credit score for a specific user by their user ID.
+ *
+ * Makes an HTTP GET request to the API endpoint to retrieve the user's credit score.
+ * Returns the number of credit score if available, otherwise returns 0.
+ *
+ * @param userId - The unique identifier of the user whose credit score is to be fetched.
+ * @returns A promise that resolves to the user's credit score as a number.
+ */
+export async function fetchUserCreditScore(userId: number): Promise<number> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  const url = `${baseUrl}${API_USER_CREDIT_SCORE.replace(':userId', String(userId))}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    return 0;
+  }
+
+  const data = await res.json();
+
+  return typeof data.creditScore === 'number' ? data.creditScore : 0;
 }
 
 /**

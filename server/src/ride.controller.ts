@@ -211,6 +211,32 @@ export class RideController {
     return { karmaPoints: user.karmaPoints };
   }
 
+  // TODO: this informations is already available on userDetails endpoint, consider removing this endpoint and using that one instead
+  @Get('/user/:id/credit-score')
+  /**
+   * Retrieves the credit score for a user by their ID.
+   *
+   * @param id - The ID of the user as a string.
+   * @returns An object containing the user's credit score.
+   * @throws {BadRequestException} If the provided ID is missing or invalid.
+   * @throws {NotFoundException} If the user with the given ID does not exist.
+   *
+   * TODO (refactor priority):
+   *   - Annotate return type with DTO (GetCreditScoreResponseDto)
+   *   - Add @Throttle() decorator for rate limiting
+   *   - Consider access control/auth guard for this endpoint
+   */
+  async getUserCreditScore(@Param('id', ParseIntPipe) userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { creditScore: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return { creditScore: user.creditScore };
+  }
+
   @Post('/feedback')
   // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
   //

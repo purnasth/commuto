@@ -96,6 +96,7 @@ export interface ReflectionStats {
   postedCount: number;
   confirmedCount: number;
   karmaPoints: number;
+  creditScore: number;
   distanceTravelled: number;
   co2Reduced: number;
   peopleImpacted: number;
