@@ -26,6 +26,7 @@ export class KarmaController {
     private readonly logger: WinstonLogger,
   ) {}
 
+  // TODO: Implement GET /karma/rewards endpoint when this is handled by the service
   /**
    * Get available rewards to redeem
    * GET /karma/rewards

@@ -43,7 +43,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
 
   const currentDate = getCurrentDate();
 
-  const voucherId = redemptionCode || generateVoucherId(reward.name);
+  const voucherId = redemptionCode || generateVoucherId(reward.name, userInfo.id);
   const redeemedAt = redemptionDate ? new Date(redemptionDate) : currentDate;
   const expiryDate = expiresAt ? new Date(expiresAt) : addMonthsToDate(currentDate, 1);
   

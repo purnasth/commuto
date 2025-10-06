@@ -1,7 +1,6 @@
 import { RideFormData } from '../interfaces/types';
 import type { UserDetails } from '../interfaces/types';
 
-import { KARMA } from '../constants/enums';
 import { API_USER_KARMA_POINTS, API_USER_CREDIT_SCORE } from '../constants/api';
 
 /**
@@ -286,16 +285,20 @@ export const addMonthsToDate = (
 /**
  * Generates a unique voucher ID
  * @param rewardName - The name of the reward
+ * @param userId - The ID of the user redeeming the reward
  * @returns A unique voucher ID
  */
-export const generateVoucherId = (rewardName: string): string => {
-  const timestamp = Date.now().toString().slice(0, 4);
+export const generateVoucherId = (
+  rewardName: string,
+  userId: number | string,
+): string => {
+  const timestamp = Date.now().toString().slice(-4);
   const abbreviation = rewardName
     .split(' ')
     .map((word) => word.charAt(0).toLowerCase())
     .join('');
 
-  return `${KARMA}${timestamp}${abbreviation}`;
+  return `KARMA-${timestamp}-U${userId}-${abbreviation}`;
 };
 
 /**
