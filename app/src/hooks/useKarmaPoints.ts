@@ -1,10 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { getStoredUser, fetchUserKarmaPoints } from '../utils/functions';
 
 export function useKarmaPoints() {
   const [karmaPoints, setKarmaPoints] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const refreshKarmaPoints = useCallback(async () => {
+    const user = getStoredUser();
+    if (user?.id) {
+      try {
+        const points = await fetchUserKarmaPoints(user.id);
+        setKarmaPoints(points);
+        setError(null);
+      } catch (err) {
+        setError('Failed to fetch karma points');
+        console.error('Error refreshing karma points:', err);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,5 +49,5 @@ export function useKarmaPoints() {
     };
   }, []);
 
-  return { karmaPoints, loading, error };
+  return { karmaPoints, loading, error, refreshKarmaPoints };
 }

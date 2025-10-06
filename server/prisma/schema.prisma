@@ -115,9 +115,14 @@ model KarmaTransaction {
   id        Int      @id @default(autoincrement())
   user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  points    Int // points earned or redeemed
-  type      String // 'earned' or 'redeemed'
+  points    Int
+  type      String
   reason    String?
+  rewardName String?
+  redemptionCode String?
+  status    RedemptionStatus?
+  expiresAt DateTime?
+  usedAt    DateTime?
   createdAt DateTime @default(now())
 }
 
@@ -135,4 +140,11 @@ model Feedback {
   createdAt  DateTime @default(now())
 
   @@unique([rideId, fromUserId, toUserId]) // Prevent duplicate feedback
+}
+
+enum RedemptionStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  LOCKED
 }

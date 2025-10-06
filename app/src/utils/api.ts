@@ -1,11 +1,21 @@
 import {
-  API_USER_AVERAGE_SCORE,
-  API_USER_DETAILS,
   API_USER_LOGOUT,
+  API_USER_DETAILS,
+  API_KARMA_REDEEM,
+  API_KARMA_REWARDS,
+  API_USER_AVERAGE_SCORE,
+  API_KARMA_UPDATE_STATUS,
   API_USER_PEOPLE_IMPACTED,
+  API_KARMA_USER_REDEMPTIONS,
 } from '../constants/api';
 
-import { AverageScoreResult, UserDetails } from '../interfaces/types';
+import {
+  UserDetails,
+  RewardResponse,
+  AverageScoreResult,
+  RedemptionResponse,
+  UserRedemptionsResponse,
+} from '../interfaces/types';
 
 import { createEmptyEmojiBreakdown } from './utils';
 
@@ -138,5 +148,76 @@ export const logoutUser = async (email: string) => {
   return apiFetch(fullUrl, {
     method: 'POST',
     body: JSON.stringify({ email }),
+  });
+};
+
+// Karma Redemption API Functions
+
+/**
+ * Get available rewards for redemption
+ * @returns Promise resolving to available rewards
+ */
+export const getAvailableRewards = async (): Promise<{
+  rewards: RewardResponse[];
+}> => {
+  const fullUrl = buildApiUrl(API_KARMA_REWARDS, {});
+  return apiFetch(fullUrl);
+};
+
+/**
+ * Redeem a reward for karma points
+ * @param rewardId - The ID of the reward to redeem
+ * @param userId - The user's ID
+ * @param rewardData - The reward data from frontend
+ * @returns Promise resolving to redemption response
+ */
+export const redeemReward = async (
+  rewardId: string,
+  userId: number,
+  rewardData: { name: string; points: number; description: string },
+): Promise<RedemptionResponse> => {
+  const fullUrl = buildApiUrl(API_KARMA_REDEEM, {});
+
+  return apiFetch(fullUrl, {
+    method: 'POST',
+    body: JSON.stringify({
+      rewardId,
+      rewardName: rewardData.name,
+      karmaPointsCost: rewardData.points,
+      description: rewardData.description,
+      userId,
+    }),
+  });
+};
+
+/**
+ * Get user's redemption history
+ * @param userId - The user's ID
+ * @returns Promise resolving to user's redemptions
+ */
+export const getUserRedemptions = async (
+  userId: number,
+): Promise<UserRedemptionsResponse> => {
+  const fullUrl = buildApiUrl(API_KARMA_USER_REDEMPTIONS, {
+    userId: userId.toString(),
+  });
+  return apiFetch(fullUrl);
+};
+
+/**
+ * Update redemption status (for admin/merchant use)
+ * @param redemptionCode - The redemption code
+ * @param status - The new status
+ * @returns Promise resolving to update confirmation
+ */
+export const updateRedemptionStatus = async (
+  redemptionCode: string,
+  status: string,
+): Promise<{ message: string }> => {
+  const fullUrl = buildApiUrl(API_KARMA_UPDATE_STATUS, { redemptionCode });
+
+  return apiFetch(fullUrl, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
   });
 };

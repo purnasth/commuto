@@ -1,4 +1,9 @@
-import { USER_ROLE, DISTANCE_TIER, FEEDBACK_EMOJI } from '../constants/enums';
+import {
+  USER_ROLE,
+  DISTANCE_TIER,
+  FEEDBACK_EMOJI,
+  REDEMPTION_STATUS,
+} from '../constants/enums';
 
 /**
  * DTO for ride creation and updates
@@ -132,4 +137,52 @@ export interface KarmaCalculationResult {
   formula: string;
   /** Step-by-step calculation breakdown */
   breakdown: KarmaCalculationBreakdown;
+}
+
+/**
+ * Response from the external rewards API
+ */
+export interface RewardConfig {
+  id: string;
+  name: string;
+  points: number;
+  description: string;
+}
+
+export type RewardId = string;
+
+/**
+ * Response interfaces for karma redemption
+ */
+export interface RedemptionResponseDto {
+  id: number;
+  userId: number;
+  rewardName: string;
+  karmaPointsCost: number;
+  redemptionCode: string;
+  status: REDEMPTION_STATUS;
+  expiresAt?: Date;
+  usedAt?: Date;
+  createdAt: Date;
+}
+
+export interface RedeemRewardResponseDto {
+  message: string;
+  redemption: RedemptionResponseDto;
+  remainingKarmaPoints: number;
+  success: boolean;
+}
+
+export interface UserRedemptionsResponseDto {
+  redemptions: Array<{
+    id: number;
+    rewardName: string;
+    karmaPointsCost: number;
+    redemptionCode: string;
+    status: string;
+    expiresAt: string | null;
+    usedAt: string | null;
+    redeemedAt: string;
+  }>;
+  total: number;
 }
