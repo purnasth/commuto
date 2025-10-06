@@ -142,6 +142,7 @@ export interface RideHistory {
 }
 
 export interface RedeemableReward {
+  id: string;
   name: string;
   points: number;
   description: string;
@@ -159,4 +160,42 @@ export interface RideStatusChangedEventDetail {
   status: RIDE_STATUS;
   ride?: RideFormData;
   role?: USER_ROLE;
+}
+
+// Karma Redemption Interfaces
+export interface RewardResponse {
+  id: string;
+  name: string;
+  cost: number;
+  description: string;
+}
+
+export interface RedemptionResponse {
+  message: string;
+  redemption: {
+    id: number;
+    rewardId: string;
+    rewardName: string;
+    karmaPointsCost: number;
+    redemptionCode: string;
+    status: string;
+    expiresAt: string;
+    redeemedAt: string;
+  };
+  remainingKarmaPoints: number;
+  success: boolean;
+}
+
+export interface UserRedemptionsResponse {
+  redemptions: Array<{
+    id: number;
+    rewardName: string;
+    karmaPointsCost: number;
+    redemptionCode: string;
+    status: string;
+    expiresAt: string | null;
+    usedAt: string | null;
+    redeemedAt: string;
+  }>;
+  total: number;
 }

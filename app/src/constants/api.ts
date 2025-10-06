@@ -21,3 +21,14 @@ export const API_AUTH_LOGIN = `${API_AUTH}/login`;
 export const API_USER_LOGOUT = `${API_AUTH}/logout`;
 
 export const API_USER_DETAILS = `${API_AUTH}/user?email=:email`;
+
+// Karma Redemption APIs
+export const API_KARMA = '/karma';
+
+export const API_KARMA_REWARDS = `${API_KARMA}/rewards`;
+
+export const API_KARMA_REDEEM = `${API_KARMA}/redeem`;
+
+export const API_KARMA_USER_REDEMPTIONS = `${API_KARMA}/user/:userId`;
+
+export const API_KARMA_UPDATE_STATUS = `${API_KARMA}/:redemptionCode/status`;

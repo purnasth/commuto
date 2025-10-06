@@ -25,29 +25,38 @@ interface GiftCardVoucherProps {
     email: string;
     id: string;
   };
+  redemptionCode?: string;
+  redemptionDate?: string;
+  expiresAt?: string;
 }
 
 const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
   reward,
   onClose,
   userInfo,
+  redemptionCode,
+  redemptionDate,
+  expiresAt,
 }) => {
   const voucherRef = useRef<HTMLDivElement>(null);
   const { generatePDF, isGenerating } = usePDFGenerator();
 
   const currentDate = getCurrentDate();
 
-  // Generate voucher ID and QR data using utility functions
-  const voucherId = generateVoucherId(reward.name);
+  const voucherId = redemptionCode || generateVoucherId(reward.name);
+  const redeemedAt = redemptionDate ? new Date(redemptionDate) : currentDate;
+  const expiryDate = expiresAt ? new Date(expiresAt) : addMonthsToDate(currentDate, 1);
+  
   const qrData = JSON.stringify({
     voucherId,
     rewardName: reward.name,
     points: reward.points,
     description: reward.description,
     redeemedBy: userInfo.name,
-    redeemedAt: currentDate.toISOString(),
+    redeemedAt: redeemedAt.toISOString(),
     userEmail: userInfo.email,
     userId: userInfo.id,
+    expiresAt: expiryDate.toISOString(),
   });
 
   const handleDownload = async () => {
@@ -160,7 +169,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
                         Valid until:
                       </label>
                       <p id="valid-until" className="text-2xl font-medium">
-                        {formatVoucherDate(addMonthsToDate(currentDate, 1))}
+                        {formatVoucherDate(expiryDate)}
                       </p>
                     </li>
                     <li className="flex flex-col">

@@ -1,3 +1,4 @@
+import { toast } from 'react-toastify';
 import { useMemo, useState, useEffect } from 'react';
 import Confetti from 'react-confetti';
 import { motion } from 'framer-motion';
@@ -5,6 +6,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { TbArrowNarrowLeft, TbGift, TbTrophy } from 'react-icons/tb';
 
 import { redeemables } from '../constants/data';
+
+import { redeemReward } from '../utils/api';
 
 import GiftCardVoucher from '../components/ui/GiftCardVoucher';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -27,7 +30,7 @@ import { useKarmaPoints } from '../hooks/useKarmaPoints';
 
 const RedeemPage = () => {
   const navigate = useNavigate();
-  const { karmaPoints } = useKarmaPoints();
+  const { karmaPoints, refreshKarmaPoints } = useKarmaPoints();
 
   // State for voucher popup
   const [selectedReward, setSelectedReward] = useState<RedeemableReward | null>(
@@ -36,8 +39,17 @@ const RedeemPage = () => {
   const [showVoucher, setShowVoucher] = useState(false);
   const [user, setUser] = useState<UserDetails | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-
-  // const karmaPoints = 200;
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [redemptionData, setRedemptionData] = useState<{
+    id: number;
+    rewardName: string;
+    karmaPointsCost: number;
+    redemptionCode: string;
+    status: string;
+    expiresAt: string;
+    redeemedAt: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Get real user data from localStorage
   useEffect(() => {
@@ -49,22 +61,67 @@ const RedeemPage = () => {
 
   const handleRedeemClick = (reward: RedeemableReward) => {
     setSelectedReward(reward);
+    setError(null);
     setShowConfirm(true);
   };
 
-  const handleConfirmRedeem = () => {
+  const handleConfirmRedeem = async () => {
+    if (!selectedReward || !user) {
+      setError('Missing reward or user information');
+      return;
+    }
+
+    setIsRedeeming(true);
     setShowConfirm(false);
-    setShowVoucher(true);
+
+    try {
+      // Call the API to redeem the reward
+      const response = await redeemReward(selectedReward.id, user.id, {
+        name: selectedReward.name,
+        points: selectedReward.points,
+        description: selectedReward.description,
+      });
+
+      if (response.success) {
+        setRedemptionData(response.redemption);
+        setShowVoucher(true);
+        // Refresh karma points to reflect the deduction
+        refreshKarmaPoints();
+        toast.success(`Successfully redeemed ${selectedReward.name}!`);
+      } else {
+        setError('Redemption failed. Please try again.');
+        toast.error('Redemption failed. Please try again.');
+      }
+    } catch (err: unknown) {
+      console.error('Redemption error:', err);
+
+      let errorMessage = 'Failed to redeem reward. Please try again.';
+
+      // Handle different types of errors
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsRedeeming(false);
+    }
   };
 
   const handleCancelRedeem = () => {
     setShowConfirm(false);
     setSelectedReward(null);
+    setError(null);
   };
 
   const handleCloseVoucher = () => {
     setShowVoucher(false);
     setSelectedReward(null);
+    setRedemptionData(null);
+    setError(null);
   };
 
   const redeemDisplay = useMemo(() => {
@@ -272,11 +329,11 @@ const RedeemPage = () => {
                           ? 'bg-amber-300 text-amber-900 hover:bg-amber-400'
                           : 'cursor-not-allowed bg-gray-300 text-gray-800 opacity-80'
                       }`}
-                      disabled={!item.canRedeem}
-                      aria-disabled={!item.canRedeem}
+                      disabled={!item.canRedeem || isRedeeming}
+                      aria-disabled={!item.canRedeem || isRedeeming}
                       onClick={() => item.canRedeem && handleRedeemClick(item)}
                     >
-                      Redeem now!
+                      {isRedeeming ? 'Redeeming...' : 'Redeem now!'}
                     </button>
                   </div>
                 </div>
@@ -291,24 +348,32 @@ const RedeemPage = () => {
         title={`Confirm Redemption?`}
         description={
           selectedReward && (
-            <p>
-              Redeeming this{' '}
-              <strong className="font-medium">{selectedReward.name}</strong>{' '}
-              will deduct{' '}
-              <strong className="font-medium">
-                {selectedReward.points} karma points
-              </strong>{' '}
-              from your account. Are you sure you want to proceed?
-            </p>
+            <div>
+              <p>
+                Redeeming this{' '}
+                <strong className="font-medium">{selectedReward.name}</strong>{' '}
+                will deduct{' '}
+                <strong className="font-medium">
+                  {selectedReward.points} karma points
+                </strong>{' '}
+                from your account. Are you sure you want to proceed?
+              </p>
+              {error && (
+                <p className="mt-2 rounded bg-red-50 p-2 text-sm text-red-600">
+                  {error}
+                </p>
+              )}
+            </div>
           )
         }
-        confirmText="Yes, Redeem"
+        confirmText={isRedeeming ? 'Redeeming...' : 'Yes, Redeem'}
         cancelText="Cancel"
         onConfirm={handleConfirmRedeem}
         onCancel={handleCancelRedeem}
+        loading={isRedeeming}
       />
 
-      {showVoucher && selectedReward && user && (
+      {showVoucher && selectedReward && user && redemptionData && (
         <GiftCardVoucher
           reward={selectedReward}
           userKarmaPoints={karmaPoints}
@@ -318,6 +383,9 @@ const RedeemPage = () => {
             email: user.email,
             id: user.id?.toString() || '',
           }}
+          redemptionCode={redemptionData.redemptionCode}
+          redemptionDate={redemptionData.redeemedAt}
+          expiresAt={redemptionData.expiresAt}
         />
       )}
     </>

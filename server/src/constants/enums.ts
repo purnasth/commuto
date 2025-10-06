@@ -61,3 +61,13 @@ export enum DISTANCE_TIER {
   LONG = 'long',
   VERY_LONG = 'very_long',
 }
+
+/**
+ * Enum representing redemption statuses in the karma redemption system.
+ */
+export enum REDEMPTION_STATUS {
+  ACTIVE = 'ACTIVE',
+  USED = 'USED',
+  EXPIRED = 'EXPIRED',
+  LOCKED = 'LOCKED',
+}
