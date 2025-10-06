@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { TbCirclePlus } from 'react-icons/tb';
-import { faqContents } from '../constants/data';
+
 import { FaqItemProps } from '../interfaces/types';
 
-const Faq: React.FC = () => {
+const Faq: React.FC<{ contents: FaqItemProps[] }> = ({ contents }) => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const toggleFAQ = (index: number) => {
@@ -15,11 +15,11 @@ const Faq: React.FC = () => {
       <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px]" />
       <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
       <div className="space-y-4 sm:space-y-6 md:space-y-6">
-        {faqContents.map((faq: FaqItemProps, index: number) => (
+        {contents.map((faq: FaqItemProps, index: number) => (
           <div
             key={index}
             className={`${
-              index !== faqContents.length - 1
+              index !== contents.length - 1
                 ? 'border-b border-teal-950/30 dark:border-teal-50/40'
                 : ''
             }`}
