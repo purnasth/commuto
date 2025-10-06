@@ -348,7 +348,7 @@ const RedeemPage = () => {
         title={`Confirm Redemption?`}
         description={
           selectedReward && (
-            <div>
+            <>
               <p>
                 Redeeming this{' '}
                 <strong className="font-medium">{selectedReward.name}</strong>{' '}
@@ -363,7 +363,7 @@ const RedeemPage = () => {
                   {error}
                 </p>
               )}
-            </div>
+            </>
           )
         }
         confirmText={isRedeeming ? 'Redeeming...' : 'Yes, Redeem'}

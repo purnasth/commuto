@@ -19,15 +19,15 @@ import { addMonthsToDate, generateVoucherId } from '../utils/voucher.utils';
 export class KarmaRedemptionService {
   constructor(private prisma: PrismaService) {}
 
-  // Note: Rewards list is now handled by frontend only
-  // Backend just handles redemption tracking and validation
-  // getAvailableRewards() {
-  //   return {
-  //     message:
-  //       'Rewards are managed by the frontend. This endpoint is deprecated.',
-  //     rewards: [],
-  //   };
-  // }
+  // TODO:
+  /**
+   * @function getAvailableRewards
+   * @description
+   * This endpoint fetches the available rewards to redeem.
+   *
+   * - Implement this endpoint once rewards need to be managed dynamically from the admin panel/database.
+   * - Currently, rewards are statically managed in the frontend `data.ts` for simplicity.
+   */
 
   async redeemReward(data: RedeemRewardDto) {
     return await this.prisma.$transaction(async (prisma) => {
@@ -47,23 +47,20 @@ export class KarmaRedemptionService {
         );
       }
 
-      // Generate unique redemption code using frontend utility
-      const redemptionCode = generateVoucherId(data.rewardName);
+      const redemptionCode = generateVoucherId(data.rewardName, data.userId);
 
-      // Auto-set expiry: 1 month from now using frontend utility
       const expiresAt = addMonthsToDate(new Date(), 1);
 
-      // Create redemption record (redeemAt is auto-set via createdAt)
       const redemption = await prisma.karmaTransaction.create({
         data: {
           userId: data.userId,
-          points: -data.karmaPointsCost, // Negative for redemption
+          points: -data.karmaPointsCost,
           type: 'redeemed',
           reason: `Redeemed: ${data.rewardName}`,
           rewardName: data.rewardName,
           redemptionCode,
           status: REDEMPTION_STATUS.ACTIVE,
-          expiresAt, // Auto-filled
+          expiresAt,
           // usedAt is null initially, set when status becomes USED
         },
       });
