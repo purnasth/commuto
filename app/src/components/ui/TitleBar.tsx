@@ -22,7 +22,7 @@ const colorClassMap: Record<AllowedColors, string> = {
   teal: 'border-teal-600/30 bg-teal-100 text-teal-900/70 dark:text-teal-800',
   amber:
     'border-amber-600/30 bg-amber-100 text-amber-900/70 dark:text-amber-800',
-  sky: 'border-sky-600/30 bg-sky-100 text-sky-900/70 dark:text-sky-200/70',
+  sky: 'border-sky-600/30 bg-sky-100 text-sky-900/70 dark:text-sky-800',
 };
 
 const TitleBar = ({ content, position, color = 'gray' }: TitleBarProps) => {

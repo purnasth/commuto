@@ -129,7 +129,7 @@ const UserCard: React.FC = () => {
 
             <hr className="my-4 w-[96%] border-gray-200 dark:border-teal-300/20 md:my-8" />
 
-            <p className="px-4 text-center text-xs text-teal-900 dark:text-white">
+            <p className="px-8 text-center text-xs text-teal-900 dark:text-white">
               Welcome to your profile, {fullname}! Here you can view your
               account details, contributions and achievements, and a detailed
               dashboard of your activities.

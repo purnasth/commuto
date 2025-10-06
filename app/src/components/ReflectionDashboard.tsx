@@ -24,8 +24,8 @@ const ReflectionDashboard = ({
   userRole,
 }: ReflectionDashboardProps) => {
   return (
-    <div className="grid grid-cols-1 rounded-3xl border-t-0 shadow-sm md:border md:border-t-0 lg:grid-cols-3">
-      <div className="col-span-1 space-y-3 overflow-hidden rounded-3xl rounded-br-none bg-teal-50 p-3 dark:bg-teal-900 md:space-y-4 md:p-4">
+    <div className="grid grid-cols-1 rounded-3xl border-t-0 shadow-sm dark:border-teal-300/50 md:border md:border-t-0 xl:grid-cols-3">
+      <div className="col-span-1 space-y-3 overflow-hidden rounded-3xl rounded-b-none bg-teal-50 p-3 dark:bg-teal-900 md:space-y-4 md:p-4 xl:rounded-bl-3xl xl:rounded-br-none">
         <div className="grid grid-cols-2 gap-3 md:gap-4">
           <div className="relative flex flex-col items-center rounded-xl border border-green-300 bg-gradient-to-br from-green-200 via-green-300 to-green-400 p-4 text-center shadow dark:from-green-300 dark:via-green-400 dark:to-green-500 md:p-6">
             <span className="text-base font-semibold text-green-900 md:text-lg">
@@ -148,8 +148,8 @@ const ReflectionDashboard = ({
           />
         </div>
       </div>
-      <div className="col-span-1 rounded-3xl rounded-b-none bg-none dark:bg-teal-900 md:bg-teal-50">
-        <div className="relative flex items-center justify-center space-y-3 rounded-3xl rounded-t-none border border-x-0 border-t-0 border-teal-300/50 bg-white pb-4 pt-1 dark:bg-dark">
+      <div className="col-span-1 rounded-b-3xl bg-none dark:bg-teal-900 md:rounded-b-none md:bg-teal-50 xl:rounded-t-3xl">
+        <div className="relative flex items-center justify-center space-y-3 border border-x-0 border-t-0 border-teal-300/50 bg-teal-50 pb-4 pt-1 dark:bg-transparent md:dark:bg-teal-900 lg:bg-white xl:rounded-b-3xl xl:dark:bg-dark">
           {/* <PeopleAvatarGrid people={people} /> */}
           <PeopleImpactedWithScore userId={currentUserId} />
           <TitleBar
@@ -163,11 +163,11 @@ const ReflectionDashboard = ({
             color="teal"
           />
         </div>
-        <div className="m-0 mt-4 h-auto scale-[1] overflow-hidden rounded-3xl bg-white pb-4 shadow outline outline-1 outline-teal-300/50 dark:bg-teal-700 md:m-4 md:mt-8 md:scale-[1.06] md:pb-4">
+        <div className="m-0 mt-4 h-auto scale-[1] overflow-hidden rounded-3xl bg-white pb-4 shadow outline outline-1 outline-teal-300/50 dark:bg-teal-700 md:m-4 md:mt-8 md:pb-4 xl:scale-[1.06]">
           <UserCard />
         </div>
       </div>
-      <div className="col-span-1 rounded-3xl rounded-bl-none md:bg-teal-50 md:dark:bg-teal-900">
+      <div className="col-span-1 rounded-3xl rounded-t-none rounded-bl-3xl md:bg-teal-50 md:dark:bg-teal-900 xl:rounded-t-3xl xl:rounded-bl-none">
         <div className="relative mt-4 flex flex-col items-center rounded-3xl border border-green-200 bg-gradient-to-br from-green-200 via-green-100 to-green-300 p-0 shadow-lg dark:from-green-300 dark:via-green-200 dark:to-green-400 md:m-4">
           <svg
             className="absolute left-2 top-2 h-8 w-8 opacity-30"
