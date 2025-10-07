@@ -192,7 +192,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       }
 
       // Helper function to update status and trigger UI updates
-      const updateStatusAndTriggerSync = (status: string) => {
+      const updateStatusAndTriggerSync = (status: RIDE_STATUS) => {
         localStorage.setItem('rideStatus', status);
         // Trigger a custom event to notify other components of the status change
         dispatchRideStatusChanged({ status });
@@ -244,7 +244,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         }
 
         // Clear ride status since both feedbacks are complete
-        updateStatusAndTriggerSync('idle');
+        updateStatusAndTriggerSync(RIDE_STATUS.IDLE);
 
         // Show success message and navigate
         toast.success('Thank you for your feedback!');
@@ -256,7 +256,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         onClose();
         navigate(ROUTE_PROFILE);
       } else if (response.waitingForOtherUser) {
-        updateStatusAndTriggerSync('idle');
+        updateStatusAndTriggerSync(RIDE_STATUS.IDLE);
 
         toast.success('Thank you for your feedback!');
         toast.info(

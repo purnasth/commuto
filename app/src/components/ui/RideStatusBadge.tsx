@@ -9,6 +9,11 @@ interface RideStatusBadgeProps {
 }
 
 const statusMap: Record<RIDE_STATUS, { color: string; text: string }> = {
+  [RIDE_STATUS.IDLE]: {
+    color:
+      'border-slate-200 bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-400',
+    text: 'bg-slate-300',
+  },
   [RIDE_STATUS.ACTIVE]: {
     color:
       'border-blue-300 bg-gradient-to-br from-blue-300 via-blue-50 to-blue-200 text-blue-600',
