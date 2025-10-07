@@ -50,13 +50,10 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
 
   const currentDate = getCurrentDate();
 
-  const voucherId =
-    redemptionCode || generateVoucherId(reward.name, userInfo.id);
+  const voucherId = redemptionCode || generateVoucherId(reward.name, userInfo.id);
   const redeemedAt = redemptionDate ? new Date(redemptionDate) : currentDate;
-  const expiryDate = expiresAt
-    ? new Date(expiresAt)
-    : addMonthsToDate(currentDate, 1);
-
+  const expiryDate = expiresAt ? new Date(expiresAt) : addMonthsToDate(currentDate, 1);
+  
   const qrData = JSON.stringify({
     voucherId,
     rewardName: reward.name,

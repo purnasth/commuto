@@ -10,6 +10,8 @@ import { ROUTE_EARN_KARMA } from '../constants/routes';
 
 import { redeemReward } from '../utils/api';
 
+import { redeemReward } from '../utils/api';
+
 import GiftCardVoucher from '../components/ui/GiftCardVoucher';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
