@@ -1,13 +1,18 @@
 import { createContext } from 'react';
-interface SocketContextType {
-  socket: any;
+import { Socket } from 'socket.io-client';
+
+import { RIDE_STATUS } from '../constants/enums';
+
+export interface SocketContextType {
+  socket: Socket | null;
   isConnected: boolean;
   messages: string[];
-  rideStatus: string;
+  rideStatus: RIDE_STATUS;
   setShowFeedbackPopup: React.Dispatch<React.SetStateAction<boolean>>;
   showFeedbackPopup: boolean;
-  setRideStatus: React.Dispatch<React.SetStateAction<string>>;
+  setRideStatus: React.Dispatch<React.SetStateAction<RIDE_STATUS>>;
 }
+
 export const SocketContext = createContext<SocketContextType | undefined>(
   undefined,
 );
