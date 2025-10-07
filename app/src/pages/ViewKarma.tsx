@@ -81,7 +81,7 @@ const ViewKarma = () => {
               </ul>
               <div className="mt-8">
                 <span className="font-semibold">Formula used:</span>
-                <pre className="mt-2 overflow-x-auto border border-teal-200 bg-teal-50 p-3 text-xs text-teal-700 md:w-fit md:text-sm">
+                <pre className="mt-2 overflow-x-auto border border-teal-200 bg-teal-50 p-3 text-xs text-teal-700 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-300 md:w-fit md:text-sm">
                   {`P = min(max((Base × Multiplier) + SentimentBonus, MinFloor), MaxCap)`}
                 </pre>
                 <p className="mt-2">
@@ -94,9 +94,9 @@ const ViewKarma = () => {
               <div className="mt-8">
                 <h3>Distance Tiers & Multipliers</h3>
                 <div className="overflow-x-auto">
-                  <table className="mt-2 w-full border border-teal-200 text-xs">
+                  <table className="mt-2 w-full border border-teal-200 text-xs dark:border-teal-600">
                     <thead>
-                      <tr className="bg-gradient-to-r from-teal-50 to-teal-100">
+                      <tr className="bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-600 dark:to-teal-800">
                         <th className="px-4 py-2 text-left">Tier</th>
                         <th className="px-4 py-2 text-left">Distance Range</th>
                         <th className="px-4 py-2 text-left">Multiplier</th>
@@ -106,15 +106,19 @@ const ViewKarma = () => {
                       {distanceTiers.map((tier, idx) => (
                         <tr
                           key={tier.tier}
-                          className={idx % 2 === 0 ? 'bg-white' : 'bg-teal-50'}
+                          className={
+                            idx % 2 === 0
+                              ? 'bg-white dark:bg-teal-950'
+                              : 'bg-teal-50 dark:bg-teal-900'
+                          }
                         >
-                          <td className="border-b border-teal-100 px-4 py-2">
+                          <td className="border-b border-teal-100 px-4 py-2 dark:border-teal-600">
                             {tier.tier}
                           </td>
-                          <td className="border-b border-teal-100 px-4 py-2">
+                          <td className="border-b border-teal-100 px-4 py-2 dark:border-teal-600">
                             {tier.range}
                           </td>
-                          <td className="border-b border-teal-100 px-4 py-2">
+                          <td className="border-b border-teal-100 px-4 py-2 dark:border-teal-600">
                             {tier.multiplier}
                           </td>
                         </tr>
@@ -126,9 +130,9 @@ const ViewKarma = () => {
               <div>
                 <h3>Sentiment-Based Bonuses</h3>
                 <div className="overflow-x-auto">
-                  <table className="mt-2 w-full border border-teal-200 text-xs">
+                  <table className="mt-2 w-full border border-teal-200 text-xs dark:border-teal-600">
                     <thead>
-                      <tr className="bg-gradient-to-r from-teal-50 to-teal-100">
+                      <tr className="bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-600 dark:to-teal-800">
                         <th className="px-4 py-2 text-left">Emoji</th>
                         <th className="px-4 py-2 text-left">Description</th>
                         <th className="px-4 py-2 text-left">Bonus Points</th>
@@ -138,15 +142,19 @@ const ViewKarma = () => {
                       {sentimentBonuses.map((bonus, idx) => (
                         <tr
                           key={bonus.description}
-                          className={idx % 2 === 0 ? 'bg-white' : 'bg-teal-50'}
+                          className={
+                            idx % 2 === 0
+                              ? 'bg-white dark:bg-teal-950'
+                              : 'bg-teal-50 dark:bg-teal-900'
+                          }
                         >
-                          <td className="border-b border-teal-100 px-4 py-2 text-base">
+                          <td className="border-b border-teal-100 px-4 py-2 text-base dark:border-teal-600">
                             {bonus.emoji}
                           </td>
-                          <td className="border-b border-teal-100 px-4 py-2">
+                          <td className="border-b border-teal-100 px-4 py-2 dark:border-teal-600">
                             {bonus.description}
                           </td>
-                          <td className="border-b border-teal-100 px-4 py-2">
+                          <td className="border-b border-teal-100 px-4 py-2 dark:border-teal-600">
                             {bonus.bonus}
                           </td>
                         </tr>
