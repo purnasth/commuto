@@ -81,7 +81,10 @@ const ViewKarma = () => {
               </ul>
               <div className="mt-8">
                 <span className="font-semibold">Formula used:</span>
-                <pre className="mt-2 overflow-x-auto border border-teal-200 bg-teal-50 p-3 text-xs text-teal-700 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-300 md:w-fit md:text-sm">
+                <pre
+                  className="mt-2 overflow-x-auto border border-teal-200 bg-teal-50 p-3 text-xs text-teal-700 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-300 md:w-fit md:text-sm"
+                  aria-label="Karma points (P) equals the minimum of the maximum of (Base times Multiplier plus Sentiment Bonus, Min Floor), and Max Cap."
+                >
                   {`P = min(max((Base × Multiplier) + SentimentBonus, MinFloor), MaxCap)`}
                 </pre>
                 <p className="mt-2">

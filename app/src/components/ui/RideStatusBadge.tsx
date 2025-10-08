@@ -44,7 +44,7 @@ const statusMap: Record<RIDE_STATUS, { color: string; text: string }> = {
       'border-green-300 bg-gradient-to-br from-green-300 via-green-50 to-green-200 text-green-600',
     text: 'bg-green-600',
   },
-};
+} as const;
 
 const RideStatusBadge: React.FC<RideStatusBadgeProps> = ({
   status,
@@ -53,9 +53,10 @@ const RideStatusBadge: React.FC<RideStatusBadgeProps> = ({
   const s = statusMap[status];
   if (!s) return null;
   const label = capitalize(status);
+
   return (
     <span
-      className={`transition-150 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-normal hover:scale-110 ${s.color} ${className}`}
+      className={`transition-150 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-normal hover:scale-110 ${s.color} ${className ?? ''}`}
     >
       <span className={`size-1.5 rounded-full ${s.text}`} />
       {label}

@@ -25,8 +25,8 @@ export const SocketManager = ({ children }: SocketManagerProps) => {
   const { triggerRideConfirmed } = useRideEvent();
   const [isConnected, setIsConnected] = useState(false);
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
-  const [rideStatus, setRideStatus] = useState(
-    localStorage.getItem('rideStatus') || 'idle',
+  const [rideStatus, setRideStatus] = useState<RIDE_STATUS>(
+    (localStorage.getItem('rideStatus') as RIDE_STATUS) || RIDE_STATUS.IDLE,
   );
   const user = localStorage.getItem('user');
   const userId = user ? JSON.parse(user).id : null;
@@ -42,13 +42,14 @@ export const SocketManager = ({ children }: SocketManagerProps) => {
   // Sync ride status with localStorage changes
   useEffect(() => {
     const handleStorageChange = () => {
-      const currentStatus = localStorage.getItem('rideStatus') || 'idle';
+      const currentStatus =
+        (localStorage.getItem('rideStatus') as RIDE_STATUS) || RIDE_STATUS.IDLE;
       setRideStatus(currentStatus);
     };
 
     const handleCustomStatusChange = (event: Event) => {
       const customEvent = event as CustomEvent;
-      setRideStatus(customEvent.detail.status);
+      setRideStatus(customEvent.detail.status as RIDE_STATUS);
     };
 
     // Listen for storage changes (when localStorage is updated from other components)

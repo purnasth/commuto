@@ -20,6 +20,7 @@ import ViewKarma from './pages/ViewKarma';
 import RedeemPage from './pages/RedeemPage';
 import RideDetails from './pages/RideDetails';
 import RoleBasedPage from './pages/RoleBasedPage';
+import LogsDashboard from './pages/LogsDashboard';
 import SelfReflection from './pages/SelfReflection';
 
 import { SocketManager } from './components/SocketManager';
@@ -38,9 +39,11 @@ import {
   ROUTE_VIEW_SCORE,
   ROUTE_EARN_KARMA,
   ROUTE_RIDE_DETAILS,
+  ROUTE_LOGS_DASHBOARD,
 } from './constants/routes';
 
 import { RideEventProvider } from './contexts/RideEventContext';
+
 const App: React.FC = () => {
   const theme = useTheme();
 
@@ -61,6 +64,7 @@ const App: React.FC = () => {
               <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
               <Route path={ROUTE_BRAND} element={<Brand />} />
               <Route path={ROUTE_LEGAL} element={<LegalPage />} />
+              <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
               <Route path={ROUTE_REDEEM} element={<RedeemPage />} />
               <Route path={ROUTE_VIEW_SCORE} element={<ViewScore />} />
               <Route path={ROUTE_EARN_KARMA} element={<ViewKarma />} />

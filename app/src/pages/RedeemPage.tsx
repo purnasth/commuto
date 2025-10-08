@@ -342,36 +342,37 @@ const RedeemPage = () => {
             })}
           </div>
         </div>
-        <ConfirmDialog
-          open={showConfirm && !!selectedReward}
-          title={`Confirm Redemption?`}
-          description={
-            selectedReward && (
-              <>
-                <p>
-                  Redeeming this{' '}
-                  <strong className="font-medium">{selectedReward.name}</strong>{' '}
-                  will deduct{' '}
-                  <strong className="font-medium">
-                    {selectedReward.points} karma points
-                  </strong>{' '}
-                  from your account. Are you sure you want to proceed?
-                </p>
-                {error && (
-                  <p className="mt-2 rounded bg-red-50 p-2 text-sm text-red-600">
-                    {error}
-                  </p>
-                )}
-              </>
-            )
-          }
-          confirmText={isRedeeming ? 'Redeeming...' : 'Yes, Redeem'}
-          cancelText="Cancel"
-          onConfirm={handleConfirmRedeem}
-          onCancel={handleCancelRedeem}
-          loading={isRedeeming}
-        />
       </main>
+
+      <ConfirmDialog
+        open={showConfirm && !!selectedReward}
+        title={`Confirm Redemption?`}
+        description={
+          selectedReward && (
+            <>
+              <p>
+                Redeeming this{' '}
+                <strong className="font-medium">{selectedReward.name}</strong>{' '}
+                will deduct{' '}
+                <strong className="font-medium">
+                  {selectedReward.points} karma points
+                </strong>{' '}
+                from your account. Are you sure you want to proceed?
+              </p>
+              {error && (
+                <p className="mt-2 rounded bg-red-50 p-2 text-sm text-red-600">
+                  {error}
+                </p>
+              )}
+            </>
+          )
+        }
+        confirmText={isRedeeming ? 'Redeeming...' : 'Yes, Redeem'}
+        cancelText="Cancel"
+        onConfirm={handleConfirmRedeem}
+        onCancel={handleCancelRedeem}
+        loading={isRedeeming}
+      />
 
       {showVoucher && selectedReward && user && redemptionData && (
         <GiftCardVoucher
