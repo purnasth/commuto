@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Bar, Doughnut, PolarArea, Bubble } from 'react-chartjs-2';
+// TODO: make this responsive and beautify design
 
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { Bar, Doughnut, PolarArea, Bubble } from 'react-chartjs-2';
+import { TooltipItem } from 'chart.js';
 import 'chart.js/auto';
 
 interface LogEntry {
@@ -17,35 +19,49 @@ interface LogEntry {
   karmaPoints?: number;
 }
 
+interface BubbleDataPoint {
+  x: number;
+  y: number;
+  r: number;
+  label: string;
+}
+
+interface CountMap {
+  [key: string]: number;
+}
+
+type FilterType = 'today' | 'all';
+
 const LogsDashboard: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'today' | 'all'>('today');
+  const [filter, setFilter] = useState<FilterType>('today');
   const [levelFilter, setLevelFilter] = useState<string>('');
   const [tagFilter, setTagFilter] = useState<string>('');
   const [userIdFilter, setUserIdFilter] = useState<string>('');
 
   useEffect(() => {
-    setLoading(true);
-    fetch(filter === 'today' ? '/logs/today' : '/logs/all')
-      .then((res) => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        return res.json();
-      })
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setLogs(data);
-        } else {
-          setLogs([]);
+    const fetchLogs = async () => {
+      setLoading(true);
+      try {
+        const endpoint = filter === 'today' ? '/logs/today' : '/logs/all';
+        const response = await fetch(endpoint);
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
         }
-        setLoading(false);
-      })
-      .catch((err) => {
+
+        const data = await response.json();
+        setLogs(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Failed to fetch logs:', error);
         setLogs([]);
+      } finally {
         setLoading(false);
-        // Optionally show an error message to the user
-        console.error('Failed to fetch logs:', err);
-      });
+      }
+    };
+
+    fetchLogs();
   }, [filter]);
 
   // Filter logs for table
@@ -57,21 +73,30 @@ const LogsDashboard: React.FC = () => {
     );
   });
 
-  // Get unique values for filters
-  const levelOptions = Array.from(new Set(logs.map((log) => log.level))).filter(
-    Boolean,
+  // Memoized unique values for filters
+  const levelOptions = useMemo(
+    () => Array.from(new Set(logs.map((log) => log.level))).filter(Boolean),
+    [logs],
   );
-  const tagOptions = Array.from(new Set(logs.map((log) => log.tag))).filter(
-    Boolean,
+  const tagOptions = useMemo(
+    () => Array.from(new Set(logs.map((log) => log.tag))).filter(Boolean),
+    [logs],
   );
-  const userIdOptions = Array.from(
-    new Set(logs.map((log) => String(log.userId))),
-  ).filter((id) => id !== 'undefined');
-  const hourCounts: { [hour: string]: number } = {};
+  const userIdOptions = useMemo(
+    () =>
+      Array.from(new Set(logs.map((log) => String(log.userId)))).filter(
+        (id) => id !== 'undefined',
+      ),
+    [logs],
+  );
+
+  // Chart 1: Log count per hour
+  const hourCounts: CountMap = {};
   logs.forEach((log) => {
     const hour = new Date(log.timestamp).getHours();
     hourCounts[hour] = (hourCounts[hour] || 0) + 1;
   });
+
   const chartDataHour = {
     labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
     datasets: [
@@ -82,14 +107,16 @@ const LogsDashboard: React.FC = () => {
       },
     ],
   };
+
   const mostActiveHour =
     Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'N/A';
 
-  // Chart 2: Log level distribution (Pie)
-  const levelCounts: { [level: string]: number } = {};
+  // Chart 2: Log level distribution
+  const levelCounts: CountMap = {};
   logs.forEach((log) => {
     levelCounts[log.level] = (levelCounts[log.level] || 0) + 1;
   });
+
   const chartDataLevel = {
     labels: Object.keys(levelCounts),
     datasets: [
@@ -97,98 +124,106 @@ const LogsDashboard: React.FC = () => {
         label: 'Log Level',
         data: Object.values(levelCounts),
         backgroundColor: [
-          'rgba(59,130,246,0.7)', // blue
-          'rgba(34,197,94,0.7)', // green
-          'rgba(239,68,68,0.7)', // red
-          'rgba(234,179,8,0.7)', // yellow
+          'rgba(59,130,246,0.7)',
+          'rgba(34,197,94,0.7)',
+          'rgba(239,68,68,0.7)',
+          'rgba(234,179,8,0.7)',
         ],
       },
     ],
   };
 
-  // Chart 3: Tag distribution (Bar)
-  const tagCounts: { [tag: string]: number } = {};
+  // Chart 3: Tag distribution
+  const tagCounts: CountMap = {};
   logs.forEach((log) => {
     tagCounts[log.tag] = (tagCounts[log.tag] || 0) + 1;
   });
+
   const chartDataTag = {
     labels: Object.keys(tagCounts),
     datasets: [
       {
         label: 'Tag Count',
         data: Object.values(tagCounts),
-        backgroundColor: 'rgba(34,197,94,0.7)', // Tailwind green-500
+        backgroundColor: 'rgba(34,197,94,0.7)',
       },
     ],
   };
 
-  // Chart 4: Ride creation per location (Bar)
-  const fromCounts: { [from: string]: number } = {};
+  // Chart 4: Ride creation per location (From)
+  const fromCounts: CountMap = {};
   logs.forEach((log) => {
     if (log.from) {
       fromCounts[log.from] = (fromCounts[log.from] || 0) + 1;
     }
   });
+
   const chartDataFrom = {
     labels: Object.keys(fromCounts),
     datasets: [
       {
         label: 'Rides Created (From)',
         data: Object.values(fromCounts),
-        backgroundColor: 'rgba(234,179,8,0.7)', // Tailwind yellow-500
+        backgroundColor: 'rgba(234,179,8,0.7)',
       },
     ],
   };
+
   const mostPopularFrom =
     Object.entries(fromCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'N/A';
 
   // Chart 5: Ride creation per location (To)
-  const toCounts: { [to: string]: number } = {};
+  const toCounts: CountMap = {};
   logs.forEach((log) => {
     if (log.to) {
       toCounts[log.to] = (toCounts[log.to] || 0) + 1;
     }
   });
+
   const chartDataTo = {
     labels: Object.keys(toCounts),
     datasets: [
       {
         label: 'Rides Created (To)',
         data: Object.values(toCounts),
-        backgroundColor: 'rgba(59,130,246,0.7)', // Tailwind blue-500
+        backgroundColor: 'rgba(59,130,246,0.7)',
       },
     ],
   };
+
   const mostPopularTo =
     Object.entries(toCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'N/A';
 
-  // Chart 6: User activity (Bar)
-  const userCounts: { [userId: string]: number } = {};
+  // Chart 6: User activity
+  const userCounts: CountMap = {};
   logs.forEach((log) => {
     if (log.userId) {
       userCounts[log.userId] = (userCounts[log.userId] || 0) + 1;
     }
   });
+
   const chartDataUser = {
     labels: Object.keys(userCounts),
     datasets: [
       {
         label: 'User Activity',
         data: Object.values(userCounts),
-        backgroundColor: 'rgba(239,68,68,0.7)', // Tailwind red-500
+        backgroundColor: 'rgba(239,68,68,0.7)',
       },
     ],
   };
+
   const mostActiveUser =
     Object.entries(userCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'N/A';
 
-  // Chart 7: Karma points distribution (Doughnut)
-  const karmaCounts: { [userId: string]: number } = {};
+  // Chart 7: Karma points distribution
+  const karmaCounts: CountMap = {};
   logs.forEach((log) => {
     if (log.userId && typeof log.karmaPoints === 'number') {
       karmaCounts[log.userId] = log.karmaPoints;
     }
   });
+
   const chartDataKarma = {
     labels: Object.keys(karmaCounts),
     datasets: [
@@ -205,29 +240,30 @@ const LogsDashboard: React.FC = () => {
     ],
   };
 
-  // Chart 8: Bubble chart - User activity vs. karma points vs. log count (STATIC DEMO DATA)
-  // Each bubble: x=userId, y=karmaPoints, r=log count
+  // Chart 8: Bubble chart
+  const bubbleData: BubbleDataPoint[] = [
+    { x: 1, y: 120, r: 10, label: 'Alice' },
+    { x: 2, y: 80, r: 15, label: 'Bob' },
+    { x: 3, y: 200, r: 25, label: 'Charlie' },
+    { x: 4, y: 60, r: 8, label: 'Diana' },
+    { x: 5, y: 150, r: 20, label: 'Eve' },
+    { x: 6, y: 90, r: 12, label: 'Frank' },
+    { x: 7, y: 180, r: 22, label: 'Grace' },
+    { x: 8, y: 50, r: 6, label: 'Heidi' },
+    { x: 9, y: 220, r: 30, label: 'Ivan' },
+    { x: 10, y: 110, r: 14, label: 'Judy' },
+    { x: 11, y: 75, r: 9, label: 'Mallory' },
+    { x: 12, y: 160, r: 18, label: 'Oscar' },
+    { x: 13, y: 130, r: 16, label: 'Peggy' },
+    { x: 14, y: 95, r: 11, label: 'Sybil' },
+    { x: 15, y: 210, r: 28, label: 'Trent' },
+  ];
+
   const chartDataBubble = {
     datasets: [
       {
         label: 'User Activity & Karma',
-        data: [
-          { x: 1, y: 120, r: 10, label: 'Alice' },
-          { x: 2, y: 80, r: 15, label: 'Bob' },
-          { x: 3, y: 200, r: 25, label: 'Charlie' },
-          { x: 4, y: 60, r: 8, label: 'Diana' },
-          { x: 5, y: 150, r: 20, label: 'Eve' },
-          { x: 6, y: 90, r: 12, label: 'Frank' },
-          { x: 7, y: 180, r: 22, label: 'Grace' },
-          { x: 8, y: 50, r: 6, label: 'Heidi' },
-          { x: 9, y: 220, r: 30, label: 'Ivan' },
-          { x: 10, y: 110, r: 14, label: 'Judy' },
-          { x: 11, y: 75, r: 9, label: 'Mallory' },
-          { x: 12, y: 160, r: 18, label: 'Oscar' },
-          { x: 13, y: 130, r: 16, label: 'Peggy' },
-          { x: 14, y: 95, r: 11, label: 'Sybil' },
-          { x: 15, y: 210, r: 28, label: 'Trent' },
-        ],
+        data: bubbleData,
         backgroundColor: [
           'rgba(59,130,246,0.5)',
           'rgba(34,197,94,0.5)',
@@ -252,14 +288,15 @@ const LogsDashboard: React.FC = () => {
       },
     ],
   };
+
   const bubbleOptions = {
     plugins: {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: function (context: any) {
-            const { x, y, r, label } = context.raw;
-            return `${label}: Karma=${y}, Logs=${r}`;
+          label: (context: TooltipItem<'bubble'>) => {
+            const rawData = context.raw as BubbleDataPoint;
+            return `${rawData.label}: Karma=${rawData.y}, Logs=${rawData.r}`;
           },
         },
       },
@@ -282,23 +319,39 @@ const LogsDashboard: React.FC = () => {
     },
   };
 
+  const handleResetFilters = useCallback(() => {
+    setLevelFilter('');
+    setTagFilter('');
+    setUserIdFilter('');
+  }, []);
+
   return (
     <div className="p-6">
       <h1 className="mb-4 text-2xl font-bold">Logs Dashboard</h1>
+
       <div className="mb-6 flex gap-2">
         <button
-          className={`rounded-full border px-4 py-1 font-semibold transition-colors ${filter === 'today' ? 'border-blue-500 bg-blue-500 text-white' : 'border-blue-500 bg-white text-blue-500 hover:bg-blue-50'}`}
+          className={`rounded-full border px-4 py-1 font-semibold transition-colors ${
+            filter === 'today'
+              ? 'border-blue-500 bg-blue-500 text-white'
+              : 'border-blue-500 bg-white text-blue-500 hover:bg-blue-50'
+          }`}
           onClick={() => setFilter('today')}
         >
           Today
         </button>
         <button
-          className={`rounded-full border px-4 py-1 font-semibold transition-colors ${filter === 'all' ? 'border-green-500 bg-green-500 text-white' : 'border-green-500 bg-white text-green-500 hover:bg-green-50'}`}
+          className={`rounded-full border px-4 py-1 font-semibold transition-colors ${
+            filter === 'all'
+              ? 'border-green-500 bg-green-500 text-white'
+              : 'border-green-500 bg-white text-green-500 hover:bg-green-50'
+          }`}
           onClick={() => setFilter('all')}
         >
           All
         </button>
       </div>
+
       {loading ? (
         <div>Loading...</div>
       ) : (
@@ -320,6 +373,7 @@ const LogsDashboard: React.FC = () => {
                 height={120}
               />
             </div>
+
             <div>
               <h2 className="mb-2 text-lg font-semibold">Log Count Per Hour</h2>
               <p className="mb-2 text-sm text-gray-700">
@@ -333,6 +387,7 @@ const LogsDashboard: React.FC = () => {
                 <span className="font-bold">{mostActiveHour}:00</span>
               </p>
             </div>
+
             <div>
               <h2 className="mb-2 text-lg font-semibold">
                 Log Level Distribution
@@ -359,6 +414,7 @@ const LogsDashboard: React.FC = () => {
                 <span className="font-bold">{mostPopularFrom}</span>
               </p>
             </div>
+
             <div>
               <h2 className="mb-2 text-lg font-semibold">
                 Rides Created Per Location (To)
@@ -373,6 +429,7 @@ const LogsDashboard: React.FC = () => {
                 <span className="font-bold">{mostPopularTo}</span>
               </p>
             </div>
+
             <div>
               <h2 className="mb-2 text-lg font-semibold">Tag Distribution</h2>
               <p className="mb-2 text-sm text-gray-700">
@@ -381,6 +438,7 @@ const LogsDashboard: React.FC = () => {
               </p>
               <Bar data={chartDataTag} />
             </div>
+
             <div>
               <h2 className="mb-2 text-lg font-semibold">User Activity</h2>
               <p className="mb-2 text-sm text-gray-700">
@@ -393,6 +451,7 @@ const LogsDashboard: React.FC = () => {
                 <span className="font-bold">{mostActiveUser}</span>
               </p>
             </div>
+
             <div>
               <h2 className="mb-2 text-lg font-semibold">
                 Karma Points Distribution
@@ -404,6 +463,7 @@ const LogsDashboard: React.FC = () => {
               <Doughnut data={chartDataKarma} />
             </div>
           </div>
+
           <div className="overflow-x-auto">
             <div className="mb-4 flex flex-wrap items-center gap-4">
               <div>
@@ -423,6 +483,7 @@ const LogsDashboard: React.FC = () => {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="mr-2 text-sm font-medium text-gray-700">
                   Tag:
@@ -440,6 +501,7 @@ const LogsDashboard: React.FC = () => {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="mr-2 text-sm font-medium text-gray-700">
                   User ID:
@@ -457,17 +519,15 @@ const LogsDashboard: React.FC = () => {
                   ))}
                 </select>
               </div>
+
               <button
                 className="ml-2 rounded bg-gray-200 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-300"
-                onClick={() => {
-                  setLevelFilter('');
-                  setTagFilter('');
-                  setUserIdFilter('');
-                }}
+                onClick={handleResetFilters}
               >
                 Reset Filters
               </button>
             </div>
+
             <div className="max-h-[75vh] overflow-y-auto rounded border border-gray-200 bg-white shadow">
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-gray-50">
@@ -508,9 +568,7 @@ const LogsDashboard: React.FC = () => {
                         <td className="border px-2 py-1">
                           {new Date(log.timestamp).toLocaleString()}
                         </td>
-                        <td className="border px-2 py-1">
-                          {log.level}
-                        </td>
+                        <td className="border px-2 py-1">{log.level}</td>
                         <td className="border px-2 py-1">{log.tag}</td>
                         <td
                           className="max-w-xs truncate whitespace-pre-line border px-2 py-1"

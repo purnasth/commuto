@@ -3,6 +3,10 @@ import React, { useRef } from 'react';
 import Confetti from 'react-confetti';
 import { toast } from 'react-toastify';
 import { TbDownload } from 'react-icons/tb';
+
+import logo from '../../assets/logo/commuto.svg';
+import logoAlt from '../../assets/logo/commuto-alt.svg';
+
 import { RedeemableReward } from '../../interfaces/types';
 import {
   getCurrentDate,
@@ -11,10 +15,12 @@ import {
   formatVoucherDate,
   generateRewardAbbreviation,
 } from '../../utils/functions';
-import { usePDFGenerator } from '../../hooks/usePDFGenerator';
-import Modal from './Modal';
 
-import logo from '../../assets/logo/commuto-alt.svg';
+import { useTheme } from '../../contexts/ThemeProvider';
+
+import { usePDFGenerator } from '../../hooks/usePDFGenerator';
+
+import Modal from './Modal';
 
 interface GiftCardVoucherProps {
   reward: RedeemableReward;
@@ -39,6 +45,7 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
   expiresAt,
 }) => {
   const voucherRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
   const { generatePDF, isGenerating } = usePDFGenerator();
 
   const currentDate = getCurrentDate();
@@ -91,11 +98,11 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
           initialVelocityY={20}
           tweenDuration={5000}
         />
-        <div className="relative inline-block h-full bg-white text-dark shadow-lg">
-          <div className="mb-6 flex justify-between gap-2 border-b p-6 pb-4 shadow-sm">
+        <div className="relative inline-block h-full bg-white text-dark shadow-lg dark:bg-amber-950">
+          <div className="mb-4 flex justify-between gap-2 border-b p-3 pb-4 shadow-sm sm:p-6 md:mb-6">
             <h2 className="inline-flex items-center gap-2.5">
               <img
-                src={logo}
+                src={theme === 'dark' ? logo : logoAlt}
                 alt="Logo"
                 className="h-6 object-contain sm:h-9"
               />
@@ -109,28 +116,28 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
               {isGenerating ? 'Generating...' : 'Download'}
             </button>
 
-            <p className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-300 px-2.5 text-sm font-semibold uppercase">
+            <p className="absolute bottom-1.5 left-1/2 z-50 -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-300 px-2.5 text-xs font-semibold uppercase sm:bottom-4 sm:text-sm">
               Redeemed
             </p>
-            <p className="absolute left-1/2 top-24 z-50 -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-100 px-2.5 text-xxs">
+            <p className="absolute left-1/2 top-[4.75rem] z-50 w-max -translate-x-1/2 rounded-full border border-amber-500/80 bg-amber-100 px-2.5 text-xxs md:top-[6.5rem]">
               Keep up the great work and collect more achievements!
             </p>
           </div>
 
           <div
             ref={voucherRef}
-            className="voucher-card relative m-6 w-full max-w-4xl overflow-hidden rounded-3xl border-[3px] border-dashed border-amber-500 bg-amber-50 p-8 pt-6"
+            className="voucher-card relative m-3 max-w-fit overflow-hidden rounded-3xl border-[3px] border-dashed border-amber-500 bg-amber-50 px-4 py-6 pt-6 sm:m-6 sm:p-8 md:max-w-4xl lg:w-full"
           >
             <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-amber-300 opacity-40 blur-[100px] dark:opacity-60" />
             <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-amber-300 opacity-80 blur-[200px] dark:opacity-80" />
             <div className="pointer-events-none absolute -left-4 -top-4 z-0 h-24 w-24 rounded-full bg-amber-300/30 blur-xl" />
             <div className="pointer-events-none absolute -bottom-4 -right-4 z-0 h-32 w-32 rounded-full bg-orange-300/30 blur-xl" />
 
-            <div className="text-center">
+            <div className="mt-4 text-center sm:mt-0">
               {/* <h2 className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-100 px-4 py-1 text-xs font-semibold uppercase text-amber-700 sm:text-sm md:text-base">
                 Karma Rewards
               </h2> */}
-              <h3 className="reward-points text-2xl font-bold">
+              <h3 className="reward-points text-base font-bold md:text-2xl">
                 {reward.name}
               </h3>
               {/* <p className="text-xs leading-relaxed text-amber-800">
@@ -138,25 +145,31 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
               </p> */}
             </div>
 
-            <div className="z-10 mt-6 grid grid-cols-3 gap-4">
+            <div className="z-10 mt-2 grid grid-cols-1 gap-4 md:mt-6 md:grid-cols-3">
               <div className="col-span-2">
                 <div>
-                  <span className="absolute right-8 top-8 text-sm font-semibold uppercase underline">
+                  <span className="absolute right-4 top-4 text-xxs font-semibold uppercase underline sm:right-6 sm:top-6 sm:text-sm md:right-8 md:top-8">
                     {reward.points} karma points
                   </span>
-                  <div className="absolute left-8 top-8">
+                  <div className="absolute left-4 top-4 sm:left-6 sm:top-6 md:left-8 md:top-8">
                     <img
-                      src={logo}
+                      src={logoAlt}
                       alt="Logo"
-                      className="h-3 object-contain sm:h-6"
+                      className="h-3 object-contain sm:h-5 md:h-6"
                     />
                   </div>
                   <ul className="mt-2 space-y-4">
                     <li className="flex flex-col">
-                      <label htmlFor="issued-to" className="text-sm opacity-70">
+                      <label
+                        htmlFor="issued-to"
+                        className="text-xs opacity-70 sm:text-sm"
+                      >
                         Issued to:
                       </label>
-                      <p id="issued-to" className="text-2xl font-medium">
+                      <p
+                        id="issued-to"
+                        className="text-xl font-medium sm:text-2xl"
+                      >
                         {userInfo.name}
                         {/* <span className="text-sm"> ({userInfo.email})</span> */}
                       </p>
@@ -164,24 +177,27 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
                     <li className="flex flex-col">
                       <label
                         htmlFor="valid-until"
-                        className="text-sm opacity-70"
+                        className="text-xs opacity-70 sm:text-sm"
                       >
                         Valid until:
                       </label>
-                      <p id="valid-until" className="text-2xl font-medium">
+                      <p
+                        id="valid-until"
+                        className="text-xl font-medium sm:text-2xl"
+                      >
                         {formatVoucherDate(expiryDate)}
                       </p>
                     </li>
                     <li className="flex flex-col">
                       <label
                         htmlFor="voucher-code"
-                        className="text-sm opacity-70"
+                        className="text-xs opacity-70 sm:text-sm"
                       >
                         Voucher Code:
                       </label>
                       <p
                         id="voucher-code"
-                        className="rounded bg-amber-200/50 px-3 py-2 text-center text-xl font-medium uppercase tracking-widest"
+                        className="w-full rounded bg-amber-200/50 px-3 py-2 text-center text-xl font-medium uppercase tracking-widest"
                       >
                         {voucherId}
                       </p>
@@ -205,19 +221,19 @@ const GiftCardVoucher: React.FC<GiftCardVoucherProps> = ({
               </div>
             </div>
 
-            <hr className="my-6 border-amber-300/80" />
+            <hr className="my-4 border-amber-300/80 md:my-6" />
 
-            <p className="mt-6 text-xs">
+            <p className="mt-4 px-2 text-xxs md:mt-6 md:p-0 md:text-xs">
               <strong>Note:</strong> This voucher is valid for one-time use
               only. It must be redeemed according to the terms and conditions
               provided at the time of redemption. Please present this voucher at
               the time of use.
             </p>
 
-            <div className="absolute left-3 top-3 h-8 w-8 rounded-tl-xl border-l-2 border-t-2 border-amber-500"></div>
-            <div className="absolute right-3 top-3 h-8 w-8 rounded-tr-xl border-r-2 border-t-2 border-amber-500"></div>
-            <div className="absolute bottom-3 left-3 h-8 w-8 rounded-bl-xl border-b-2 border-l-2 border-amber-500"></div>
-            <div className="absolute bottom-3 right-3 h-8 w-8 rounded-br-xl border-b-2 border-r-2 border-amber-500"></div>
+            <div className="absolute left-2 top-2 h-8 w-8 rounded-tl-xl border-l-2 border-t-2 border-amber-500 sm:left-3 sm:top-3"></div>
+            <div className="absolute right-2 top-2 h-8 w-8 rounded-tr-xl border-r-2 border-t-2 border-amber-500 sm:right-3 sm:top-3"></div>
+            <div className="absolute bottom-2 left-2 h-8 w-8 rounded-bl-xl border-b-2 border-l-2 border-amber-500 sm:bottom-3 sm:left-3"></div>
+            <div className="absolute bottom-2 right-2 h-8 w-8 rounded-br-xl border-b-2 border-r-2 border-amber-500 sm:bottom-3 sm:right-3"></div>
           </div>
         </div>
       </Modal>

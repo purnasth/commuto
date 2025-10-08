@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { TbArrowNarrowLeft, TbGift, TbTrophy } from 'react-icons/tb';
 
 import { redeemables } from '../constants/data';
+import { ROUTE_EARN_KARMA } from '../constants/routes';
 
 import { redeemReward } from '../utils/api';
 
@@ -149,7 +150,7 @@ const RedeemPage = () => {
         initialVelocityY={10}
         // tweenDuration={1000}
       />
-      <main className="relative overflow-x-hidden dark:bg-black">
+      <main className="relative overflow-x-hidden">
         <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-amber-300 opacity-40 blur-[100px] dark:opacity-20" />
         <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-amber-300 opacity-80 blur-[200px] dark:opacity-40" />
         <div className="w-full">
@@ -209,7 +210,7 @@ const RedeemPage = () => {
               </div>
             </div>
             <Link
-              to="#"
+              to={ROUTE_EARN_KARMA}
               className="hidden rounded-full border border-amber-300 bg-amber-100 px-4 py-1 text-xs font-semibold text-amber-700 shadow hover:bg-amber-200 sm:block md:text-sm"
             >
               How to earn?

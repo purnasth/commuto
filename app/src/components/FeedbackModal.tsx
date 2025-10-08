@@ -192,7 +192,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       }
 
       // Helper function to update status and trigger UI updates
-      const updateStatusAndTriggerSync = (status: string) => {
+      const updateStatusAndTriggerSync = (status: RIDE_STATUS) => {
         localStorage.setItem('rideStatus', status);
         // Trigger a custom event to notify other components of the status change
         dispatchRideStatusChanged({ status });
@@ -244,7 +244,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         }
 
         // Clear ride status since both feedbacks are complete
-        updateStatusAndTriggerSync('idle');
+        updateStatusAndTriggerSync(RIDE_STATUS.IDLE);
 
         // Show success message and navigate
         toast.success('Thank you for your feedback!');
@@ -256,7 +256,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
         onClose();
         navigate(ROUTE_PROFILE);
       } else if (response.waitingForOtherUser) {
-        updateStatusAndTriggerSync('idle');
+        updateStatusAndTriggerSync(RIDE_STATUS.IDLE);
 
         toast.success('Thank you for your feedback!');
         toast.info(
@@ -277,7 +277,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   return (
     <Modal onClose={onClose}>
-      <div className="relative w-full max-w-lg overflow-hidden border border-teal-300 bg-white p-8 shadow-xl dark:border-teal-300/50 dark:bg-dark">
+      <div className="relative w-full max-w-lg overflow-hidden border border-teal-300 bg-white p-6 shadow-xl dark:border-teal-300/50 dark:bg-dark md:p-8">
         <div className="top-1/5 pointer-events-none absolute -right-[20%] z-auto size-48 rounded-full bg-teal-300 blur-[80px]" />
         <div className="pointer-events-none absolute -bottom-0 -left-20 z-auto size-52 rounded-full bg-teal-300 blur-[50px] dark:opacity-70" />
 

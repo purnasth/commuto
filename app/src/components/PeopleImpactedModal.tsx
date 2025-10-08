@@ -13,19 +13,19 @@ const PeopleImpactedModal = ({ onClose, people }: PeopleImpactedModalProps) => {
   return (
     <>
       <Modal onClose={onClose} className="w-full">
-        <div className="mx-auto w-full max-w-md overflow-hidden border border-dark/20 bg-white shadow dark:border-light/20 dark:bg-dark md:rounded-xl">
+        <div className="mx-auto w-full max-w-md overflow-hidden border border-teal-300 bg-white shadow dark:border-teal-300/70 dark:bg-dark">
           <h3
             id="people-impacted-modal-title"
-            className="border-b border-dark/10 bg-teal-100 p-5 text-lg font-medium text-dark dark:text-teal-300 md:text-lg"
+            className="border-b border-teal-300/50 bg-teal-100 p-5 text-lg font-medium text-dark dark:bg-teal-950 dark:text-teal-300 md:text-lg"
           >
             People You've Impacted ({people.length})
           </h3>
 
-          <div className="max-h-96 space-y-3 overflow-y-auto bg-teal-50 p-5">
+          <div className="max-h-96 space-y-3 overflow-y-auto bg-teal-50 p-3 dark:bg-teal-900 md:p-5">
             {people.map((person, index) => (
               <div
                 key={person.id}
-                className="flex items-center gap-3 rounded-lg border border-teal-200/70 bg-gradient-to-br from-white via-teal-100 to-white p-3 shadow-sm transition-all hover:border-teal-300 hover:shadow-sm dark:border-teal-700/50 dark:from-teal-900/20 dark:to-gray-800 dark:hover:border-teal-600"
+                className="flex items-center gap-3 rounded-xl border border-teal-200/70 bg-gradient-to-br from-white via-teal-100 to-white p-3 shadow-sm transition-all hover:border-teal-300 hover:shadow-sm dark:border-teal-700 dark:from-teal-950/20 dark:to-teal-700 dark:hover:border-teal-500"
               >
                 <div className="relative">
                   <img

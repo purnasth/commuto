@@ -21,6 +21,7 @@ export type UserRoleType = (typeof USER_ROLES)[number];
  *   status === RideStatus.ACTIVE
  */
 export enum RIDE_STATUS {
+  IDLE = 'IDLE',
   ACTIVE = 'ACTIVE',
   CONFIRMED = 'CONFIRMED',
   REJECTED = 'REJECTED',

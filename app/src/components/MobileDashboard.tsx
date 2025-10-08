@@ -16,12 +16,9 @@ import {
 import Tooltip from './ui/Tooltip';
 import NoRideFound from './ui/NoRideFound';
 import UserDisplay from './ui/UserDisplay';
+import RideStatusBadge from './ui/RideStatusBadge';
 
-import {
-  USER_ROLE,
-  RIDE_STATUS,
-  LS_RIDE_FORM_DATA_KEY,
-} from '../constants/enums';
+import { USER_ROLE, LS_RIDE_FORM_DATA_KEY } from '../constants/enums';
 import { ROUTE_HOME, ROUTE_ROLE } from '../constants/routes';
 
 import { RideHistory } from '../interfaces/types';
@@ -144,9 +141,14 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
   };
 
   return (
-    <div className="mt-6 overflow-hidden rounded-3xl border border-teal-300">
-      <h2 className="border-b bg-teal-50 p-3 text-center">Ride History</h2>
-      <div className="max-h-[60vh] min-h-64 overflow-y-auto">
+    <div className="mt-6 overflow-hidden rounded-3xl border border-teal-300 dark:border-teal-300/50">
+      <h2 className="border-b border-teal-300/50 bg-teal-50 p-3 text-center dark:bg-teal-950">
+        Ride History
+      </h2>
+      <div className="relative max-h-[60vh] min-h-64 overflow-y-auto overflow-x-hidden bg-transparent">
+        <div className="pointer-events-none fixed -left-[20%] top-1/3 -z-10 size-48 rounded-full bg-teal-300 blur-[80px]" />
+        <div className="pointer-events-none fixed bottom-1/4 -right-10 -z-10 size-32 rounded-full bg-teal-300 blur-[80px]" />
+
         {rides.length === 0 ? (
           <NoRideFound
             title="No rides yet"
@@ -156,7 +158,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
           rides.map((ride: RideHistory, idx: number) => (
             <div
               key={ride.id}
-              className={`relative flex flex-col gap-1 bg-teal-50 p-3 shadow-sm transition-shadow hover:shadow-md dark:bg-dark ${
+              className={`relative z-20 flex flex-col gap-1 p-3 shadow-sm transition-shadow hover:shadow-md ${
                 idx !== rides.length - 1 ? 'border-b border-teal-300/60' : ''
               }`}
             >
@@ -181,30 +183,30 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
                 </div>
                 <div className="flex-1 space-y-2">
                   <Tooltip content={ride.from}>
-                    <p className="max-w-full truncate text-xs font-normal text-dark">
+                    <p className="max-w-full truncate text-xs font-normal">
                       {truncateText(ride.from, 32)}
                     </p>
                   </Tooltip>
                   <div className="h-1 w-px"></div>
 
                   <Tooltip content={ride.to}>
-                    <p className="max-w-full truncate text-xs font-normal text-dark">
+                    <p className="max-w-full truncate text-xs font-normal">
                       {truncateText(ride.to, 32)}
                     </p>
                   </Tooltip>
                 </div>
               </div>
               {/* Message bubble */}
-              <div className="relative mt-1 rounded-xl bg-teal-200 p-3">
-                <div className="absolute -top-2 right-5 size-0 origin-top rotate-90 scale-[2] border-l-[10px] border-r-[2px] border-t-[10px] border-l-transparent border-r-transparent border-t-teal-200"></div>
+              <div className="relative mt-1 rounded-xl bg-teal-200 p-3 dark:bg-teal-500">
+                <div className="absolute -top-2 right-5 size-0 origin-top rotate-90 scale-[2] border-l-[10px] border-r-[2px] border-t-[10px] border-l-transparent border-r-transparent border-t-teal-200 dark:border-t-teal-500"></div>
                 <div className="flex items-center justify-between gap-2">
                   <Tooltip content={ride.message || '-'}>
-                    <p className="max-w-[70%] truncate text-xs font-normal text-dark">
+                    <p className="max-w-[90%] truncate text-xs font-normal text-dark">
                       {truncateText(ride.message || '-', 40)}
                     </p>
                   </Tooltip>
-                  <span className="flex min-w-20 items-center justify-center gap-0.5 rounded-full bg-teal-50 px-2 py-1 text-xs font-normal text-teal-500 shadow">
-                    <TbAlarm className="text-base" />
+                  <span className="flex min-w-20 items-center justify-center gap-0.5 rounded-full bg-teal-50 px-2 py-1 text-xxs font-normal text-teal-500 shadow dark:bg-teal-900 dark:text-teal-100">
+                    <TbAlarm className="text-sm" />
                     {formatFullDate(ride.timestamp)}
                   </span>
                 </div>
@@ -215,7 +217,8 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
                 <span className="text-xs font-semibold text-teal-700 dark:text-teal-200">
                   Status:
                 </span>
-                <span className="ml-auto text-xs">
+                <RideStatusBadge status={ride.status} className="ml-auto" />
+                {/* <span className="ml-auto text-xs">
                   {ride.status === RIDE_STATUS.ACTIVE && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-100 px-2 py-0.5 text-xs font-normal text-blue-600">
                       <span className="size-1.5 rounded-full bg-blue-600" />
@@ -252,7 +255,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
                       Completed
                     </span>
                   )}
-                </span>
+                </span> */}
               </div>
               {/* User Display (Rider/Passenger based on current user) */}
               <div className="mt-1 flex items-center justify-between">

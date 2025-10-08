@@ -71,7 +71,7 @@ const PeopleImpactedWithScore = ({ userId }: PeopleAvatarGridProps) => {
     <>
       <section className="flex items-center justify-center gap-3">
         <div
-          className={`relative flex items-center rounded-full border border-teal-300 bg-gradient-to-br from-teal-100 via-teal-300 to-teal-50 px-2.5 py-2 ${people.length > MAX_VISIBLE_SLOTS && 'pr-0'}`}
+          className={`relative flex items-center rounded-full border border-teal-300 bg-gradient-to-br from-teal-100 via-teal-300 to-teal-50 px-2.5 py-2 dark:from-teal-500 dark:to-teal-900 ${people.length > MAX_VISIBLE_SLOTS && 'pr-0'}`}
         >
           {slots.map((person: Person | null, index: number) => {
             const hasData = Boolean(person?.img);
@@ -100,7 +100,7 @@ const PeopleImpactedWithScore = ({ userId }: PeopleAvatarGridProps) => {
               type="button"
               onClick={handleShowModal}
               aria-label="Show all people impacted"
-              className={`transition-150 relative inline-flex aspect-square size-9 -translate-x-2.5 items-center justify-center rounded-full border-2 border-teal-300 bg-light bg-gradient-to-br from-teal-50 via-teal-300 to-teal-50 object-cover p-1 text-2xl text-teal-600 shadow hover:z-50 hover:border-teal-400 hover:bg-gradient-to-br hover:from-teal-400 hover:via-teal-200 hover:to-teal-300 dark:border-0 dark:border-teal-700 dark:bg-dark dark:hover:border-teal-600 dark:hover:from-teal-600 dark:hover:via-teal-700 dark:hover:to-teal-800 md:size-11`}
+              className={`transition-150 relative inline-flex aspect-square size-9 -translate-x-2.5 items-center justify-center rounded-full border-2 border-teal-300 bg-light bg-gradient-to-br from-teal-50 via-teal-300 to-teal-50 object-cover p-1 text-2xl text-teal-600 shadow hover:z-50 hover:border-teal-400 hover:bg-gradient-to-br hover:from-teal-400 hover:via-teal-200 hover:to-teal-300 dark:border-teal-700 dark:bg-dark dark:from-teal-500 dark:via-teal-500 dark:to-teal-900 dark:text-teal-100 dark:hover:bg-gradient-to-tl md:size-11`}
             >
               <TbPlus />
             </button>
@@ -108,7 +108,7 @@ const PeopleImpactedWithScore = ({ userId }: PeopleAvatarGridProps) => {
         </div>
 
         {averageScoreData && averageScoreData.averageScore !== null && (
-          <div className="relative flex items-center gap-0.5 rounded-full border border-teal-300 bg-gradient-to-bl from-teal-200 via-teal-100 to-teal-300 py-2 pl-1.5 pr-4">
+          <div className="relative flex items-center gap-0.5 rounded-full border border-teal-300 bg-gradient-to-bl from-teal-200 via-teal-100 to-teal-300 py-2 pl-1.5 pr-4 dark:from-teal-500 dark:to-teal-900">
             <Tooltip
               content={`Your average score: ${getScoreDescription(averageScoreData.averageScore)}`}
             >

@@ -1,7 +1,8 @@
-# 
-
+# Ignore vscode settings
 .vscode/
 
-#ignore the sql files
-
+# Ignore the sql files
 *.sql
+
+# Ignore macOS system files
+.DS_Store

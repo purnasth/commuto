@@ -35,7 +35,7 @@ const ViewScore = () => {
           </p>
         </div>
         <div className="flex flex-col items-end gap-2 p-3 px-2 pt-0 md:flex-row md:justify-between md:gap-0">
-          <div className="relative mx-auto flex translate-y-3 flex-col items-center md:translate-y-12">
+          <div className="relative mx-auto flex translate-y-10 flex-col items-center md:translate-y-12">
             <div className="relative mb-0 flex h-40 w-80 items-end justify-center drop-shadow-xl md:mb-2 md:h-48 md:w-96">
               <svg viewBox="0 0 320 160" className="absolute left-0 top-0">
                 <path

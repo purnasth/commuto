@@ -1,5 +1,8 @@
 import { useParams } from 'react-router-dom';
+
 import { userRoles } from '../constants/data';
+import { USER_ROLE } from '../constants/enums';
+
 import Error404 from './Error404';
 import Title from '../components/ui/Title';
 import RideBar from '../components/RideBar';
@@ -18,7 +21,7 @@ const RoleBasedPage = () => {
             <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
             <Title title={role.title} description={role.description} />
 
-            <RideBar role={role.id} />
+            <RideBar role={role.id as USER_ROLE} />
           </main>
 
           <div className="my-12 md:my-16 lg:my-24">

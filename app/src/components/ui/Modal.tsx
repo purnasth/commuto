@@ -39,7 +39,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, className }) => {
         transition={{
           duration: 0.3,
         }}
-        className={className || ''}
+        className={`m-2 md:m-0 ${className || ''}`}
       >
         {children}
       </motion.div>
