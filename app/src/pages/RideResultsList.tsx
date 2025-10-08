@@ -28,7 +28,7 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
   <main className="relative flex size-full flex-col items-center justify-center overflow-hidden bg-white p-0 dark:bg-dark sm:p-5">
     <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px]" />
     <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
-    <div className="relative size-full max-w-xl p-5 md:h-auto md:rounded-3xl">
+    <div className="relative flex size-full max-w-xl flex-col justify-center p-5 md:h-auto md:rounded-3xl">
       <h3
         id="modal-title"
         className="pb-4 text-lg font-medium text-teal-500 dark:text-teal-300 md:text-xl"

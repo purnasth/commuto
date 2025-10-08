@@ -277,7 +277,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   return (
     <Modal onClose={onClose}>
-      <div className="relative w-full max-w-lg overflow-hidden border border-teal-300 bg-white p-8 shadow-xl dark:border-teal-300/50 dark:bg-dark">
+      <div className="relative w-full max-w-lg overflow-hidden border border-teal-300 bg-white p-6 shadow-xl dark:border-teal-300/50 dark:bg-dark md:p-8">
         <div className="top-1/5 pointer-events-none absolute -right-[20%] z-auto size-48 rounded-full bg-teal-300 blur-[80px]" />
         <div className="pointer-events-none absolute -bottom-0 -left-20 z-auto size-52 rounded-full bg-teal-300 blur-[50px] dark:opacity-70" />
 

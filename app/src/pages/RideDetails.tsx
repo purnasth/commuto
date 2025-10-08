@@ -51,7 +51,7 @@ const MatchedUserCard: React.FC<{ matchedUser: UserDetails }> = ({
       {matchedUser.role} details
     </h4>
 
-    <div className="flex w-full items-center justify-between gap-4">
+    <div className="flex w-full flex-col justify-between gap-4 sm:flex-row sm:items-center">
       <div className="flex items-center gap-3">
         <div className="flex items-center justify-center rounded-full bg-teal-200 dark:bg-teal-800">
           {matchedUser.profilePicture ? (
@@ -77,13 +77,13 @@ const MatchedUserCard: React.FC<{ matchedUser: UserDetails }> = ({
       <div className="mt-1 flex items-center gap-2">
         <Link
           to={`tel:${matchedUser.phone}`}
-          className="transition-150 rounded-full border bg-green-600 px-6 py-2.5 text-lg text-green-50 transition hover:bg-green-400 hover:text-green-900 dark:bg-green-500 dark:text-green-950 dark:hover:bg-green-700 dark:hover:text-green-100"
+          className="transition-150 flex w-full items-center justify-center rounded-full border bg-green-600 px-6 py-2.5 text-lg text-green-50 transition hover:bg-green-400 hover:text-green-900 dark:bg-green-500 dark:text-green-950 dark:hover:bg-green-700 dark:hover:text-green-100"
         >
           <MdLocalPhone className="scale-125" />
         </Link>
         <Link
           to={`mailto:${matchedUser.email}`}
-          className="transition-150 rounded-full border bg-amber-400 px-6 py-2.5 text-lg text-amber-50 transition hover:bg-amber-200 hover:text-amber-600 dark:bg-amber-300 dark:text-amber-900 dark:hover:bg-amber-400 dark:hover:text-amber-950"
+          className="transition-150 flex w-1/2 items-center justify-center rounded-full border bg-amber-400 px-6 py-2.5 text-lg text-amber-50 transition hover:bg-amber-200 hover:text-amber-600 dark:bg-amber-300 dark:text-amber-900 dark:hover:bg-amber-400 dark:hover:text-amber-950 sm:w-full"
         >
           <MdEmail className="scale-125" />
         </Link>
@@ -156,7 +156,7 @@ const RideActionButton: React.FC<{
       <button
         type="button"
         onClick={handleClick}
-        className={`group relative overflow-hidden rounded-full border border-teal-200 px-7 py-3 text-sm text-light dark:text-dark ${buttonColor}`}
+        className={`group relative overflow-hidden rounded-full border border-teal-200 px-7 py-3 text-sm text-light dark:border-teal-700 dark:text-dark ${buttonColor}`}
       >
         <span
           className={`absolute inset-0 z-0 animate-slide ${isCompleted || hasFeedbackPending ? 'bg-gradient-to-r from-amber-400 to-amber-500 dark:to-amber-300' : 'bg-gradient-to-r from-green-500 to-green-400'} group-hover:animate-none`}
@@ -335,10 +335,10 @@ const RideDetails: React.FC = () => {
               <TbMapPin className="text-xl text-teal-500" />
             </div>
             <div className="flex-1 space-y-6">
-              <p className="text-base font-normal text-dark dark:text-light">
+              <p className="text-sm font-normal text-dark dark:text-light sm:text-base">
                 {from}
               </p>
-              <p className="text-base font-normal text-dark dark:text-light">
+              <p className="text-sm font-normal text-dark dark:text-light sm:text-base">
                 {to}
               </p>
             </div>
@@ -347,8 +347,8 @@ const RideDetails: React.FC = () => {
             <div className="absolute -top-2 right-5 size-0 origin-top rotate-90 scale-[2] border-l-[10px] border-r-[2px] border-t-[10px] border-l-transparent border-r-transparent border-t-teal-200 dark:border-t-teal-500"></div>
             <div className="flex flex-col items-start justify-between gap-2 md:flex-row md:items-center">
               <p className="pl-2 text-base font-normal text-dark">{message}</p>
-              <p className="flex items-center justify-center gap-0.5 rounded-full bg-teal-50 px-3 py-1 text-base font-normal capitalize text-teal-500 shadow dark:bg-teal-900 dark:text-teal-50">
-                <TbAlarm className="text-xl" />
+              <p className="flex items-center justify-center gap-0.5 rounded-full bg-teal-50 px-3 py-1 text-xs font-normal capitalize text-teal-500 shadow dark:bg-teal-900 dark:text-teal-50 sm:text-base">
+                <TbAlarm className="text-sm sm:text-xl" />
                 {timestamp ? formatFullDate(timestamp) : 'Just now'}
               </p>
             </div>
@@ -432,14 +432,14 @@ const RideDetails: React.FC = () => {
         </div>
 
         {showFeedbackBanner && (
-          <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-amber-300/50 bg-gradient-to-br from-amber-300 via-amber-50 to-amber-200 py-2 pl-3 pr-4 text-sm font-medium text-amber-900 backdrop-blur-sm transition-all duration-300">
-            <TbInfoCircleFilled className="mr-2 inline-block scale-150 text-base text-amber-700" />
+          <p className="fixed bottom-6 left-1/2 z-50 w-max -translate-x-1/2 rounded-full border border-amber-300/50 bg-gradient-to-br from-amber-300 via-amber-50 to-amber-200 py-1 pl-1.5 pr-2 text-xxs font-medium text-amber-900 backdrop-blur-sm transition-all duration-300 sm:py-2 sm:pl-3 sm:pr-4 sm:text-sm">
+            <TbInfoCircleFilled className="mr-2 inline-block scale-150 text-sm text-amber-700 sm:text-base" />
             {`Complete this feedback form to redeem your ${
               rideDetails.role === USER_ROLE.RIDER
                 ? 'karma points.'
                 : 'credit score.'
             }`}
-          </div>
+          </p>
         )}
       </main>
 

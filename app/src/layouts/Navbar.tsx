@@ -175,7 +175,7 @@ const Navbar = () => {
                   type="button"
                   onClick={handleClick}
                   aria-label="Active Ride"
-                  className="flex items-center gap-1.5 rounded-full bg-green-100 px-4 py-2 font-medium text-green-700"
+                  className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 sm:px-4 sm:py-2 sm:text-base"
                 >
                   <span className="size-2.5 animate-pulse rounded-full bg-green-600" />
                   Active
@@ -186,7 +186,7 @@ const Navbar = () => {
                   type="button"
                   onClick={handleClick}
                   aria-label="Feedback Pending"
-                  className="flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 text-sm font-medium text-amber-700 sm:text-base"
+                  className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 sm:px-4 sm:py-2 sm:text-base"
                 >
                   <span className="size-2 animate-pulse rounded-full bg-amber-600 sm:size-2.5" />
                   Feedback
