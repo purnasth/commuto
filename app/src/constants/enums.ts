@@ -145,3 +145,12 @@ export const SCORE_CONFIG = {
  * This prevents permanent deadlocks if a completion process fails unexpectedly.
  */
 export const COMPLETION_LOCK_TIMEOUT_MS = 30000; // 30 seconds
+
+/** 
+ * Enum representing leaderboard ranks.
+ */
+export enum LEADERBOARD_RANK {
+  GOLD = 'Gold',
+  SILVER = 'Silver',
+  BRONZE = 'Bronze',
+}
