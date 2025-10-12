@@ -279,7 +279,7 @@ const Leaderboard: React.FC = () => {
     <>
       <main>
         <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px]" />
-        <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
+        <div className="pointer-events-none absolute right-0 top-1/4 -z-10 contents size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
 
         <div className="container mb-24 flex size-full max-w-4xl flex-col items-center justify-center gap-4 text-center">
           <span className="inline-flex items-center justify-center gap-2 rounded-full bg-teal-100 px-4 py-1 text-xs font-semibold uppercase text-teal-700 sm:text-sm md:text-base">
