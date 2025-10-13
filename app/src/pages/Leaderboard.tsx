@@ -1,54 +1,98 @@
-// TODO: responsive
-
+// TODO: responsive and code quality improvements
+// TODO: fetch real data from backend instead of using mock data
 import React, { useEffect, useState } from 'react';
-import {
-  MdLeaderboard,
-  MdEmojiEvents,
-  MdWorkspacePremium,
-  MdDirectionsCar,
-} from 'react-icons/md';
+
 import {
   TbBike,
-  TbMedal,
-  TbAward,
-  TbUser,
   TbGift,
+  TbMessageCircleStar,
   TbCircleNumber1Filled,
   TbCircleNumber2Filled,
   TbCircleNumber3Filled,
-  TbMessageCircleStar,
 } from 'react-icons/tb';
-
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { MdOutlineLeaderboard } from 'react-icons/md';
 
 import { LeaderboardUser } from '../interfaces/types';
-import { USER_ROLE } from '../constants/enums';
+import { USER_ROLE, LEADERBOARD_RANK } from '../constants/enums';
+
 import CtoUI from '../components/ui/CtoUI';
-import Tooltip from '../components/ui/Tooltip';
 import StatusBadge from '../components/ui/StatusBadge';
+import UserDisplay from '../components/ui/UserDisplay';
+import LeaderboardFacts from '../components/ui/LeaderboardFacts';
+import Podium from '../components/ui/Podium';
+
+const MOCK_USERS = [
+  {
+    id: 1,
+    name: 'John Doe',
+    profilePicture:
+      'https://avatars.githubusercontent.com/u/107195487?s=400&u=6120358cdcf760f65cfda7f81e982dfb1d8f7a27&v=4',
+    role: USER_ROLE.RIDER,
+    rides: 45,
+    karma: 2450,
+    feedback: 4.8,
+  },
+  {
+    id: 2,
+    name: 'Jane Smith',
+    profilePicture:
+      'https://avatars.githubusercontent.com/u/107195487?s=400&u=6120358cdcf760f65cfda7f81e982dfb1d8f7a27&v=4',
+    role: USER_ROLE.RIDER,
+    rides: 38,
+    karma: 1950,
+    feedback: 4.9,
+  },
+  {
+    id: 3,
+    name: 'Mike Johnson',
+    profilePicture:
+      'https://avatars.githubusercontent.com/u/107195487?s=400&u=6120358cdcf760f65cfda7f81e982dfb1d8f7a27&v=4',
+    role: USER_ROLE.RIDER,
+    rides: 32,
+    karma: 2180,
+    feedback: 4.6,
+  },
+  {
+    id: 4,
+    name: 'Sarah Wilson',
+    profilePicture:
+      'https://avatars.githubusercontent.com/u/107195487?s=400&u=6120358cdcf760f65cfda7f81e982dfb1d8f7a27&v=4',
+    role: USER_ROLE.RIDER,
+    rides: 28,
+    karma: 1820,
+    feedback: 4.7,
+  },
+  {
+    id: 5,
+    name: 'David Brown',
+    profilePicture:
+      'https://avatars.githubusercontent.com/u/107195487?s=400&u=6120358cdcf760f65cfda7f81e982dfb1d8f7a27&v=4',
+    role: USER_ROLE.RIDER,
+    rides: 24,
+    karma: 1650,
+    feedback: 4.5,
+  },
+];
 
 const Leaderboard: React.FC = () => {
   const [topRiders, setTopRiders] = useState<LeaderboardUser[]>([]);
-  const [topKarmaUsers, setTopKarmaUsers] = useState<LeaderboardUser[]>([]);
-  const [topFeedbackUsers, setTopFeedbackUsers] = useState<LeaderboardUser[]>(
-    [],
-  );
+  const [topKarmaPoints, setTopKarmaPoints] = useState<LeaderboardUser[]>([]);
+  const [topFeedback, setTopFeedback] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'rides' | 'karma' | 'feedback'>(
     'rides',
   );
 
-  // Helper function to get badge based on rank
-  const getBadge = (rank: number): string => {
+  const getBadge = (rank: number): LEADERBOARD_RANK | undefined => {
     switch (rank) {
       case 1:
-        return 'Gold';
+        return LEADERBOARD_RANK.GOLD;
       case 2:
-        return 'Silver';
+        return LEADERBOARD_RANK.SILVER;
       case 3:
-        return 'Bronze';
+        return LEADERBOARD_RANK.BRONZE;
       default:
-        return '';
+        return undefined;
     }
   };
 
@@ -73,172 +117,49 @@ const Leaderboard: React.FC = () => {
   };
 
   useEffect(() => {
-    const fetchLeaderboardData = async () => {
-      try {
-        setLoading(true);
+    // Rides leaderboard
+    const riders = [...MOCK_USERS]
+      .sort((a, b) => b.rides - a.rides)
+      .map((user, idx) => ({
+        id: user.id,
+        name: user.name,
+        profilePicture: user.profilePicture,
+        role: user.role,
+        value: user.rides,
+        rank: idx + 1,
+        badge: getBadge(idx + 1),
+      }));
+    setTopRiders(riders);
 
-        // Since there's no dedicated leaderboard API, we'll need to:
-        // 1. Get all ride history data
-        // 2. Process it to create leaderboards
+    // Karma leaderboard
+    const karma = [...MOCK_USERS]
+      .sort((a, b) => b.karma - a.karma)
+      .map((user, idx) => ({
+        id: user.id,
+        name: user.name,
+        profilePicture: user.profilePicture,
+        role: user.role,
+        value: user.karma,
+        rank: idx + 1,
+        badge: getBadge(idx + 1),
+      }));
+    setTopKarmaPoints(karma);
 
-        // For demo purposes, let's create some mock data based on the existing API structure
-        // In a real implementation, you'd want to create backend endpoints for this
+    // Feedback leaderboard
+    const feedback = [...MOCK_USERS]
+      .sort((a, b) => b.feedback - a.feedback)
+      .map((user, idx) => ({
+        id: user.id,
+        name: user.name,
+        profilePicture: user.profilePicture,
+        role: user.role,
+        value: user.feedback,
+        rank: idx + 1,
+        badge: getBadge(idx + 1),
+      }));
+    setTopFeedback(feedback);
 
-        const mockTopRiders: LeaderboardUser[] = [
-          {
-            id: 1,
-            name: 'John Doe',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 45,
-            rank: 1,
-            badge: getBadge(1),
-          },
-          {
-            id: 2,
-            name: 'Jane Smith',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 38,
-            rank: 2,
-            badge: getBadge(2),
-          },
-          {
-            id: 3,
-            name: 'Mike Johnson',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 32,
-            rank: 3,
-            badge: getBadge(3),
-          },
-          {
-            id: 4,
-            name: 'Sarah Wilson',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 28,
-            rank: 4,
-            badge: getBadge(4),
-          },
-          {
-            id: 5,
-            name: 'David Brown',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 24,
-            rank: 5,
-            badge: getBadge(5),
-          },
-        ];
-
-        const mockTopKarma: LeaderboardUser[] = [
-          {
-            id: 1,
-            name: 'John Doe',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 2450,
-            rank: 1,
-            badge: getBadge(1),
-          },
-          {
-            id: 3,
-            name: 'Mike Johnson',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 2180,
-            rank: 2,
-            badge: getBadge(2),
-          },
-          {
-            id: 2,
-            name: 'Jane Smith',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 1950,
-            rank: 3,
-            badge: getBadge(3),
-          },
-          {
-            id: 4,
-            name: 'Sarah Wilson',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 1820,
-            rank: 4,
-            badge: getBadge(4),
-          },
-          {
-            id: 5,
-            name: 'David Brown',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 1650,
-            rank: 5,
-            badge: getBadge(5),
-          },
-        ];
-
-        const mockTopFeedback: LeaderboardUser[] = [
-          {
-            id: 2,
-            name: 'Jane Smith',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 4.9,
-            rank: 1,
-            badge: getBadge(1),
-          },
-          {
-            id: 1,
-            name: 'John Doe',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 4.8,
-            rank: 2,
-            badge: getBadge(2),
-          },
-          {
-            id: 4,
-            name: 'Sarah Wilson',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 4.7,
-            rank: 3,
-            badge: getBadge(3),
-          },
-          {
-            id: 3,
-            name: 'Mike Johnson',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 4.6,
-            rank: 4,
-            badge: getBadge(4),
-          },
-          {
-            id: 5,
-            name: 'David Brown',
-            profilePicture: '',
-            role: USER_ROLE.RIDER,
-            value: 4.5,
-            rank: 5,
-            badge: getBadge(5),
-          },
-        ];
-
-        setTopRiders(mockTopRiders);
-        setTopKarmaUsers(mockTopKarma);
-        setTopFeedbackUsers(mockTopFeedback);
-      } catch (error) {
-        console.error('Error fetching leaderboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeaderboardData();
+    setLoading(false);
   }, []);
 
   const getCurrentLeaderboard = () => {
@@ -246,9 +167,9 @@ const Leaderboard: React.FC = () => {
       case 'rides':
         return topRiders;
       case 'karma':
-        return topKarmaUsers;
+        return topKarmaPoints;
       case 'feedback':
-        return topFeedbackUsers;
+        return topFeedback;
       default:
         return topRiders;
     }
@@ -279,11 +200,11 @@ const Leaderboard: React.FC = () => {
     <>
       <main>
         <div className="pointer-events-none absolute left-0 -z-10 size-96 -translate-x-1/2 rounded-full bg-teal-300 opacity-40 blur-[100px]" />
-        <div className="pointer-events-none absolute right-0 top-1/4 -z-10 contents size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
+        <div className="pointer-events-none absolute right-0 top-1/4 -z-10 size-[36rem] translate-x-1/2 rounded-full bg-teal-300 opacity-80 blur-[200px]" />
 
         <div className="container mb-24 flex size-full max-w-4xl flex-col items-center justify-center gap-4 text-center">
           <span className="inline-flex items-center justify-center gap-2 rounded-full bg-teal-100 px-4 py-1 text-xs font-semibold uppercase text-teal-700 sm:text-sm md:text-base">
-            <MdLeaderboard className="text-lg text-teal-700" />
+            <MdOutlineLeaderboard className="text-lg text-teal-700" />
             Community Champions
           </span>
           <h1 className="mt-4 text-2xl font-bold capitalize leading-snug text-teal-500 md:text-4xl md:leading-snug lg:text-5xl lg:leading-snug">
@@ -352,64 +273,11 @@ const Leaderboard: React.FC = () => {
             </p>
           </div>
 
-          {/* Top 3 Podium */}
-          <div className="mt-24 flex flex-wrap items-end justify-center gap-2">
-            {getCurrentLeaderboard()
-              .slice(0, 3)
-              .map((user, index) => (
-                <div
-                  key={user.id}
-                  className={`relative flex flex-col items-center ${
-                    index === 0
-                      ? 'order-2 md:order-2'
-                      : index === 1
-                        ? 'order-1 md:order-1'
-                        : 'order-3 md:order-3'
-                  }`}
-                >
-                  {/* Podium Step */}
-                  <div
-                    className={`relative mb-4 flex w-48 flex-col items-center justify-end rounded-t-3xl bg-gradient-to-tr ${
-                      index === 0
-                        ? 'h-60 from-yellow-500 via-yellow-100 to-yellow-400'
-                        : index === 1
-                          ? 'h-44 from-gray-500 via-gray-200 to-gray-400'
-                          : 'h-32 from-amber-700 via-amber-400 to-amber-600'
-                    }`}
-                  >
-                    {/* User Avatar */}
-                    <div
-                      className={`absolute -top-8 flex size-16 items-center justify-center rounded-full border-4 text-xl font-bold text-white ${
-                        index === 0
-                          ? 'border-yellow-300 bg-yellow-500'
-                          : index === 1
-                            ? 'border-gray-400 bg-gray-500'
-                            : 'border-amber-600 bg-amber-700'
-                      }`}
-                    >
-                      {user.name.charAt(0)}
-                    </div>
-
-                    <div className="mb-3 flex flex-col items-center gap-1">
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="text-2xl">
-                          {getRankIcon(user.rank)}
-                        </span>
-
-                        <Tooltip content={user.name}>
-                          <h3 className="text-sm font-medium leading-[0] text-dark">
-                            {user.name}
-                          </h3>
-                        </Tooltip>
-                      </div>
-                      <p className="rounded-full bg-white/50 px-2 py-0.5 text-xs font-normal backdrop-blur dark:bg-dark/50">
-                        {user.value} {getValueSuffix()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
+          <Podium
+            getCurrentLeaderboard={getCurrentLeaderboard}
+            getRankIcon={getRankIcon}
+            getValueSuffix={getValueSuffix}
+          />
 
           {/* Full Leaderboard List */}
           <div className="mt-12 space-y-3">
@@ -435,7 +303,6 @@ const Leaderboard: React.FC = () => {
                       {activeTab === 'feedback' && 'Feedback Score'}
                     </th>
                     <th className="px-4 py-3 text-left font-semibold text-teal-700 dark:text-teal-200">
-                      <TbAward className="inline-block align-middle text-sm xl:text-base" />{' '}
                       Badge
                     </th>
                   </tr>
@@ -452,7 +319,7 @@ const Leaderboard: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                        {/* <div className="flex items-center gap-3">
                           <div className="flex size-8 items-center justify-center rounded-full bg-teal-500 text-xs font-bold text-white">
                             {user.name.charAt(0)}
                           </div>
@@ -461,11 +328,21 @@ const Leaderboard: React.FC = () => {
                               {user.name}
                             </p>
                           </div>
-                        </div>
+                        </div> */}
+                        <UserDisplay
+                          user={{
+                            id: user.id,
+                            profilePicture: user.profilePicture,
+                            email: `${user.name.replace(/\s+/g, '.').toLowerCase()}@example.com`,
+                            fullname: user.name,
+                          }}
+                          showProfilePicture={true}
+                          className="max-w-40 text-xs"
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <span className="text-lg font-bold text-teal-600 dark:text-teal-400">
+                          <span className="text-base font-semibold">
                             {activeTab === 'feedback'
                               ? user.value.toFixed(1)
                               : user.value.toLocaleString()}
@@ -483,35 +360,11 @@ const Leaderboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="relative grid grid-cols-1 items-center gap-4 overflow-hidden rounded-b-3xl border border-t-0 border-teal-300/30 bg-gradient-to-br from-white via-teal-100 to-white p-12 shadow transition-all hover:border-teal-300 hover:shadow-sm dark:border-teal-300/30 dark:from-teal-950/20 dark:to-teal-700 dark:hover:border-teal-500 md:grid-cols-3">
-            <div className="pointer-events-none absolute -bottom-1/2 -left-[0%] z-10 size-32 rounded-full bg-teal-300 blur-[50px]"></div>
-            <div className="pointer-events-none absolute -right-0 -top-6 z-10 size-24 rounded-full bg-teal-300 blur-[50px]"></div>
-            <div className="text-center">
-              <div className="text-5xl font-bold text-teal-400">
-                {topRiders.reduce((acc, user) => acc + user.value, 0)}
-              </div>
-              <span className="text-xs">Total Rides Completed</span>
-            </div>
-
-            <div className="text-center">
-              <div className="text-5xl font-bold text-teal-400">
-                {topKarmaUsers
-                  .reduce((acc, user) => acc + user.value, 0)
-                  .toLocaleString()}
-              </div>
-              <span className="text-xs">Total Karma Points Earned</span>
-            </div>
-
-            <div className="text-center">
-              <div className="text-5xl font-bold text-teal-400">
-                {(
-                  topFeedbackUsers.reduce((acc, user) => acc + user.value, 0) /
-                  topFeedbackUsers.length
-                ).toFixed(1)}
-              </div>
-              <span className="text-xs">Average Feedback Score</span>
-            </div>
-          </div>
+          <LeaderboardFacts
+            topRiders={topRiders}
+            topKarmaPoints={topKarmaPoints}
+            topFeedback={topFeedback}
+          />
         </div>
       </main>
       <div className="my-32">
