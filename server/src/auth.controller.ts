@@ -6,6 +6,8 @@ import {
   Query,
   Delete,
   Inject,
+  Request,
+  UseGuards,
   Controller,
   BadRequestException,
   UnauthorizedException,
@@ -19,6 +21,8 @@ import { EnvService } from './env.service';
 import { USER_ROLE } from './constants/enums';
 import { PrismaService } from './prisma.service';
 import { AuthService } from './services/auth.service';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { AuthenticatedRequest } from './interfaces/types';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 
 interface LoginDto {
@@ -352,12 +356,18 @@ export class AuthController {
   }
 
   @Get('user')
-  async getUser(@Query('email') email: string) {
+  @UseGuards(JwtAuthGuard)
+  async getUser(
+    @Query('email') email: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
     this.logger.log({
       level: 'info',
       message: `Get user profile for email: ${email}`,
       tag: 'auth',
       email,
+      authenticatedUserId,
     });
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -371,6 +381,9 @@ export class AuthController {
       });
       throw new BadRequestException('User not found');
     }
+    if (user.id !== authenticatedUserId) {
+      throw new UnauthorizedException('You can only view your own profile');
+    }
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(
       Object.entries(user).filter(([key]) => key !== 'password'),
@@ -379,29 +392,33 @@ export class AuthController {
   }
 
   @Put('update')
+  @UseGuards(JwtAuthGuard)
   async updateUser(
     @Body()
     body: {
-      email: string;
       password: string;
       updates: Partial<SignupDto>;
     },
+    @Request() req: AuthenticatedRequest,
   ) {
+    const authenticatedUserId = req.user.userId;
+    const authenticatedEmail = req.user.email;
     this.logger.log({
       level: 'info',
-      message: `Update user attempt for email: ${body.email}`,
+      message: `Update user attempt for authenticated user`,
       tag: 'auth',
-      email: body.email,
+      userId: authenticatedUserId,
+      email: authenticatedEmail,
     });
     const user = await this.prisma.user.findUnique({
-      where: { email: body.email },
+      where: { id: authenticatedUserId },
     });
     if (!user) {
       this.logger.log({
         level: 'warn',
-        message: `Update user failed for email: ${body.email} - User not found`,
+        message: `Update user failed - User not found`,
         tag: 'error',
-        email: body.email,
+        userId: authenticatedUserId,
       });
       throw new BadRequestException('User not found');
     }
@@ -411,9 +428,9 @@ export class AuthController {
     if (!isPasswordValid) {
       this.logger.log({
         level: 'warn',
-        message: `Update user failed for email: ${body.email} - Invalid password`,
+        message: `Update user failed - Invalid password`,
         tag: 'error',
-        email: body.email,
+        userId: authenticatedUserId,
       });
       throw new UnauthorizedException('Invalid password');
     }
@@ -422,15 +439,15 @@ export class AuthController {
     delete allowedUpdates.email;
     delete allowedUpdates.password;
     const updatedUser = await this.prisma.user.update({
-      where: { email: body.email },
+      where: { id: authenticatedUserId },
       data: allowedUpdates,
     });
     this.logger.log({
       level: 'info',
-      message: `User updated for email: ${body.email}`,
+      message: `User updated for email: ${authenticatedEmail}`,
       tag: 'auth',
-      email: body.email,
-      userId: user.id,
+      email: authenticatedEmail,
+      userId: authenticatedUserId,
     });
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(

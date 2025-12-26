@@ -9,9 +9,12 @@ import {
   Param,
   Delete,
   Inject,
+  Request,
   Controller,
+  UseGuards,
   ParseIntPipe,
   NotFoundException,
+  ForbiddenException,
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -21,6 +24,7 @@ import { Ride, User, Feedback } from 'generated/prisma';
 
 import { PrismaService } from './prisma.service';
 import { KarmaCalculationService } from './services/karma-calculation.service';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 import { RideGateway } from './rides/rides.gateway';
 
@@ -41,6 +45,7 @@ import {
   ConfirmRideDto,
   AverageScoreResult,
   KarmaCalculationResult,
+  AuthenticatedRequest,
 } from './interfaces/types';
 
 import {
@@ -237,41 +242,33 @@ export class RideController {
     return { creditScore: user.creditScore };
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('/feedback')
-  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
-  //
-  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts fromUserId from request body,
-  // allowing any user to submit feedback on behalf of others by changing the fromUserId.
-  // This bypasses authorization and enables manipulation of karma/credit systems.
-  //
-  // SECURITY RISKS:
-  // - User A can submit feedback as User B without permission
-  // - Manipulation of karma points and credit scores
-  // - Fraudulent feedback submissions affecting user ratings
-  //
-  // REQUIRED FIX: Extract authenticated userId from JWT context instead of fromUserId in request body
-  // The fromUserId should be replaced with the authenticated user's ID from the JWT token.
-  //
   /**
    * Submit feedback for a completed ride
    * Updates karma points for riders and credit score for passengers
+   * Now protected with JWT authentication - fromUserId comes from authenticated user
    */
-  async submitFeedback(@Body() body: FeedbackDto) {
+  async submitFeedback(
+    @Body() body: Omit<FeedbackDto, 'fromUserId'>,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId; // From JWT token
+
     this.logger.log({
       level: 'info',
-      message: `Feedback submission attempt for ride ${body.rideId} from user ${body.fromUserId} to user ${body.toUserId}`,
+      message: `Feedback submission attempt for ride ${body.rideId} from authenticated user ${authenticatedUserId} to user ${body.toUserId}`,
       tag: 'feedback',
       rideId: body.rideId,
-      fromUserId: body.fromUserId,
+      fromUserId: authenticatedUserId,
       toUserId: body.toUserId,
       role: body.role,
       emoji: body.emoji,
     });
 
-    // Validate required fields
+    // Validate required fields (fromUserId comes from JWT, not body)
     if (
       !body.rideId ||
-      !body.fromUserId ||
       !body.toUserId ||
       !body.role ||
       body.emoji === undefined ||
@@ -305,9 +302,9 @@ export class RideController {
       );
     }
 
-    // Verify that fromUser is part of this ride
-    const isRider = ride.riderId === body.fromUserId;
-    const isPassenger = ride.passengerId === body.fromUserId;
+    // Verify that authenticated user is part of this ride
+    const isRider = ride.riderId === authenticatedUserId;
+    const isPassenger = ride.passengerId === authenticatedUserId;
 
     if (!isRider && !isPassenger) {
       throw new BadRequestException('User is not part of this ride');
@@ -319,7 +316,7 @@ export class RideController {
       existingFeedback = await this.prisma.feedback.findFirst({
         where: {
           rideId: body.rideId,
-          fromUserId: body.fromUserId,
+          fromUserId: authenticatedUserId,
           toUserId: body.toUserId,
         },
       });
@@ -343,7 +340,7 @@ export class RideController {
       feedback = await this.prisma.feedback.create({
         data: {
           rideId: body.rideId,
-          fromUserId: body.fromUserId,
+          fromUserId: authenticatedUserId,
           toUserId: body.toUserId,
           role: body.role,
           emoji: body.emoji,
@@ -385,7 +382,7 @@ export class RideController {
       message: `Karma calculation completed using ${TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING} algorithm`,
       tag: 'feedback',
       rideId: body.rideId,
-      fromUserId: body.fromUserId,
+      fromUserId: authenticatedUserId,
       algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
       calculation: {
         distance: rideDistance,
@@ -405,14 +402,14 @@ export class RideController {
     if (body.role === USER_ROLE.RIDER) {
       // Update rider's karma points
       await this.prisma.user.update({
-        where: { id: body.fromUserId },
+        where: { id: authenticatedUserId },
         data: { karmaPoints: { increment: totalPoints } },
       });
 
       // Create karma transaction
       await this.prisma.karmaTransaction.create({
         data: {
-          userId: body.fromUserId,
+          userId: authenticatedUserId,
           points: totalPoints,
           type: 'earned',
           reason: `Ride feedback: ${KarmaCalculationService.getFeedbackRatingDescription(body.emoji)} | Distance: ${rideDistance || 'N/A'}km | Points: ${totalPoints}`,
@@ -423,7 +420,7 @@ export class RideController {
         level: 'info',
         message: `Karma points awarded to rider using distance-based algorithm`,
         tag: 'feedback',
-        userId: body.fromUserId,
+        userId: authenticatedUserId,
         role: 'rider',
         rideId: body.rideId,
         algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
@@ -440,7 +437,7 @@ export class RideController {
     } else if (body.role === USER_ROLE.PASSENGER) {
       // Update passenger's credit score
       await this.prisma.user.update({
-        where: { id: body.fromUserId },
+        where: { id: authenticatedUserId },
         data: { creditScore: { increment: totalPoints } },
       });
 
@@ -448,7 +445,7 @@ export class RideController {
         level: 'info',
         message: `Credit score awarded to passenger using distance-based algorithm`,
         tag: 'feedback',
-        userId: body.fromUserId,
+        userId: authenticatedUserId,
         role: 'passenger',
         rideId: body.rideId,
         algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
@@ -481,7 +478,7 @@ export class RideController {
 
     // Get updated user data to return
     const updatedUser = await this.prisma.user.findUnique({
-      where: { id: body.fromUserId },
+      where: { id: authenticatedUserId },
       select: { id: true, karmaPoints: true, creditScore: true },
     });
 
@@ -623,29 +620,34 @@ export class RideController {
   }
 
   @Post()
-  async createRide(@Body() body: RideDto) {
+  @UseGuards(JwtAuthGuard)
+  async createRide(
+    @Body() body: Omit<RideDto, 'createdBy'>,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
     this.logger.log({
       level: 'info',
-      message: `Create ride attempt by userId=${body.createdBy}, from='${body.from}' to='${body.to}', role='${body.role}'`,
+      message: `Create ride attempt by userId=${authenticatedUserId}, from='${body.from}' to='${body.to}', role='${body.role}'`,
       tag: 'ride',
-      userId: body.createdBy,
+      userId: authenticatedUserId,
       from: body.from,
       to: body.to,
       role: body.role,
     });
-    if (!body.from || !body.to || !body.role || !body.createdBy) {
+    if (!body.from || !body.to || !body.role) {
       throw new BadRequestException('Missing required fields');
     }
     // Fetch user and check role
     const user = await this.prisma.user.findUnique({
-      where: { id: body.createdBy },
+      where: { id: authenticatedUserId },
     });
     if (!user) {
       this.logger.log({
         level: 'warn',
-        message: `Ride creation failed: User not found (userId=${body.createdBy})`,
+        message: `Ride creation failed: User not found (userId=${authenticatedUserId})`,
         tag: 'ride',
-        userId: body.createdBy,
+        userId: authenticatedUserId,
       });
       throw new NotFoundException('User not found');
     }
@@ -653,9 +655,9 @@ export class RideController {
     if (user.role.toLowerCase() !== body.role.toLowerCase()) {
       this.logger.log({
         level: 'warn',
-        message: `Ride creation failed: Role mismatch for userId=${body.createdBy} (userRole='${user.role}', requestedRole='${body.role}')`,
+        message: `Ride creation failed: Role mismatch for userId=${authenticatedUserId} (userRole='${user.role}', requestedRole='${body.role}')`,
         tag: 'ride',
-        userId: body.createdBy,
+        userId: authenticatedUserId,
         userRole: user.role,
         requestedRole: body.role,
       });
@@ -666,16 +668,16 @@ export class RideController {
     // Prevent posting if user has an active or confirmed ride (regardless of time)
     const existingActiveRide = await this.prisma.ride.findFirst({
       where: {
-        createdBy: body.createdBy,
+        createdBy: authenticatedUserId,
         status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
       },
     });
     if (existingActiveRide) {
       this.logger.log({
         level: 'warn',
-        message: `Ride creation failed: UserId=${body.createdBy} already has an active or confirmed ride`,
+        message: `Ride creation failed: UserId=${authenticatedUserId} already has an active or confirmed ride`,
         tag: 'ride',
-        userId: body.createdBy,
+        userId: authenticatedUserId,
         existingRideStatus: existingActiveRide.status,
       });
       throw new BadRequestException(
@@ -688,11 +690,11 @@ export class RideController {
     let passengerId: number | null = null;
 
     if (body.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
-      riderId = body.createdBy;
+      riderId = authenticatedUserId;
       passengerId = null;
     } else if (body.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase()) {
       riderId = null;
-      passengerId = body.createdBy;
+      passengerId = authenticatedUserId;
     }
 
     // Create ride with proper role-based assignment
@@ -706,7 +708,7 @@ export class RideController {
         toLng: body.toLng,
         message: body.message,
         role: body.role,
-        createdBy: body.createdBy,
+        createdBy: authenticatedUserId,
         riderId: riderId,
         passengerId: passengerId,
         estimatedTimeOfArrival: body.estimatedTimeOfArrival,
@@ -720,9 +722,9 @@ export class RideController {
     });
     this.logger.log({
       level: 'info',
-      message: `Ride created by userId=${body.createdBy}: ${JSON.stringify(ride)}`,
+      message: `Ride created by userId=${authenticatedUserId}: ${JSON.stringify(ride)}`,
       tag: 'ride',
-      userId: body.createdBy,
+      userId: authenticatedUserId,
       rideId: ride.id,
     });
     return { message: 'Ride created', ride };
@@ -785,17 +787,12 @@ export class RideController {
   //   3. Optimize query for large datasets (indexes, limits)
   //   4. Document API changes for frontend
   @Get('history')
-  async getRideHistory(@Query('userId') userId: string) {
-    // Expire old rides using the centralized helper
-    await this.expireOldRides();
-
-    this.logger.log({
-      level: 'info',
-      message: `Expired rides older than grace period for history fetch`,
-      tag: 'ride',
-      timestamp: getNow(),
-      userId,
-    });
+  @UseGuards(JwtAuthGuard)
+  async getRideHistory(
+    @Query('userId') userId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
     const id = Number(userId);
     if (!userId || isNaN(id)) {
       this.logger.log({
@@ -806,6 +803,27 @@ export class RideController {
       });
       throw new BadRequestException('Valid userId is required');
     }
+    // Verify user can only fetch their own history
+    if (id !== authenticatedUserId) {
+      this.logger.log({
+        level: 'warn',
+        message: `Get ride history denied: userId=${authenticatedUserId} attempted to fetch history for userId=${id}`,
+        tag: 'ride',
+        authenticatedUserId,
+        requestedUserId: id,
+      });
+      throw new ForbiddenException('You can only fetch your own ride history');
+    }
+    // Expire old rides using the centralized helper
+    await this.expireOldRides();
+
+    this.logger.log({
+      level: 'info',
+      message: `Expired rides older than grace period for history fetch`,
+      tag: 'ride',
+      timestamp: getNow(),
+      userId,
+    });
     const rides = await this.prisma.ride.findMany({
       where: {
         OR: [{ riderId: id }, { passengerId: id }, { createdBy: id }],
@@ -913,7 +931,30 @@ export class RideController {
   }
 
   @Put(':id')
-  async updateRide(@Param('id') id: string, @Body() updates: UpdateRideDto) {
+  @UseGuards(JwtAuthGuard)
+  async updateRide(
+    @Param('id') id: string,
+    @Body() updates: UpdateRideDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
+    // Verify user owns the ride before updating
+    const existingRide = await this.prisma.ride.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!existingRide) {
+      throw new NotFoundException('Ride not found');
+    }
+    if (existingRide.createdBy !== authenticatedUserId) {
+      this.logger.log({
+        level: 'warn',
+        message: `Update ride denied: userId=${authenticatedUserId} does not own ride ${id}`,
+        tag: 'ride',
+        userId: authenticatedUserId,
+        rideId: id,
+      });
+      throw new ForbiddenException('You can only update your own rides');
+    }
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
       data: updates,
@@ -922,6 +963,7 @@ export class RideController {
       level: 'info',
       message: `Ride updated`,
       tag: 'ride',
+      userId: authenticatedUserId,
       rideId: id,
       updates,
     });
@@ -932,11 +974,34 @@ export class RideController {
   }
 
   @Delete(':id')
-  async deleteRide(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard)
+  async deleteRide(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
+    // Verify user owns the ride before deleting
+    const existingRide = await this.prisma.ride.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!existingRide) {
+      throw new NotFoundException('Ride not found');
+    }
+    if (existingRide.createdBy !== authenticatedUserId) {
+      this.logger.log({
+        level: 'warn',
+        message: `Delete ride denied: userId=${authenticatedUserId} does not own ride ${id}`,
+        tag: 'ride',
+        userId: authenticatedUserId,
+        rideId: id,
+      });
+      throw new ForbiddenException('You can only delete your own rides');
+    }
     this.logger.log({
       level: 'warn',
       message: `Deleting ride with id: ${id}`,
       tag: 'ride',
+      userId: authenticatedUserId,
       rideId: id,
     });
     await this.prisma.ride.delete({ where: { id: Number(id) } });
@@ -951,7 +1016,13 @@ export class RideController {
 
   // Confirm a ride (match rides and mark as confirmed)
   @Post(':id/confirm')
-  async confirmRide(@Param('id') id: string, @Body() body: ConfirmRideDto) {
+  @UseGuards(JwtAuthGuard)
+  async confirmRide(
+    @Param('id') id: string,
+    @Body() body: ConfirmRideDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
     const rideId = Number(id);
     const currentRide = await this.prisma.ride.findUnique({
       where: { id: rideId },
@@ -970,6 +1041,18 @@ export class RideController {
         rideId: id,
       });
       throw new NotFoundException('Ride not found');
+    }
+
+    // Verify user owns the current ride they're confirming from
+    if (currentRide.createdBy !== authenticatedUserId) {
+      this.logger.log({
+        level: 'warn',
+        message: `Confirm ride denied: userId=${authenticatedUserId} does not own ride ${id}`,
+        tag: 'ride',
+        userId: authenticatedUserId,
+        rideId: id,
+      });
+      throw new ForbiddenException('You can only confirm your own rides');
     }
 
     let targetRideId: number;
@@ -1088,47 +1171,13 @@ export class RideController {
     // Fix: Create ConfirmedRideDto that maps only safe fields from confirmed rides
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/complete')
-  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
-  //
-  // PROBLEM: This endpoint accepts userId from the request body, creating a major security flaw
-  // where any user can complete rides on behalf of other users by simply changing the userId
-  // in their request. This bypasses all authorization checks and allows unauthorized ride completion.
-  //
-  // CURRENT FLOW:
-  // 1. Client sends POST /rides/:id/complete with { userId: X } in body
-  // 2. Server trusts this userId without any authentication verification
-  // 3. Any malicious user can set userId to any other user's ID
-  // 4. Result: User A can complete User B's rides without permission
-  //
-  // SECURITY RISKS:
-  // - Unauthorized ride completion on behalf of others
-  // - Manipulation of ride statistics (distance, CO2 savings, etc.)
-  // - Triggering of unintended notifications and feedback flows
-  // - Potential impact on user karma/credit systems
-  //
-  // AFFECTED ENDPOINTS WITH SAME VULNERABILITY:
-  // - POST /rides/:id/complete (this endpoint)
-  // - POST /rides/:id/reject
-  // - POST /rides/:id/cancel
-  //
-  // REQUIRED SOLUTION:
-  // 1. Implement JWT authentication with @UseGuards(JwtAuthGuard) decorator
-  // 2. Extract authenticated userId from JWT token via @Request() or custom decorator
-  // 3. Remove userId from request body - get it from authentication context instead
-  // 4. Example fix:
-  //    async completeRide(@Param('id') id: string, @Request() req: any) {
-  //      const authenticatedUserId = req.user.id; // From JWT token
-  //      // Use authenticatedUserId instead of body.userId
-  //    }
-  //
-  // PRIORITY: CRITICAL - Must be fixed before production deployment
-  // IMPACT: Complete bypass of user authorization for ride management actions
-  //
   async completeRide(
     @Param('id') id: string,
-    @Body() body: { userId: number },
+    @Request() req: AuthenticatedRequest,
   ) {
+    const authenticatedUserId = req.user.userId; // From JWT token
     const rideId = Number(id);
 
     const ride = await this.prisma.ride.findUnique({
@@ -1146,9 +1195,9 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
-    // Verify that the user is part of this ride
-    const isRider = ride.riderId === body.userId;
-    const isPassenger = ride.passengerId === body.userId;
+    // Verify that the authenticated user is part of this ride
+    const isRider = ride.riderId === authenticatedUserId;
+    const isPassenger = ride.passengerId === authenticatedUserId;
 
     if (!isRider && !isPassenger) {
       throw new BadRequestException(
@@ -1234,10 +1283,10 @@ export class RideController {
 
     this.logger.log({
       level: 'info',
-      message: `Ride(s) completed by user ${body.userId}`,
+      message: `Ride(s) completed by authenticated user ${authenticatedUserId}`,
       tag: 'ride',
       rideId,
-      completedByUserId: body.userId,
+      completedByUserId: authenticatedUserId,
       isRider,
       isPassenger,
       distance,
@@ -1262,34 +1311,32 @@ export class RideController {
     // Fix: Create CompletedRideDto that maps only safe fields
   }
 
-  // Reject a ride (mark as rejected)
+  @UseGuards(JwtAuthGuard)
   @Post(':id/reject')
-  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
-  //
-  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts userId from request body,
-  // allowing any user to reject rides on behalf of others by changing the userId.
-  // This bypasses authorization and enables unauthorized ride management actions.
-  //
-  // SECURITY RISK: User A can reject User B's rides without permission
-  // REQUIRED FIX: Extract userId from JWT authentication context instead of request body
-  //
-  async rejectRide(@Param('id') id: string, @Body() body: { userId: number }) {
+  async rejectRide(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId; // From JWT token
+
     // Mark ride as rejected
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
       data: { status: RIDE_STATUS.REJECTED },
     });
+
     this.logger.log({
       level: 'info',
       message: `Ride rejected`,
       tag: 'ride',
       rideId: id,
-      userId: body.userId,
+      userId: authenticatedUserId,
     });
+
     return {
       message: 'Ride rejected. You can now post a new ride.',
       rideId: id,
-      userId: body.userId,
+      userId: authenticatedUserId,
       ride,
     };
     // TODO (data_exposure_security): MEDIUM - ride object contains Prisma fields that may not be needed
@@ -1297,34 +1344,32 @@ export class RideController {
     // Fix: Return minimal ride info or just confirmation message
   }
 
-  // Cancel a ride (mark as cancelled)
+  @UseGuards(JwtAuthGuard)
   @Post(':id/cancel')
-  // TODO (authentication_security): CRITICAL SECURITY VULNERABILITY
-  //
-  // SAME ISSUE AS /rides/:id/complete - This endpoint accepts userId from request body,
-  // allowing any user to cancel rides on behalf of others by changing the userId.
-  // This bypasses authorization and enables unauthorized ride management actions.
-  //
-  // SECURITY RISK: User A can cancel User B's rides without permission
-  // REQUIRED FIX: Extract userId from JWT authentication context instead of request body
-  //
-  async cancelRide(@Param('id') id: string, @Body() body: { userId: number }) {
+  async cancelRide(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId; // From JWT token
+
     // Mark ride as cancelled
     const ride = await this.prisma.ride.update({
       where: { id: Number(id) },
       data: { status: RIDE_STATUS.CANCELLED },
     });
+
     this.logger.log({
       level: 'info',
       message: `Ride cancelled`,
       tag: 'ride',
       rideId: id,
-      userId: body.userId,
+      userId: authenticatedUserId,
     });
+
     return {
       message: 'Ride cancelled. You can now post a new ride.',
       rideId: id,
-      userId: body.userId,
+      userId: authenticatedUserId,
       ride,
     };
     // TODO (data_exposure_security): MEDIUM - ride object contains Prisma fields that may not be needed
@@ -1334,7 +1379,23 @@ export class RideController {
 
   // Get current user's active ride with expiry information
   @Get('user/:userId/current')
-  async getCurrentUserRide(@Param('userId', ParseIntPipe) userId: number) {
+  @UseGuards(JwtAuthGuard)
+  async getCurrentUserRide(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
+    // Verify user can only fetch their own ride
+    if (userId !== authenticatedUserId) {
+      this.logger.log({
+        level: 'warn',
+        message: `Get current ride denied: userId=${authenticatedUserId} attempted to fetch ride for userId=${userId}`,
+        tag: 'ride',
+        authenticatedUserId,
+        requestedUserId: userId,
+      });
+      throw new ForbiddenException('You can only fetch your own ride');
+    }
     // First expire any old rides
     await this.expireOldRides();
 

@@ -4,6 +4,15 @@ import {
   FEEDBACK_EMOJI,
   REDEMPTION_STATUS,
 } from '../constants/enums';
+import { JwtUser } from '../auth/jwt.strategy';
+
+/**
+ * Interface for authenticated request with JWT user payload
+ * Used in protected endpoints that require JWT authentication
+ */
+export interface AuthenticatedRequest {
+  user: JwtUser;
+}
 
 /**
  * DTO for ride creation and updates
