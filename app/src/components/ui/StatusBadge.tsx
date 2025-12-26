@@ -1,14 +1,15 @@
 import React from 'react';
 
-import { RIDE_STATUS } from '../../constants/enums';
+import { RIDE_STATUS, LEADERBOARD_RANK } from '../../constants/enums';
 import { capitalize } from '../../utils/functions';
 
-interface RideStatusBadgeProps {
-  status: RIDE_STATUS;
+interface StatusBadgeProps {
+  status?: RIDE_STATUS;
+  rank?: LEADERBOARD_RANK;
   className?: string;
 }
 
-const statusMap: Record<RIDE_STATUS, { color: string; text: string }> = {
+const rideStatusMap: Record<RIDE_STATUS, { color: string; text: string }> = {
   [RIDE_STATUS.IDLE]: {
     color:
       'border-slate-200 bg-gradient-to-br from-slate-100 via-white to-slate-50 text-slate-400',
@@ -46,13 +47,46 @@ const statusMap: Record<RIDE_STATUS, { color: string; text: string }> = {
   },
 } as const;
 
-const RideStatusBadge: React.FC<RideStatusBadgeProps> = ({
+const leaderboardRankMap: Record<
+  LEADERBOARD_RANK,
+  { color: string; text: string }
+> = {
+  [LEADERBOARD_RANK.GOLD]: {
+    color:
+      'border-yellow-300 bg-gradient-to-tr from-yellow-500 via-yellow-100 to-yellow-400 text-yellow-600',
+    text: 'bg-yellow-600',
+  },
+  [LEADERBOARD_RANK.SILVER]: {
+    color:
+      'border-gray-300 bg-gradient-to-tr text-gray-600 from-gray-500 via-gray-200 to-gray-500 text-gray-500',
+    text: 'bg-gray-500',
+  },
+  [LEADERBOARD_RANK.BRONZE]: {
+    color:
+      'border-amber-400 bg-gradient-to-tr from-amber-600 via-amber-400 to-amber-600 text-amber-800',
+    text: 'bg-amber-800',
+  },
+} as const;
+
+const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
+  rank,
   className,
 }) => {
-  const s = statusMap[status];
+  let s: { color: string; text: string } | undefined;
+  let label: string;
+
+  if (status) {
+    s = rideStatusMap[status];
+    label = capitalize(status);
+  } else if (rank) {
+    s = leaderboardRankMap[rank];
+    label = rank;
+  } else {
+    return null;
+  }
+
   if (!s) return null;
-  const label = capitalize(status);
 
   return (
     <span
@@ -64,4 +98,4 @@ const RideStatusBadge: React.FC<RideStatusBadgeProps> = ({
   );
 };
 
-export default RideStatusBadge;
+export default StatusBadge;

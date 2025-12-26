@@ -18,7 +18,12 @@ const routeLinks = [
   },
   {
     id: 3,
-    title: 'FAQ',
+    title: 'Leaderboard',
+    link: '/leaderboard',
+  },
+  {
+    id: 4,
+    title: 'Support & FAQ',
     link: '/help',
   },
 ];

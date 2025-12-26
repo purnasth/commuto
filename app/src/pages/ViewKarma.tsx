@@ -1,5 +1,6 @@
 import { MdWorkspacePremium } from 'react-icons/md';
 
+import CtoUI from '../components/ui/CtoUI';
 import LogoBar from '../components/ui/LogoBar';
 
 const karmaPointsDescription = `Karma Points are rewards you earn for sharing rides and helping others reduce their carbon footprint. The more you contribute, the more points you collect!`;
@@ -169,6 +170,13 @@ const ViewKarma = () => {
             </div>
           </section>
         </div>
+      </main>
+
+      <main>
+        <CtoUI
+          title="Earn Karma Points Today!"
+          description="Share a ride, Be a hero & Save the Environment! Earn Karma Points with every ride you share. Start your journey towards a greener planet today."
+        />
       </main>
     </>
   );

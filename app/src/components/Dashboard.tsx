@@ -29,8 +29,8 @@ import {
 import Tooltip from './ui/Tooltip';
 import UserDisplay from './ui/UserDisplay';
 import NoRideFound from './ui/NoRideFound';
+import StatusBadge from './ui/StatusBadge';
 import MobileDashboard from './MobileDashboard';
-import RideStatusBadge from './ui/RideStatusBadge';
 
 interface DashboardProps {
   rides: RideHistory[];
@@ -209,7 +209,7 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
               return (
                 <tr
                   key={ride.id}
-                  className="border-b transition-colors last:border-none hover:bg-teal-50 dark:hover:bg-teal-900"
+                  className="border-b transition-colors last:border-none hover:bg-teal-50 dark:border-teal-300/30 dark:hover:bg-teal-900"
                 >
                   <td className="py-3 pl-4">{idx + 1}</td>
                   <td className="px-4 py-3">
@@ -233,7 +233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
                     </Tooltip>
                   </td>
                   <td className="px-4 py-3">
-                    <RideStatusBadge status={ride.status} />
+                    <StatusBadge status={ride.status} />
                   </td>
                   <td className="px-4 py-3">
                     <UserDisplay

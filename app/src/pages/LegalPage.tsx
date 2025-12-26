@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 
 import Error404 from './Error404';
+import CtoUI from '../components/ui/CtoUI';
 import LogoBar from '../components/ui/LogoBar';
 import CareOurEarth from '../components/ui/CareOurEarth';
 
@@ -44,6 +45,13 @@ const LegalPage = () => {
             </section>
           ))}
         </div>
+      </main>
+
+      <main>
+        <CtoUI
+          title="Join Commuto Today!"
+          description="Together, we can create a more sustainable future. Start your journey with Commuto today. Be it as a Rider or a Passenger, every ride counts towards reducing our carbon footprint."
+        />
       </main>
     </>
   );

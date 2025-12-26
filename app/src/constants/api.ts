@@ -32,3 +32,9 @@ export const API_KARMA_REDEEM = `${API_KARMA}/redeem`;
 export const API_KARMA_USER_REDEMPTIONS = `${API_KARMA}/user/:userId`;
 
 export const API_KARMA_UPDATE_STATUS = `${API_KARMA}/:redemptionCode/status`;
+
+// TODO: implement this API endpoint from server side for leaderboard
+export const API_LEADERBOARD = '/leaderboard';
+export const API_LEADERBOARD_TOP_RIDERS = `${API_LEADERBOARD}/riders`;
+export const API_LEADERBOARD_TOP_KARMA = `${API_LEADERBOARD}/karma`;
+export const API_LEADERBOARD_TOP_FEEDBACK = `${API_LEADERBOARD}/feedback`;

@@ -16,7 +16,7 @@ import {
 import Tooltip from './ui/Tooltip';
 import NoRideFound from './ui/NoRideFound';
 import UserDisplay from './ui/UserDisplay';
-import RideStatusBadge from './ui/RideStatusBadge';
+import StatusBadge from './ui/StatusBadge';
 
 import { USER_ROLE, LS_RIDE_FORM_DATA_KEY } from '../constants/enums';
 import { ROUTE_HOME, ROUTE_ROLE } from '../constants/routes';
@@ -147,7 +147,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
       </h2>
       <div className="relative max-h-[60vh] min-h-64 overflow-y-auto overflow-x-hidden bg-transparent">
         <div className="pointer-events-none fixed -left-[20%] top-1/3 -z-10 size-48 rounded-full bg-teal-300 blur-[80px]" />
-        <div className="pointer-events-none fixed bottom-1/4 -right-10 -z-10 size-32 rounded-full bg-teal-300 blur-[80px]" />
+        <div className="pointer-events-none fixed -right-10 bottom-1/4 -z-10 size-32 rounded-full bg-teal-300 blur-[80px]" />
 
         {rides.length === 0 ? (
           <NoRideFound
@@ -217,45 +217,7 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
                 <span className="text-xs font-semibold text-teal-700 dark:text-teal-200">
                   Status:
                 </span>
-                <RideStatusBadge status={ride.status} className="ml-auto" />
-                {/* <span className="ml-auto text-xs">
-                  {ride.status === RIDE_STATUS.ACTIVE && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-300 bg-blue-100 px-2 py-0.5 text-xs font-normal text-blue-600">
-                      <span className="size-1.5 rounded-full bg-blue-600" />
-                      Active
-                    </span>
-                  )}
-                  {ride.status === RIDE_STATUS.CONFIRMED && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-100 px-2 py-0.5 text-xs font-normal text-teal-600">
-                      <span className="size-1.5 rounded-full bg-teal-600" />
-                      Confirmed
-                    </span>
-                  )}
-                  {ride.status === RIDE_STATUS.REJECTED && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-xs font-normal text-red-600">
-                      <span className="size-1.5 rounded-full bg-red-600" />
-                      Rejected
-                    </span>
-                  )}
-                  {ride.status === RIDE_STATUS.EXPIRED && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-600">
-                      <span className="size-1.5 rounded-full bg-gray-600" />
-                      Expired
-                    </span>
-                  )}
-                  {ride.status === RIDE_STATUS.CANCELLED && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-600">
-                      <span className="size-1.5 rounded-full bg-amber-600" />
-                      Cancelled
-                    </span>
-                  )}
-                  {ride.status === RIDE_STATUS.COMPLETED && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-green-300 bg-green-100 px-2 py-0.5 text-xs font-normal text-green-600">
-                      <span className="size-1.5 rounded-full bg-green-600" />
-                      Completed
-                    </span>
-                  )}
-                </span> */}
+                <StatusBadge status={ride.status} className="ml-auto" />
               </div>
               {/* User Display (Rider/Passenger based on current user) */}
               <div className="mt-1 flex items-center justify-between">

@@ -1,4 +1,4 @@
-import { RIDE_STATUS, USER_ROLE } from '../constants/enums';
+import { RIDE_STATUS, USER_ROLE, LEADERBOARD_RANK } from '../constants/enums';
 
 export interface Person {
   id: number;
@@ -198,4 +198,20 @@ export interface UserRedemptionsResponse {
     redeemedAt: string;
   }>;
   total: number;
+}
+
+export interface LeaderboardUser {
+  id: number;
+  name: string;
+  profilePicture?: string;
+  role: USER_ROLE;
+  value: number;
+  rank: number;
+  badge?: LEADERBOARD_RANK;
+}
+
+export interface LeaderboardData {
+  topRiders: LeaderboardUser[];
+  topKarmaPoints: LeaderboardUser[];
+  topFeedback: LeaderboardUser[];
 }

@@ -3,6 +3,7 @@ import { TbTrophy } from 'react-icons/tb';
 
 import { useCreditScore } from '../hooks/useCreditScore';
 
+import CtoUI from '../components/ui/CtoUI';
 import LogoBar from '../components/ui/LogoBar';
 
 const ViewScore = () => {
@@ -120,6 +121,13 @@ const ViewScore = () => {
             </ul>
           </section>
         </div>
+      </main>
+
+      <main>
+        <CtoUI
+          title="Improve Your Credit Score Today!"
+          description="Start joining rides and building your reputation on Commuto. The more reliable and trustworthy you are, the better your credit score will be. Take the first step towards becoming a preferred passenger now!"
+        />
       </main>
     </>
   );

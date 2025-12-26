@@ -12,3 +12,4 @@ export const ROUTE_404 = '*';
 export const ROUTE_REDEEM = '/redeem';
 export const ROUTE_VIEW_SCORE = '/view-score';
 export const ROUTE_EARN_KARMA = '/earn-karma';
+export const ROUTE_LEADERBOARD = '/leaderboard';
