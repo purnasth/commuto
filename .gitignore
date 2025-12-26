@@ -9,3 +9,6 @@
 
 # Ignore github files
 /.github
+
+# Ignore docs folder
+/.docs

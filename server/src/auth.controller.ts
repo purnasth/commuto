@@ -18,6 +18,8 @@ import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 import { EnvService } from './env.service';
 import { USER_ROLE } from './constants/enums';
 import { PrismaService } from './prisma.service';
+import { AuthService } from './services/auth.service';
+import { AUTH_CONSTANTS } from './constants/auth.constants';
 
 interface LoginDto {
   email: string;
@@ -58,6 +60,7 @@ export class AuthController {
   //
   constructor(
     private prisma: PrismaService,
+    private authService: AuthService,
     private configService: ConfigService,
     private envService: EnvService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
@@ -146,10 +149,20 @@ export class AuthController {
       });
       throw new UnauthorizedException('Invalid password');
     }
+    // Generate JWT tokens
+    const accessToken = this.authService.generateAccessToken(
+      user.id,
+      user.email,
+    );
+    const refreshToken = await this.authService.generateAndStoreRefreshToken(
+      user.id,
+    );
+
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(
       Object.entries(user).filter(([key]) => key !== 'password'),
     );
+
     this.logger.log({
       level: 'info',
       message: `Login successful for email: ${body.email}`,
@@ -157,7 +170,13 @@ export class AuthController {
       email: body.email,
       userId: user.id,
     });
-    return { message: 'Login successful', user: userWithoutPassword };
+
+    return {
+      message: 'Login successful',
+      user: userWithoutPassword,
+      accessToken,
+      refreshToken,
+    };
   }
 
   @Post('signup')
@@ -182,7 +201,10 @@ export class AuthController {
       throw new BadRequestException('Email already registered');
     }
     // Use static import for bcrypt for better performance
-    const hashedPassword = await bcrypt.hash(body.password, 10);
+    const hashedPassword = await bcrypt.hash(
+      body.password,
+      AUTH_CONSTANTS.BCRYPT_SALT_ROUNDS,
+    );
     const user = await this.prisma.user.create({
       data: {
         fullname: body.fullname,
@@ -195,6 +217,15 @@ export class AuthController {
         ratings: body.ratings,
       },
     });
+    // Generate JWT tokens
+    const accessToken = this.authService.generateAccessToken(
+      user.id,
+      user.email,
+    );
+    const refreshToken = await this.authService.generateAndStoreRefreshToken(
+      user.id,
+    );
+
     this.logger.log({
       level: 'info',
       message: `Signup successful for email: ${body.email}, fullname: ${body.fullname}`,
@@ -202,22 +233,73 @@ export class AuthController {
       email: body.email,
       userId: user.id,
     });
+
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(
       Object.entries(user).filter(([key]) => key !== 'password'),
     );
-    return { message: 'Signup successful', user: userWithoutPassword };
+
+    return {
+      message: 'Signup successful',
+      user: userWithoutPassword,
+      accessToken,
+      refreshToken,
+    };
   }
 
   @Post('logout')
-  logout(@Body() body: { email?: string }) {
+  async logout(@Body() body: { refreshToken: string; email?: string }) {
     this.logger.log({
       level: 'info',
       message: `Logout${body?.email ? ` for email: ${body.email}` : ''}`,
       tag: 'auth',
       ...(body?.email ? { email: body.email } : {}),
     });
+
+    // Delete the refresh token from database
+    if (body.refreshToken) {
+      await this.authService.revokeRefreshToken(body.refreshToken);
+    }
+
     return { message: 'Logout successful' };
+  }
+
+  @Post('refresh')
+  async refreshToken(@Body() body: { refreshToken: string }) {
+    this.logger.log({
+      level: 'info',
+      message: 'Refresh token request',
+      tag: 'auth',
+    });
+
+    if (!body.refreshToken) {
+      throw new BadRequestException('Refresh token is required');
+    }
+
+    try {
+      const accessToken = await this.authService.refreshAccessToken(
+        body.refreshToken,
+      );
+
+      this.logger.log({
+        level: 'info',
+        message: 'Access token refreshed successfully',
+        tag: 'auth',
+      });
+
+      return {
+        message: 'Token refreshed successfully',
+        accessToken,
+      };
+    } catch (error) {
+      this.logger.log({
+        level: 'error',
+        message: `Refresh token verification failed: ${error}`,
+        tag: 'error',
+      });
+
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 
   @Delete('delete')
@@ -252,6 +334,10 @@ export class AuthController {
       });
       throw new UnauthorizedException('Invalid password');
     }
+
+    // Revoke all refresh tokens before deleting user
+    await this.authService.revokeAllUserTokens(user.id);
+
     await this.prisma.user.delete({
       where: { email: body.email },
     });
