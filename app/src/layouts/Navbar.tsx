@@ -10,12 +10,13 @@ import { ROUTE_HOME, ROUTE_LOGIN, ROUTE_PROFILE } from '../constants/routes';
 
 import { useSocket } from '../utils/useSocket';
 import { useRideEvent } from '../utils/useRideEvent';
-import { getUserGreeting } from '../utils/functions';
 
+import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../contexts/ThemeProvider';
 
 import SideNav from './SideNav';
 import ThemeToggle from '../components/ui/ThemeToggle';
+import { getFirstNameFromFullName } from '../utils/functions';
 
 const navLinks = [
   {
@@ -65,9 +66,13 @@ const Navbar = () => {
   console.log('Navbar rideStatus:', rideStatus);
 
   const [visible, setVisible] = useState(true);
-  const [userName, setUserName] = useState<string | null>(null);
   const location = useLocation();
   const { theme } = useTheme();
+  const { user } = useAuth();
+
+  const userName = user?.fullname
+    ? getFirstNameFromFullName(user.fullname)
+    : null;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -105,10 +110,6 @@ const Navbar = () => {
     setShowRideButton(true);
     console.log('Running navbar logic after ride confirmation');
   };
-
-  useEffect(() => {
-    setUserName(getUserGreeting());
-  }, []);
 
   const toggleNav = () => {
     setIsOpen(!isOpen);

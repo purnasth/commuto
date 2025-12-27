@@ -18,9 +18,15 @@ export const API_AUTH = '/auth';
 
 export const API_AUTH_LOGIN = `${API_AUTH}/login`;
 
-export const API_USER_LOGOUT = `${API_AUTH}/logout`;
+export const API_AUTH_SIGNUP = `${API_AUTH}/signup`;
 
-export const API_USER_DETAILS = `${API_AUTH}/user?email=:email`;
+export const API_AUTH_LOGOUT = `${API_AUTH}/logout`;
+
+export const API_AUTH_REFRESH = `${API_AUTH}/refresh`;
+
+export const API_AUTH_USER = `${API_AUTH}/user`;
+
+export const API_AUTH_UPDATE = `${API_AUTH}/update`;
 
 // Karma Redemption APIs
 export const API_KARMA = '/karma';

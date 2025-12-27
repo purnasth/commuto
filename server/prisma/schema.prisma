@@ -15,29 +15,42 @@ datasource db {
 }
 
 model User {
-  id             Int       @id @default(autoincrement())
-  fullname       String
-  email          String    @unique
-  password       String
-  role           String
-  phone          String?
-  address        String?
-  profilePicture String?
-  ratings        Float?    // average rating
-  rides          Ride[]    @relation("RiderRides")
-  rideRequests   RideRequest[]
-  messages       Message[] @relation("UserMessages")
-  passengerRides Ride[]    @relation("RidePassengers")
-  createdRides   Ride[]    @relation("CreatedUser")
-  ratingsGiven   Rating[]  @relation("FromUser")
-  ratingsReceived Rating[] @relation("ToUser")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  karmaPoints    Int      @default(0) // Total karma points
-  creditScore    Int      @default(0) // Total credit score for passengers
+  id                Int                @id @default(autoincrement())
+  fullname          String
+  email             String             @unique
+  password          String
+  role              String
+  phone             String?
+  address           String?
+  profilePicture    String?
+  ratings           Float? // average rating
+  rides             Ride[]             @relation("RiderRides")
+  rideRequests      RideRequest[]
+  messages          Message[]          @relation("UserMessages")
+  passengerRides    Ride[]             @relation("RidePassengers")
+  createdRides      Ride[]             @relation("CreatedUser")
+  ratingsGiven      Rating[]           @relation("FromUser")
+  ratingsReceived   Rating[]           @relation("ToUser")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  karmaPoints       Int                @default(0) // Total karma points
+  creditScore       Int                @default(0) // Total credit score for passengers
   karmaTransactions KarmaTransaction[]
   feedbackGiven     Feedback[]         @relation("FromUser")
   feedbackReceived  Feedback[]         @relation("ToUser")
+  refreshTokens     RefreshToken[] // JWT refresh tokens
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
 }
 
 model Ride {
@@ -113,18 +126,18 @@ model Message {
 }
 
 model KarmaTransaction {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  points    Int
-  type      String
-  reason    String?
-  rewardName String?
+  id             Int               @id @default(autoincrement())
+  user           User              @relation(fields: [userId], references: [id])
+  userId         Int
+  points         Int
+  type           String
+  reason         String?
+  rewardName     String?
   redemptionCode String?
-  status    RedemptionStatus?
-  expiresAt DateTime?
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
+  status         RedemptionStatus?
+  expiresAt      DateTime?
+  usedAt         DateTime?
+  createdAt      DateTime          @default(now())
 }
 
 model Feedback {
@@ -136,7 +149,7 @@ model Feedback {
   toUser     User     @relation("ToUser", fields: [toUserId], references: [id])
   toUserId   Int
   role       String // role of the person giving feedback (rider/passenger)
-  emoji      Int    // emoji reaction index: 0=😊, 1=😐, 2=😠
+  emoji      Int // emoji reaction index: 0=😊, 1=😐, 2=😠
   comment    String? // optional comment
   createdAt  DateTime @default(now())
 

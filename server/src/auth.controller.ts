@@ -3,9 +3,10 @@ import {
   Put,
   Post,
   Body,
-  Query,
   Delete,
   Inject,
+  Request,
+  UseGuards,
   Controller,
   BadRequestException,
   UnauthorizedException,
@@ -16,24 +17,17 @@ import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { EnvService } from './env.service';
-import { USER_ROLE } from './constants/enums';
 import { PrismaService } from './prisma.service';
-
-interface LoginDto {
-  email: string;
-  password: string;
-}
-
-interface SignupDto {
-  fullname: string;
-  email: string;
-  password: string;
-  role: USER_ROLE;
-  phone?: string;
-  address?: string;
-  profilePicture?: string;
-  ratings?: number;
-}
+import { AuthService } from './services/auth.service';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { AuthenticatedRequest } from './interfaces/types';
+import { AUTH_CONSTANTS } from './constants/auth.constants';
+import {
+  LoginDto,
+  SignupDto,
+  RefreshTokenDto,
+  DeleteAccountDto,
+} from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -58,6 +52,7 @@ export class AuthController {
   //
   constructor(
     private prisma: PrismaService,
+    private authService: AuthService,
     private configService: ConfigService,
     private envService: EnvService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
@@ -65,7 +60,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  async login(@Body() body: LoginDto & { recaptchaToken?: string }) {
+  async login(@Body() body: LoginDto) {
     this.logger.log({
       level: 'info',
       message: `Login attempt for email: ${body.email}`,
@@ -73,11 +68,11 @@ export class AuthController {
       email: body.email,
     });
 
-    // Skip reCAPTCHA in development environment
     if (!this.envService.isDev) {
       const recaptchaSecret = this.configService.get<string>(
         'RECAPTCHA_SECRET_KEY',
       );
+
       if (!body.recaptchaToken) {
         this.logger.log({
           level: 'warn',
@@ -85,6 +80,7 @@ export class AuthController {
           tag: 'auth',
           email: body.email,
         });
+
         throw new BadRequestException('Missing reCAPTCHA token');
       }
       const verifyUrl = `https://www.google.com/recaptcha/api/siteverify`;
@@ -146,10 +142,20 @@ export class AuthController {
       });
       throw new UnauthorizedException('Invalid password');
     }
+    // Generate JWT tokens
+    const accessToken = this.authService.generateAccessToken(
+      user.id,
+      user.email,
+    );
+    const refreshToken = await this.authService.generateAndStoreRefreshToken(
+      user.id,
+    );
+
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(
       Object.entries(user).filter(([key]) => key !== 'password'),
     );
+
     this.logger.log({
       level: 'info',
       message: `Login successful for email: ${body.email}`,
@@ -157,7 +163,13 @@ export class AuthController {
       email: body.email,
       userId: user.id,
     });
-    return { message: 'Login successful', user: userWithoutPassword };
+
+    return {
+      message: 'Login successful',
+      user: userWithoutPassword,
+      accessToken,
+      refreshToken,
+    };
   }
 
   @Post('signup')
@@ -169,9 +181,11 @@ export class AuthController {
       email: body.email,
       fullname: body.fullname,
     });
+
     const existing = await this.prisma.user.findUnique({
       where: { email: body.email },
     });
+
     if (existing) {
       this.logger.log({
         level: 'warn',
@@ -179,10 +193,15 @@ export class AuthController {
         tag: 'error',
         email: body.email,
       });
+
       throw new BadRequestException('Email already registered');
     }
-    // Use static import for bcrypt for better performance
-    const hashedPassword = await bcrypt.hash(body.password, 10);
+
+    const hashedPassword = await bcrypt.hash(
+      body.password,
+      AUTH_CONSTANTS.BCRYPT_SALT_ROUNDS,
+    );
+
     const user = await this.prisma.user.create({
       data: {
         fullname: body.fullname,
@@ -195,6 +214,15 @@ export class AuthController {
         ratings: body.ratings,
       },
     });
+    // Generate JWT tokens
+    const accessToken = this.authService.generateAccessToken(
+      user.id,
+      user.email,
+    );
+    const refreshToken = await this.authService.generateAndStoreRefreshToken(
+      user.id,
+    );
+
     this.logger.log({
       level: 'info',
       message: `Signup successful for email: ${body.email}, fullname: ${body.fullname}`,
@@ -202,26 +230,78 @@ export class AuthController {
       email: body.email,
       userId: user.id,
     });
+
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(
       Object.entries(user).filter(([key]) => key !== 'password'),
     );
-    return { message: 'Signup successful', user: userWithoutPassword };
+
+    return {
+      message: 'Signup successful',
+      user: userWithoutPassword,
+      accessToken,
+      refreshToken,
+    };
   }
 
   @Post('logout')
-  logout(@Body() body: { email?: string }) {
+  async logout(@Body() body: RefreshTokenDto) {
     this.logger.log({
       level: 'info',
-      message: `Logout${body?.email ? ` for email: ${body.email}` : ''}`,
+      message: `Logout attempt`,
       tag: 'auth',
-      ...(body?.email ? { email: body.email } : {}),
+      refreshToken: body.refreshToken,
     });
+
+    if (!body.refreshToken) {
+      throw new BadRequestException('Refresh token is required for logout');
+    }
+
+    await this.authService.revokeRefreshToken(body.refreshToken);
+
     return { message: 'Logout successful' };
   }
 
+  @Post('refresh')
+  async refreshToken(@Body() body: RefreshTokenDto) {
+    this.logger.log({
+      level: 'info',
+      message: 'Refresh token request',
+      tag: 'auth',
+    });
+
+    if (!body.refreshToken) {
+      throw new BadRequestException('Refresh token is required');
+    }
+
+    try {
+      const accessToken = await this.authService.refreshAccessToken(
+        body.refreshToken,
+      );
+
+      this.logger.log({
+        level: 'info',
+        message: 'Access token refreshed successfully',
+        tag: 'auth',
+      });
+
+      return {
+        message: 'Token refreshed successfully',
+        accessToken,
+      };
+    } catch (error) {
+      this.logger.log({
+        level: 'error',
+        message: `Refresh token verification failed: ${error}`,
+        tag: 'error',
+      });
+
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
   @Delete('delete')
-  async deleteAccount(@Body() body: { email: string; password: string }) {
+  async deleteAccount(@Body() body: DeleteAccountDto) {
     this.logger.log({
       level: 'info',
       message: `Delete account attempt for email: ${body.email}`,
@@ -252,6 +332,10 @@ export class AuthController {
       });
       throw new UnauthorizedException('Invalid password');
     }
+
+    // Revoke all refresh tokens before deleting user
+    await this.authService.revokeAllUserTokens(user.id);
+
     await this.prisma.user.delete({
       where: { email: body.email },
     });
@@ -266,22 +350,24 @@ export class AuthController {
   }
 
   @Get('user')
-  async getUser(@Query('email') email: string) {
+  @UseGuards(JwtAuthGuard)
+  async getUser(@Request() req: AuthenticatedRequest) {
+    const authenticatedUserId = req.user.userId;
     this.logger.log({
       level: 'info',
-      message: `Get user profile for email: ${email}`,
+      message: `Get user profile for userId: ${authenticatedUserId}`,
       tag: 'auth',
-      email,
+      userId: authenticatedUserId,
     });
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { id: authenticatedUserId },
     });
     if (!user) {
       this.logger.log({
         level: 'warn',
-        message: `Get user failed for email: ${email} - User not found`,
+        message: `Get user failed for userId: ${authenticatedUserId} - User not found`,
         tag: 'error',
-        email,
+        userId: authenticatedUserId,
       });
       throw new BadRequestException('User not found');
     }
@@ -293,29 +379,33 @@ export class AuthController {
   }
 
   @Put('update')
+  @UseGuards(JwtAuthGuard)
   async updateUser(
     @Body()
     body: {
-      email: string;
       password: string;
       updates: Partial<SignupDto>;
     },
+    @Request() req: AuthenticatedRequest,
   ) {
+    const authenticatedUserId = req.user.userId;
+    const authenticatedEmail = req.user.email;
     this.logger.log({
       level: 'info',
-      message: `Update user attempt for email: ${body.email}`,
+      message: `Update user attempt for authenticated user`,
       tag: 'auth',
-      email: body.email,
+      userId: authenticatedUserId,
+      email: authenticatedEmail,
     });
     const user = await this.prisma.user.findUnique({
-      where: { email: body.email },
+      where: { id: authenticatedUserId },
     });
     if (!user) {
       this.logger.log({
         level: 'warn',
-        message: `Update user failed for email: ${body.email} - User not found`,
+        message: `Update user failed - User not found`,
         tag: 'error',
-        email: body.email,
+        userId: authenticatedUserId,
       });
       throw new BadRequestException('User not found');
     }
@@ -325,9 +415,9 @@ export class AuthController {
     if (!isPasswordValid) {
       this.logger.log({
         level: 'warn',
-        message: `Update user failed for email: ${body.email} - Invalid password`,
+        message: `Update user failed - Invalid password`,
         tag: 'error',
-        email: body.email,
+        userId: authenticatedUserId,
       });
       throw new UnauthorizedException('Invalid password');
     }
@@ -336,15 +426,15 @@ export class AuthController {
     delete allowedUpdates.email;
     delete allowedUpdates.password;
     const updatedUser = await this.prisma.user.update({
-      where: { email: body.email },
+      where: { id: authenticatedUserId },
       data: allowedUpdates,
     });
     this.logger.log({
       level: 'info',
-      message: `User updated for email: ${body.email}`,
+      message: `User updated for email: ${authenticatedEmail}`,
       tag: 'auth',
-      email: body.email,
-      userId: user.id,
+      email: authenticatedEmail,
+      userId: authenticatedUserId,
     });
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(

@@ -29,11 +29,11 @@ export class KarmaRedemptionService {
    * - Currently, rewards are statically managed in the frontend `data.ts` for simplicity.
    */
 
-  async redeemReward(data: RedeemRewardDto) {
+  async redeemReward(userId: number, data: RedeemRewardDto) {
     return await this.prisma.$transaction(async (prisma) => {
       // Validate user exists and has sufficient karma points
       const user = await prisma.user.findUnique({
-        where: { id: data.userId },
+        where: { id: userId },
         select: { id: true, karmaPoints: true },
       });
 
@@ -47,13 +47,13 @@ export class KarmaRedemptionService {
         );
       }
 
-      const redemptionCode = generateVoucherId(data.rewardName, data.userId);
+      const redemptionCode = generateVoucherId(data.rewardName, userId);
 
       const expiresAt = addMonthsToDate(new Date(), 1);
 
       const redemption = await prisma.karmaTransaction.create({
         data: {
-          userId: data.userId,
+          userId: userId,
           points: -data.karmaPointsCost,
           type: 'redeemed',
           reason: `Redeemed: ${data.rewardName}`,
@@ -67,7 +67,7 @@ export class KarmaRedemptionService {
 
       // Deduct karma points from user
       await prisma.user.update({
-        where: { id: data.userId },
+        where: { id: userId },
         data: { karmaPoints: { decrement: data.karmaPointsCost } },
       });
 

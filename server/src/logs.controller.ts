@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as process from 'process';
@@ -16,8 +17,9 @@ interface LogEntry {
   expirationTime?: string;
 }
 
-// TODO: Protect log endpoints with authentication and authorization guards (e.g., only allow admins)
+// TODO: Add role-based authorization guard to restrict logs to admin users only
 @Controller('logs')
+@UseGuards(JwtAuthGuard)
 export class LogsController {
   @Get('today')
   async getTodayLogs(): Promise<LogEntry[]> {

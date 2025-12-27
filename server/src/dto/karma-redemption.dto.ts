@@ -19,10 +19,6 @@ export class RedeemRewardDto {
   @IsString()
   @IsNotEmpty()
   description: string;
-
-  @IsInt()
-  @Min(1)
-  userId: number; // TODO: Extract from JWT token instead
 }
 
 // DTO for updating redemption status

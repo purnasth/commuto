@@ -5,11 +5,17 @@ import {
   Body,
   Param,
   Inject,
+  Request,
   Controller,
+  UseGuards,
   ParseIntPipe,
   ValidationPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
+
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { AuthenticatedRequest } from './interfaces/types';
 
 import {
   RedeemRewardDto,
@@ -41,16 +47,21 @@ export class KarmaController {
    * POST /karma/redeem
    */
   @Post('redeem')
-  async redeemReward(@Body(ValidationPipe) data: RedeemRewardDto) {
+  @UseGuards(JwtAuthGuard)
+  async redeemReward(
+    @Body(ValidationPipe) data: Omit<RedeemRewardDto, 'userId'>,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
     this.logger.log({
       level: 'info',
       message: 'Karma redemption attempt',
       tag: 'karma',
-      userId: data.userId,
+      userId: authenticatedUserId,
       rewardId: data.rewardId,
     });
 
-    return await this.karmaService.redeemReward(data);
+    return await this.karmaService.redeemReward(authenticatedUserId, data);
   }
 
   /**
@@ -58,7 +69,18 @@ export class KarmaController {
    * GET /karma/user/:userId
    */
   @Get('user/:userId')
-  async getUserRedemptions(@Param('userId', ParseIntPipe) userId: number) {
+  @UseGuards(JwtAuthGuard)
+  async getUserRedemptions(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const authenticatedUserId = req.user.userId;
+    if (userId !== authenticatedUserId) {
+      throw new ForbiddenException(
+        'You can only view your own redemption history',
+      );
+    }
+
     return await this.karmaService.getUserRedemptions(userId);
   }
 

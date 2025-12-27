@@ -4,12 +4,15 @@ import { toast } from 'react-toastify';
 import { useForm } from 'react-hook-form';
 import ReCAPTCHA from 'react-google-recaptcha';
 import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from 'react-router-dom';
 import { yupResolver } from '@hookform/resolvers/yup';
 
-import { LoginFormData, UserDetails } from '../interfaces/types';
-// import { useNavigate } from 'react-router-dom';
-import { getFirstNameFromEmail } from '../utils/functions';
-import { apiFetch } from '../utils/api';
+import type { LoginFormData, AuthResponse } from '../interfaces/types';
+
+import { API_AUTH_LOGIN } from '../constants/api';
+
+import { setAuthData } from '../utils/auth';
+import { getFirstNameFromFullName } from '../utils/functions';
 
 // Validation schema
 const schema = yup.object().shape({
@@ -19,7 +22,7 @@ const schema = yup.object().shape({
 
 const Login = () => {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
 
   const {
     register,
@@ -40,10 +43,13 @@ const Login = () => {
     }
 
     try {
-      const result = await apiFetch<{ message: string; user: UserDetails }>(
-        `${import.meta.env.VITE_API_BASE_URL}/auth/login`, // TODO: Centralize API path if used in multiple places
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}${API_AUTH_LOGIN}`,
         {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             email: data.email,
             password: data.password,
@@ -52,23 +58,26 @@ const Login = () => {
         },
       );
 
-      const firstName = getFirstNameFromEmail(data.email);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'Login failed');
+      }
 
-      // Store user info in localStorage
-      const userWithTimestamp = {
-        ...result.user,
-        loginTimestamp: Date.now(),
-      };
-      localStorage.setItem('user', JSON.stringify(userWithTimestamp));
+      const result: AuthResponse = await response.json();
+
+      setAuthData(result);
+
+      const firstName = getFirstNameFromFullName(result.user.fullname);
 
       toast.success(`Login successful! Welcome, ${firstName}!`);
 
       const redirectAfterLogin = localStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         localStorage.removeItem('redirectAfterLogin');
-        window.location.href = redirectAfterLogin;
+        // window.location.href = redirectAfterLogin;
+        navigate(redirectAfterLogin);
       } else {
-        window.location.href = '/';
+        navigate('/');
       }
     } catch (err: unknown) {
       if (err instanceof Error) {

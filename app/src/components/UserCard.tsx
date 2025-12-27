@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   MdVerified,
   MdOutlineCall,
@@ -11,7 +11,10 @@ import { UserDetails } from '../interfaces/types';
 
 import { ROUTE_LOGIN } from '../constants/routes';
 
-import { getUserDetails } from '../utils/api';
+import { useAuth } from '../hooks/useAuth';
+
+import { getCurrentUser } from '../utils/authApi';
+import { getUserId, getUserData } from '../utils/auth';
 
 import ConfirmDialog from './ui/ConfirmDialog';
 
@@ -19,15 +22,16 @@ const UserCard: React.FC = () => {
   const [user, setUser] = useState<UserDetails | null>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
   useEffect(() => {
-    //TODO:  Get user email from auth context or similar
+    const userId = getUserId();
+    const userData = getUserData();
 
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const email = storedUser?.email;
+    if (!userId || !userData) return;
 
-    if (!email) return;
-
-    getUserDetails(email)
+    getCurrentUser()
       .then((data) => {
         if (data?.user) {
           setUser(data.user);
@@ -44,11 +48,16 @@ const UserCard: React.FC = () => {
     setShowLogoutConfirm(true);
   };
 
-  const handleConfirmLogout = () => {
+  const handleConfirmLogout = async () => {
     setShowLogoutConfirm(false);
-    localStorage.removeItem('user');
-    toast.success('Logged out successfully!');
-    window.location.href = ROUTE_LOGIN;
+    try {
+      await logout();
+
+      toast.success('Logged out successfully!');
+      navigate(ROUTE_LOGIN);
+    } catch {
+      toast.error('Logout failed. Please try again.');
+    }
   };
 
   const handleCancelLogout = () => {
@@ -61,7 +70,6 @@ const UserCard: React.FC = () => {
     <>
       {user && (
         <div className="relative">
-          {/* ...existing code... */}
           <div className="pointer-events-none absolute -left-[20%] top-1/3 -z-10 size-48 rounded-full bg-teal-300 blur-[80px]" />
           <div className="pointer-events-none absolute -bottom-32 -right-10 -z-10 size-32 rounded-full bg-teal-300 blur-[50px]" />
 

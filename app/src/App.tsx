@@ -5,6 +5,8 @@ import { ToastContainer } from 'react-toastify';
 import useTheme from './hooks/useTheme';
 import RouterToTop from './utils/RouterToTop';
 
+import { AuthProvider } from './contexts/AuthContext';
+
 import Navbar from './layouts/Navbar';
 import Footer from './layouts/Footer';
 
@@ -52,30 +54,32 @@ const App: React.FC = () => {
   return (
     <>
       <Router>
-        <RideEventProvider>
-          <SocketManager>
-            <RouterToTop />
-            <Navbar />
-            <Routes>
-              <Route path={ROUTE_HOME} element={<Home />} />
-              <Route path={ROUTE_HELP} element={<FAQPage />} />
-              <Route path={ROUTE_ABOUT} element={<AboutPage />} />
-              <Route path={ROUTE_LOGIN} element={<Login />} />
-              <Route path={ROUTE_PROFILE} element={<SelfReflection />} />
-              <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
-              <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
-              <Route path={ROUTE_BRAND} element={<Brand />} />
-              <Route path={ROUTE_LEGAL} element={<LegalPage />} />
-              <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
-              <Route path={ROUTE_REDEEM} element={<RedeemPage />} />
-              <Route path={ROUTE_VIEW_SCORE} element={<ViewScore />} />
-              <Route path={ROUTE_EARN_KARMA} element={<ViewKarma />} />
-              <Route path={ROUTE_LEADERBOARD} element={<Leaderboard />} />
-              <Route path={ROUTE_404} element={<Error404 />} />
-            </Routes>
-            <Footer />
-          </SocketManager>
-        </RideEventProvider>
+        <AuthProvider>
+          <RideEventProvider>
+            <SocketManager>
+              <RouterToTop />
+              <Navbar />
+              <Routes>
+                <Route path={ROUTE_HOME} element={<Home />} />
+                <Route path={ROUTE_HELP} element={<FAQPage />} />
+                <Route path={ROUTE_ABOUT} element={<AboutPage />} />
+                <Route path={ROUTE_LOGIN} element={<Login />} />
+                <Route path={ROUTE_PROFILE} element={<SelfReflection />} />
+                <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
+                <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
+                <Route path={ROUTE_BRAND} element={<Brand />} />
+                <Route path={ROUTE_LEGAL} element={<LegalPage />} />
+                <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
+                <Route path={ROUTE_REDEEM} element={<RedeemPage />} />
+                <Route path={ROUTE_VIEW_SCORE} element={<ViewScore />} />
+                <Route path={ROUTE_EARN_KARMA} element={<ViewKarma />} />
+                <Route path={ROUTE_LEADERBOARD} element={<Leaderboard />} />
+                <Route path={ROUTE_404} element={<Error404 />} />
+              </Routes>
+              <Footer />
+            </SocketManager>
+          </RideEventProvider>
+        </AuthProvider>
       </Router>
 
       <ToastContainer

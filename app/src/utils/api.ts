@@ -1,6 +1,5 @@
 import {
-  API_USER_LOGOUT,
-  API_USER_DETAILS,
+  API_AUTH_REFRESH,
   API_KARMA_REDEEM,
   API_KARMA_REWARDS,
   API_USER_AVERAGE_SCORE,
@@ -8,9 +7,9 @@ import {
   API_USER_PEOPLE_IMPACTED,
   API_KARMA_USER_REDEMPTIONS,
 } from '../constants/api';
+import { ROUTE_LOGIN } from '../constants/routes';
 
-import {
-  UserDetails,
+import type {
   RewardResponse,
   AverageScoreResult,
   RedemptionResponse,
@@ -18,23 +17,146 @@ import {
 } from '../interfaces/types';
 
 import { createEmptyEmojiBreakdown } from './utils';
+import {
+  getAccessToken,
+  getRefreshToken,
+  isAccessTokenExpired,
+  updateAccessToken,
+  clearAuthData,
+} from './auth';
 
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * Refresh the access token using the refresh token with Promise-based locking
+ * Ensures only one refresh operation executes at a time, queuing subsequent calls
+ * @returns New access token or null if refresh fails
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    const refreshToken = getRefreshToken();
+
+    if (!refreshToken) {
+      console.error('No refresh token available');
+
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}${API_AUTH_REFRESH}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error('Token refresh failed');
+      }
+
+      const data = await response.json();
+
+      if (data.accessToken) {
+        updateAccessToken(data.accessToken);
+        return data.accessToken;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+
+      clearAuthData();
+
+      window.location.href = ROUTE_LOGIN;
+
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+/**
+ * Enhanced fetch wrapper with JWT authentication and automatic token refresh
+ */
 export async function apiFetch<T>(
   url: string,
   options?: RequestInit,
+  onAuthFailure?: () => void,
 ): Promise<T> {
+  if (isAccessTokenExpired()) {
+    const newToken = await refreshAccessToken();
+
+    if (!newToken) {
+      if (onAuthFailure) {
+        onAuthFailure();
+      } else {
+        window.location.href = ROUTE_LOGIN;
+      }
+
+      throw new Error('Authentication expired. Please login again.');
+    }
+  }
+
+  const accessToken = getAccessToken();
+
   const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(options?.headers || {}),
+      ...options?.headers,
+      ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
     },
   });
+
+  // Handle 401 Unauthorized - token might be invalid
+  if (response.status === 401) {
+    const newToken = await refreshAccessToken();
+
+    if (newToken) {
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+          Authorization: `Bearer ${newToken}`,
+        },
+      });
+
+      if (!retryResponse.ok) {
+        const error = await retryResponse.json().catch(() => ({}));
+        throw new Error(error.message || 'API Error');
+      }
+
+      return retryResponse.json();
+    }
+
+    clearAuthData();
+
+    if (onAuthFailure) {
+      onAuthFailure();
+    } else {
+      window.location.href = ROUTE_LOGIN;
+    }
+
+    throw new Error('Authentication required');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'API Error');
   }
+
   return response.json();
 }
 
@@ -126,31 +248,6 @@ export const fetchPeopleImpacted = async (
   }
 };
 
-/**
- * Fetches user details from the server using email
- * @param email - The user's email address
- * @returns Promise resolving to user details
- */
-export const getUserDetails = async (email: string) => {
-  const fullUrl = buildApiUrl(API_USER_DETAILS, { email });
-
-  return apiFetch<{ user: UserDetails }>(fullUrl);
-};
-
-/**
- * Calls the logout API for the user
- * @param email - The user's email address
- * @returns Promise resolving when logout is complete
- */
-export const logoutUser = async (email: string) => {
-  const fullUrl = buildApiUrl(API_USER_LOGOUT, {});
-
-  return apiFetch(fullUrl, {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
-};
-
 // Karma Redemption API Functions
 
 /**
@@ -167,13 +264,12 @@ export const getAvailableRewards = async (): Promise<{
 /**
  * Redeem a reward for karma points
  * @param rewardId - The ID of the reward to redeem
- * @param userId - The user's ID
  * @param rewardData - The reward data from frontend
+ *
  * @returns Promise resolving to redemption response
  */
 export const redeemReward = async (
   rewardId: string,
-  userId: number,
   rewardData: { name: string; points: number; description: string },
 ): Promise<RedemptionResponse> => {
   const fullUrl = buildApiUrl(API_KARMA_REDEEM, {});
@@ -185,7 +281,6 @@ export const redeemReward = async (
       rewardName: rewardData.name,
       karmaPointsCost: rewardData.points,
       description: rewardData.description,
-      userId,
     }),
   });
 };

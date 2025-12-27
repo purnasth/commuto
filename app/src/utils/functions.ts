@@ -1,7 +1,10 @@
 import { RideFormData } from '../interfaces/types';
 import type { UserDetails } from '../interfaces/types';
 
+import { USER_ROLE } from '../constants/enums';
 import { API_USER_KARMA_POINTS, API_USER_CREDIT_SCORE } from '../constants/api';
+
+import { getUserData } from './auth';
 
 /**
  * Truncates a location string to its first three comma-separated parts.
@@ -66,15 +69,32 @@ export const getFirstNameFromEmail = (email: string): string => {
 };
 
 /**
- * Gets the user's greeting (first name) from local storage if available.
+ * Extracts the first name from a full name string
+ * @param fullname - The user's full name
+ *
+ * @returns The first name, or the full name if no space is found
+ */
+export function getFirstNameFromFullName(fullname: string): string {
+  if (!fullname) {
+    return '';
+  }
+
+  const parts = fullname.trim().split(' ');
+
+  return parts[0] || fullname;
+}
+
+/**
+ * Gets the user's greeting (first name) from JWT auth storage if available.
  * @returns The user's first name or null if not found.
  */
 export const getUserGreeting = (): string | null => {
-  const user = localStorage.getItem('user');
-  if (user) {
-    const parsedUser = JSON.parse(user);
-    return getFirstNameFromEmail(parsedUser.email);
+  const userData = getUserData();
+
+  if (userData?.fullname) {
+    return userData.fullname.split(' ')[0];
   }
+
   return null;
 };
 
@@ -141,18 +161,22 @@ export function formatDayMonthWithWeekday(dateString: string): string {
 }
 
 /**
- * Safely retrieves the user object from localStorage, or null if not found/invalid.
+ * Safely retrieves the user object from JWT auth storage.
  * @returns {UserDetails | null}
  */
 export function getStoredUser(): UserDetails | null {
-  try {
-    const storedUser = localStorage.getItem('user');
+  const userData = getUserData();
 
-    if (!storedUser) return null;
-    return JSON.parse(storedUser);
-  } catch {
+  if (!userData) {
     return null;
   }
+
+  return {
+    id: userData.id,
+    fullname: userData.fullname,
+    email: userData.email,
+    role: userData.role as USER_ROLE,
+  };
 }
 
 /**
