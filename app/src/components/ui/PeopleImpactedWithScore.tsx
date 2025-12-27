@@ -37,6 +37,10 @@ const PeopleImpactedWithScore = ({ userId }: PeopleAvatarGridProps) => {
 
   // Fetch average score and people impacted data on component mount
   useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
     const fetchData = async () => {
       try {
         const [scoreData, peopleData] = await Promise.all([
