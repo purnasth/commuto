@@ -11,6 +11,8 @@ import type { LoginFormData, AuthResponse } from '../interfaces/types';
 
 import { API_AUTH_LOGIN } from '../constants/api';
 
+import { useAuth } from '../hooks/useAuth';
+
 import { setAuthData } from '../utils/auth';
 import { getFirstNameFromFullName } from '../utils/functions';
 
@@ -23,6 +25,7 @@ const schema = yup.object().shape({
 const Login = () => {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { setUser } = useAuth();
 
   const {
     register,
@@ -66,6 +69,7 @@ const Login = () => {
       const result: AuthResponse = await response.json();
 
       setAuthData(result);
+      setUser(result.user);
 
       const firstName = getFirstNameFromFullName(result.user.fullname);
 
@@ -74,7 +78,6 @@ const Login = () => {
       const redirectAfterLogin = localStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         localStorage.removeItem('redirectAfterLogin');
-        // window.location.href = redirectAfterLogin;
         navigate(redirectAfterLogin);
       } else {
         navigate('/');
