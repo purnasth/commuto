@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
 import { PrismaService } from '../prisma.service';
 import { AUTH_CONSTANTS } from '../constants/auth.constants';
+import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 @Injectable()
 export class AuthService {
@@ -11,6 +12,8 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    @Inject(WINSTON_MODULE_NEST_PROVIDER)
+    private readonly logger: WinstonLogger,
   ) {}
 
   /**
@@ -63,9 +66,18 @@ export class AuthService {
    */
   async refreshAccessToken(refreshToken: string): Promise<string> {
     // Verify the refresh token
-    this.jwtService.verify(refreshToken, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-    });
+    try {
+      this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
+    } catch (error) {
+      this.logger.error(
+        `Refresh token verification failed: ${(error as Error).message}`,
+        'auth',
+      );
+
+      throw new UnauthorizedException('Refresh token verification failed');
+    }
 
     // Check if refresh token exists in database and is not expired
     const storedToken = await this.prisma.refreshToken.findUnique({
@@ -74,7 +86,9 @@ export class AuthService {
     });
 
     if (!storedToken) {
-      throw new Error('Invalid refresh token');
+      throw new UnauthorizedException(
+        'Refresh token not found or has been revoked',
+      );
     }
 
     if (storedToken.expiresAt < new Date()) {
@@ -82,7 +96,8 @@ export class AuthService {
       await this.prisma.refreshToken.delete({
         where: { token: refreshToken },
       });
-      throw new Error('Refresh token expired');
+
+      throw new UnauthorizedException('Refresh token expired');
     }
 
     // Generate new access token

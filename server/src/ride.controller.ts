@@ -793,8 +793,8 @@ export class RideController {
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId;
-    const id = Number(userId);
-    if (!userId || isNaN(id)) {
+    const userIdNum = Number(userId);
+    if (!userId || isNaN(userIdNum)) {
       this.logger.log({
         level: 'warn',
         message: `Ride history fetch failed: Invalid userId`,
@@ -804,13 +804,13 @@ export class RideController {
       throw new BadRequestException('Valid userId is required');
     }
     // Verify user can only fetch their own history
-    if (id !== authenticatedUserId) {
+    if (userIdNum !== authenticatedUserId) {
       this.logger.log({
         level: 'warn',
-        message: `Get ride history denied: userId=${authenticatedUserId} attempted to fetch history for userId=${id}`,
+        message: `Get ride history denied: userId=${authenticatedUserId} attempted to fetch history for userId=${userIdNum}`,
         tag: 'ride',
         authenticatedUserId,
-        requestedUserId: id,
+        requestedUserId: userIdNum,
       });
       throw new ForbiddenException('You can only fetch your own ride history');
     }
@@ -826,7 +826,11 @@ export class RideController {
     });
     const rides = await this.prisma.ride.findMany({
       where: {
-        OR: [{ riderId: id }, { passengerId: id }, { createdBy: id }],
+        OR: [
+          { riderId: userIdNum },
+          { passengerId: userIdNum },
+          { createdBy: userIdNum },
+        ],
       },
       include: {
         rider: true,

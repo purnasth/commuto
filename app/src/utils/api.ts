@@ -7,6 +7,7 @@ import {
   API_USER_PEOPLE_IMPACTED,
   API_KARMA_USER_REDEMPTIONS,
 } from '../constants/api';
+import { ROUTE_LOGIN } from '../constants/routes';
 
 import type {
   RewardResponse,
@@ -24,68 +25,65 @@ import {
   clearAuthData,
 } from './auth';
 
-// Track if we're currently refreshing the token to prevent multiple refresh calls
-let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
+let refreshPromise: Promise<string | null> | null = null;
 
 /**
- * Subscribe to token refresh completion
- * Used to queue failed requests during token refresh
- */
-function subscribeTokenRefresh(callback: (token: string) => void): void {
-  refreshSubscribers.push(callback);
-}
-
-/**
- * Notify all subscribers when token refresh completes
- */
-function onTokenRefreshed(token: string): void {
-  refreshSubscribers.forEach((callback) => callback(token));
-  refreshSubscribers = [];
-}
-
-/**
- * Refresh the access token using the refresh token
+ * Refresh the access token using the refresh token with Promise-based locking
+ * Ensures only one refresh operation executes at a time, queuing subsequent calls
  * @returns New access token or null if refresh fails
  */
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-
-  if (!refreshToken) {
-    console.error('No refresh token available');
-    return null;
+  if (refreshPromise) {
+    return refreshPromise;
   }
 
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL}${API_AUTH_REFRESH}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+  refreshPromise = (async () => {
+    const refreshToken = getRefreshToken();
+
+    if (!refreshToken) {
+      console.error('No refresh token available');
+
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}${API_AUTH_REFRESH}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken }),
         },
-        body: JSON.stringify({ refreshToken }),
-      },
-    );
+      );
 
-    if (!response.ok) {
-      throw new Error('Token refresh failed');
+      if (!response.ok) {
+        throw new Error('Token refresh failed');
+      }
+
+      const data = await response.json();
+
+      if (data.accessToken) {
+        updateAccessToken(data.accessToken);
+        return data.accessToken;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+
+      clearAuthData();
+
+      window.location.href = ROUTE_LOGIN;
+
+      return null;
+    } finally {
+      refreshPromise = null;
     }
+  })();
 
-    const data = await response.json();
-
-    if (data.accessToken) {
-      updateAccessToken(data.accessToken);
-      return data.accessToken;
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error refreshing token:', error);
-    clearAuthData(); // Clear invalid tokens
-    window.location.href = '/login'; // Redirect to login
-    return null;
-  }
+  return refreshPromise;
 }
 
 /**
@@ -94,24 +92,19 @@ async function refreshAccessToken(): Promise<string | null> {
 export async function apiFetch<T>(
   url: string,
   options?: RequestInit,
+  onAuthFailure?: () => void,
 ): Promise<T> {
-  // Check if access token is expired
   if (isAccessTokenExpired()) {
-    if (!isRefreshing) {
-      isRefreshing = true;
-      const newToken = await refreshAccessToken();
-      isRefreshing = false;
+    const newToken = await refreshAccessToken();
 
-      if (newToken) {
-        onTokenRefreshed(newToken);
+    if (!newToken) {
+      if (onAuthFailure) {
+        onAuthFailure();
       } else {
-        throw new Error('Authentication expired. Please login again.');
+        window.location.href = ROUTE_LOGIN;
       }
-    } else {
-      // Wait for ongoing refresh to complete
-      await new Promise<void>((resolve) => {
-        subscribeTokenRefresh(() => resolve());
-      });
+
+      throw new Error('Authentication expired. Please login again.');
     }
   }
 
@@ -128,35 +121,34 @@ export async function apiFetch<T>(
 
   // Handle 401 Unauthorized - token might be invalid
   if (response.status === 401) {
-    // Try to refresh token once
-    if (!isRefreshing) {
-      isRefreshing = true;
-      const newToken = await refreshAccessToken();
-      isRefreshing = false;
+    const newToken = await refreshAccessToken();
 
-      if (newToken) {
-        // Retry the original request with new token
-        const retryResponse = await fetch(url, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            ...options?.headers,
-            Authorization: `Bearer ${newToken}`,
-          },
-        });
+    if (newToken) {
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+          Authorization: `Bearer ${newToken}`,
+        },
+      });
 
-        if (!retryResponse.ok) {
-          const error = await retryResponse.json().catch(() => ({}));
-          throw new Error(error.message || 'API Error');
-        }
-
-        return retryResponse.json();
+      if (!retryResponse.ok) {
+        const error = await retryResponse.json().catch(() => ({}));
+        throw new Error(error.message || 'API Error');
       }
+
+      return retryResponse.json();
     }
 
-    // If refresh failed, clear auth and redirect
     clearAuthData();
-    window.location.href = '/login';
+
+    if (onAuthFailure) {
+      onAuthFailure();
+    } else {
+      window.location.href = ROUTE_LOGIN;
+    }
+
     throw new Error('Authentication required');
   }
 
@@ -273,8 +265,8 @@ export const getAvailableRewards = async (): Promise<{
  * Redeem a reward for karma points
  * @param rewardId - The ID of the reward to redeem
  * @param rewardData - The reward data from frontend
+ *
  * @returns Promise resolving to redemption response
- * @note userId is no longer needed - backend extracts it from JWT token
  */
 export const redeemReward = async (
   rewardId: string,
@@ -289,7 +281,6 @@ export const redeemReward = async (
       rewardName: rewardData.name,
       karmaPointsCost: rewardData.points,
       description: rewardData.description,
-      // userId removed - backend gets it from JWT token
     }),
   });
 };

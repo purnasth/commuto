@@ -1,11 +1,12 @@
 // TODO: responsive on mobile, tablet and accessibility check
 
 import { Link } from 'react-router-dom';
-import { getStoredUser } from '../../utils/functions';
 import { USER_ROLE } from '../../constants/enums';
 import { ROUTE_LOGIN, ROUTE_PROFILE, ROUTE_ROLE } from '../../constants/routes';
 
 import saveEarth from '../../assets/vector/save-earth-2.svg';
+
+import { getFirstNameFromFullName, getStoredUser } from '../../utils/functions';
 
 interface CtoUIProps {
   title: string;
@@ -17,7 +18,10 @@ const CtoUI = ({ title, description }: CtoUIProps) => {
 
   let cta = null;
   let profileGreeting = null;
-  const userName = user?.fullname;
+
+  const userName = user?.fullname
+    ? getFirstNameFromFullName(user.fullname)
+    : null;
 
   if (!user) {
     profileGreeting = null;
@@ -30,14 +34,13 @@ const CtoUI = ({ title, description }: CtoUIProps) => {
       </Link>
     );
   } else {
-    // TODO: properly use the first name with utils function
     profileGreeting = (
       <Link
         to={ROUTE_PROFILE}
         className="transition-150 inline-flex items-center gap-1 rounded-full border border-teal-400 bg-gradient-to-tr from-teal-400 via-teal-200 to-teal-400 px-6 py-2.5 text-sm font-normal text-dark hover:scale-110 hover:bg-gradient-to-tl hover:from-teal-400 hover:to-teal-300 dark:border-teal-700 dark:bg-teal-900 dark:text-dark dark:hover:bg-teal-800"
       >
         <span className="animate-wave">&#128075;</span>
-        Hi, {userName?.split(' ')[0]}!
+        Hi, {userName}!
       </Link>
     );
 

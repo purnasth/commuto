@@ -100,12 +100,6 @@ const SideNav: React.FC<SideNavProps> = ({
           {/* <hr className="border-teal-300/40 md:hidden" /> */}
 
           <div>
-            {/* <Link
-              to="/login"
-              className="inline-block w-full rounded-full bg-teal-300 px-6 py-2 text-center font-semibold text-teal-950"
-            >
-              Visit Login Page
-            </Link> */}
             {userName ? (
               <Link
                 to={ROUTE_PROFILE}

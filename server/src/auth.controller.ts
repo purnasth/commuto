@@ -17,28 +17,17 @@ import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { EnvService } from './env.service';
-import { USER_ROLE } from './constants/enums';
 import { PrismaService } from './prisma.service';
 import { AuthService } from './services/auth.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { AuthenticatedRequest } from './interfaces/types';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
-
-interface LoginDto {
-  email: string;
-  password: string;
-}
-
-interface SignupDto {
-  fullname: string;
-  email: string;
-  password: string;
-  role: USER_ROLE;
-  phone?: string;
-  address?: string;
-  profilePicture?: string;
-  ratings?: number;
-}
+import {
+  LoginDto,
+  SignupDto,
+  RefreshTokenDto,
+  DeleteAccountDto,
+} from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -71,7 +60,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  async login(@Body() body: LoginDto & { recaptchaToken?: string }) {
+  async login(@Body() body: LoginDto) {
     this.logger.log({
       level: 'info',
       message: `Login attempt for email: ${body.email}`,
@@ -79,11 +68,11 @@ export class AuthController {
       email: body.email,
     });
 
-    // Skip reCAPTCHA in development environment
     if (!this.envService.isDev) {
       const recaptchaSecret = this.configService.get<string>(
         'RECAPTCHA_SECRET_KEY',
       );
+
       if (!body.recaptchaToken) {
         this.logger.log({
           level: 'warn',
@@ -91,6 +80,7 @@ export class AuthController {
           tag: 'auth',
           email: body.email,
         });
+
         throw new BadRequestException('Missing reCAPTCHA token');
       }
       const verifyUrl = `https://www.google.com/recaptcha/api/siteverify`;
@@ -191,9 +181,11 @@ export class AuthController {
       email: body.email,
       fullname: body.fullname,
     });
+
     const existing = await this.prisma.user.findUnique({
       where: { email: body.email },
     });
+
     if (existing) {
       this.logger.log({
         level: 'warn',
@@ -201,13 +193,15 @@ export class AuthController {
         tag: 'error',
         email: body.email,
       });
+
       throw new BadRequestException('Email already registered');
     }
-    // Use static import for bcrypt for better performance
+
     const hashedPassword = await bcrypt.hash(
       body.password,
       AUTH_CONSTANTS.BCRYPT_SALT_ROUNDS,
     );
+
     const user = await this.prisma.user.create({
       data: {
         fullname: body.fullname,
@@ -251,24 +245,25 @@ export class AuthController {
   }
 
   @Post('logout')
-  async logout(@Body() body: { refreshToken: string; email?: string }) {
+  async logout(@Body() body: RefreshTokenDto) {
     this.logger.log({
       level: 'info',
-      message: `Logout${body?.email ? ` for email: ${body.email}` : ''}`,
+      message: `Logout attempt`,
       tag: 'auth',
-      ...(body?.email ? { email: body.email } : {}),
+      refreshToken: body.refreshToken,
     });
 
-    // Delete the refresh token from database
-    if (body.refreshToken) {
-      await this.authService.revokeRefreshToken(body.refreshToken);
+    if (!body.refreshToken) {
+      throw new BadRequestException('Refresh token is required for logout');
     }
+
+    await this.authService.revokeRefreshToken(body.refreshToken);
 
     return { message: 'Logout successful' };
   }
 
   @Post('refresh')
-  async refreshToken(@Body() body: { refreshToken: string }) {
+  async refreshToken(@Body() body: RefreshTokenDto) {
     this.logger.log({
       level: 'info',
       message: 'Refresh token request',
@@ -306,7 +301,7 @@ export class AuthController {
   }
 
   @Delete('delete')
-  async deleteAccount(@Body() body: { email: string; password: string }) {
+  async deleteAccount(@Body() body: DeleteAccountDto) {
     this.logger.log({
       level: 'info',
       message: `Delete account attempt for email: ${body.email}`,

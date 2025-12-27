@@ -388,6 +388,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         const userRides = userRidesResponse.rides || [];
 
         // Find the user's most recent active ride where they are creator, rider, or passenger
+        // Defensive: Some ride properties may be string or number depending on API response.
+        // TODO: Ensure backend always returns numeric IDs for createdBy, riderId, passengerId.
+        // For now, use Number() to handle both cases safely.
         const currentUserRide = userRides.find(
           (r) =>
             (Number(r.createdBy) === user.id ||
@@ -491,12 +494,10 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
   const handleReject = async (ride: RideFormData) => {
     try {
-      const userId = getUserId();
       await apiFetch(
         `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/reject`,
         {
           method: 'POST',
-          body: JSON.stringify({ userId }),
         },
       );
       localStorage.removeItem('lastSearchParams');

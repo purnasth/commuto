@@ -61,10 +61,7 @@ export class KarmaController {
       rewardId: data.rewardId,
     });
 
-    return await this.karmaService.redeemReward({
-      ...data,
-      userId: authenticatedUserId,
-    });
+    return await this.karmaService.redeemReward(authenticatedUserId, data);
   }
 
   /**

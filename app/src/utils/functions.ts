@@ -69,6 +69,22 @@ export const getFirstNameFromEmail = (email: string): string => {
 };
 
 /**
+ * Extracts the first name from a full name string
+ * @param fullname - The user's full name
+ *
+ * @returns The first name, or the full name if no space is found
+ */
+export function getFirstNameFromFullName(fullname: string): string {
+  if (!fullname) {
+    return '';
+  }
+
+  const parts = fullname.trim().split(' ');
+
+  return parts[0] || fullname;
+}
+
+/**
  * Gets the user's greeting (first name) from JWT auth storage if available.
  * @returns The user's first name or null if not found.
  */

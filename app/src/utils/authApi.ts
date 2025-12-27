@@ -20,12 +20,7 @@ import type {
   UserDetails,
 } from '../interfaces/types';
 
-import {
-  setAuthData,
-  clearAuthData,
-  getRefreshToken,
-  getUserEmail,
-} from './auth';
+import { setAuthData, clearAuthData, getRefreshToken } from './auth';
 
 import { apiFetch } from './api';
 
@@ -114,23 +109,19 @@ export const signupUser = async (
 export const logoutUser = async (): Promise<void> => {
   try {
     const refreshToken = getRefreshToken();
-    const email = getUserEmail();
 
     if (refreshToken) {
-      // Call backend to revoke refresh token
       await fetch(buildApiUrl(API_AUTH_LOGOUT), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ refreshToken, email }),
+        body: JSON.stringify({ refreshToken }),
       });
     }
   } catch (error) {
     console.error('Logout error:', error);
-    // Continue with local cleanup even if server call fails
   } finally {
-    // Always clear local auth data
     clearAuthData();
   }
 };
@@ -170,7 +161,9 @@ export const refreshToken = async (): Promise<RefreshTokenResponse> => {
 
 /**
  * Get current authenticated user details
- * Requires valid access token - user info extracted from JWT token
+ * Fetches user details from the server using the JWT access token for authentication.
+ * The server extracts user info from the JWT and returns the user object.
+ *
  * @returns Promise resolving to user details
  */
 export const getCurrentUser = async (): Promise<{ user: UserDetails }> => {

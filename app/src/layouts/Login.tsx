@@ -4,13 +4,15 @@ import { toast } from 'react-toastify';
 import { useForm } from 'react-hook-form';
 import ReCAPTCHA from 'react-google-recaptcha';
 import 'react-toastify/dist/ReactToastify.css';
-// import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { yupResolver } from '@hookform/resolvers/yup';
 
 import type { LoginFormData, AuthResponse } from '../interfaces/types';
-import { getFirstNameFromEmail } from '../utils/functions';
-import { setAuthData } from '../utils/auth';
+
 import { API_AUTH_LOGIN } from '../constants/api';
+
+import { setAuthData } from '../utils/auth';
+import { getFirstNameFromFullName } from '../utils/functions';
 
 // Validation schema
 const schema = yup.object().shape({
@@ -20,7 +22,7 @@ const schema = yup.object().shape({
 
 const Login = () => {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
 
   const {
     register,
@@ -65,17 +67,17 @@ const Login = () => {
 
       setAuthData(result);
 
-      const firstName = getFirstNameFromEmail(data.email);
+      const firstName = getFirstNameFromFullName(result.user.fullname);
+
       toast.success(`Login successful! Welcome, ${firstName}!`);
 
       const redirectAfterLogin = localStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         localStorage.removeItem('redirectAfterLogin');
-        window.location.href = redirectAfterLogin;
-        // navigate(redirectAfterLogin);
+        // window.location.href = redirectAfterLogin;
+        navigate(redirectAfterLogin);
       } else {
-        window.location.href = '/';
-        // navigate('/');
+        navigate('/');
       }
     } catch (err: unknown) {
       if (err instanceof Error) {

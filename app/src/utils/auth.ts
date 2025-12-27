@@ -14,8 +14,8 @@ import {
 
 import type {
   AuthTokens,
-  StoredUserData,
   AuthResponse,
+  StoredUserData,
 } from '../interfaces/types';
 
 /**
@@ -175,12 +175,14 @@ class TokenManager {
   ): (Record<string, unknown> & { exp?: number }) | null {
     try {
       const parts = token.split('.');
+
       if (parts.length !== 3) {
         return null;
       }
 
       const payload = parts[1];
       const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+
       return JSON.parse(decoded);
     } catch (error) {
       console.error('Error decoding token:', error);
@@ -190,16 +192,29 @@ class TokenManager {
 
   /**
    * Check if access token is expired
-   * @returns True if token is expired or invalid, false otherwise
+   *
+   * Uses a buffer time to proactively treat the token as expired slightly before its actual expiration.
+   * This helps prevent requests from failing due to the token expiring during network transit or slow processing,
+   * ensuring that the app can refresh the token in advance and avoid user-facing errors.
+   *
+   * @returns True if token is expired or within the buffer window, false otherwise
    */
   isAccessTokenExpired(): boolean {
     const token = this.getAccessToken();
-    if (!token) return true;
+
+    if (!token) {
+      return true;
+    }
 
     const decoded = this.decodeToken(token);
-    if (!decoded || !decoded.exp) return true;
+    if (!decoded || !decoded.exp) {
+      return true;
+    }
 
-    // Check if token expires within buffer time (for network latency)
+    // Proactively treat token as expired if it's within the buffer window
+    // to avoid failures from expiration during network transit or slow requests.
+    // By default, a 30-second buffer (configured via TOKEN_EXPIRY_BUFFER_SECONDS) provides
+    // sufficient margin for typical API response times while minimizing unnecessary token refreshes.
     const expirationTime = decoded.exp * 1000; // Convert to milliseconds
     const currentTime = Date.now();
     const bufferTime = TOKEN_EXPIRY_BUFFER_SECONDS * 1000;
@@ -213,10 +228,15 @@ class TokenManager {
    */
   isRefreshTokenExpired(): boolean {
     const token = this.getRefreshToken();
-    if (!token) return true;
+    if (!token) {
+      return true;
+    }
 
     const decoded = this.decodeToken(token);
-    if (!decoded || !decoded.exp) return true;
+
+    if (!decoded || !decoded.exp) {
+      return true;
+    }
 
     const expirationTime = decoded.exp * 1000;
     const currentTime = Date.now();
@@ -230,6 +250,7 @@ class TokenManager {
    */
   getUserId(): number | null {
     const userData = this.getUserData();
+
     return userData?.id ?? null;
   }
 
@@ -239,6 +260,7 @@ class TokenManager {
    */
   getUserEmail(): string | null {
     const userData = this.getUserData();
+
     return userData?.email ?? null;
   }
 
@@ -248,6 +270,7 @@ class TokenManager {
    */
   getUserFullName(): string | null {
     const userData = this.getUserData();
+
     return userData?.fullname ?? null;
   }
 
@@ -257,6 +280,7 @@ class TokenManager {
    */
   getUserRole(): string | null {
     const userData = this.getUserData();
+
     return userData?.role ?? null;
   }
 }
