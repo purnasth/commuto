@@ -3,7 +3,6 @@ import {
   Put,
   Post,
   Body,
-  Query,
   Delete,
   Inject,
   Request,
@@ -357,32 +356,25 @@ export class AuthController {
 
   @Get('user')
   @UseGuards(JwtAuthGuard)
-  async getUser(
-    @Query('email') email: string,
-    @Request() req: AuthenticatedRequest,
-  ) {
+  async getUser(@Request() req: AuthenticatedRequest) {
     const authenticatedUserId = req.user.userId;
     this.logger.log({
       level: 'info',
-      message: `Get user profile for email: ${email}`,
+      message: `Get user profile for userId: ${authenticatedUserId}`,
       tag: 'auth',
-      email,
-      authenticatedUserId,
+      userId: authenticatedUserId,
     });
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { id: authenticatedUserId },
     });
     if (!user) {
       this.logger.log({
         level: 'warn',
-        message: `Get user failed for email: ${email} - User not found`,
+        message: `Get user failed for userId: ${authenticatedUserId} - User not found`,
         tag: 'error',
-        email,
+        userId: authenticatedUserId,
       });
       throw new BadRequestException('User not found');
-    }
-    if (user.id !== authenticatedUserId) {
-      throw new UnauthorizedException('You can only view your own profile');
     }
     // Remove password field from user object for response
     const userWithoutPassword = Object.fromEntries(

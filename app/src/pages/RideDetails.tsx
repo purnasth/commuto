@@ -27,6 +27,7 @@ import {
 import { CUSTOM_EVENTS, RIDE_STATUS, USER_ROLE } from '../constants/enums';
 
 import { apiFetch } from '../utils/api';
+import { getUserId } from '../utils/auth';
 import { useSocket } from '../utils/useSocket';
 import { determineMatchedUser } from '../utils/utils';
 import { dispatchRideStatusChanged } from '../utils/customEvents';
@@ -198,9 +199,10 @@ const RideDetails: React.FC = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      setUser(JSON.parse(userStr));
+    const userId = getUserId();
+    if (userId) {
+      const userData = { id: userId };
+      setUser(userData as UserDetails);
     }
   }, []);
 

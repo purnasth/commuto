@@ -11,7 +11,8 @@ import { UserDetails } from '../interfaces/types';
 
 import { ROUTE_LOGIN } from '../constants/routes';
 
-import { getUserDetails } from '../utils/api';
+import { getCurrentUser } from '../utils/authApi';
+import { getUserId, getUserData, tokenManager } from '../utils/auth';
 
 import ConfirmDialog from './ui/ConfirmDialog';
 
@@ -20,14 +21,12 @@ const UserCard: React.FC = () => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
-    //TODO:  Get user email from auth context or similar
+    const userId = getUserId();
+    const userData = getUserData();
 
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const email = storedUser?.email;
+    if (!userId || !userData) return;
 
-    if (!email) return;
-
-    getUserDetails(email)
+    getCurrentUser()
       .then((data) => {
         if (data?.user) {
           setUser(data.user);
@@ -46,7 +45,7 @@ const UserCard: React.FC = () => {
 
   const handleConfirmLogout = () => {
     setShowLogoutConfirm(false);
-    localStorage.removeItem('user');
+    tokenManager.clearAuthData();
     toast.success('Logged out successfully!');
     window.location.href = ROUTE_LOGIN;
   };

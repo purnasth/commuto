@@ -1,6 +1,5 @@
 import {
-  API_USER_LOGOUT,
-  API_USER_DETAILS,
+  API_AUTH_REFRESH,
   API_KARMA_REDEEM,
   API_KARMA_REWARDS,
   API_USER_AVERAGE_SCORE,
@@ -9,8 +8,7 @@ import {
   API_KARMA_USER_REDEMPTIONS,
 } from '../constants/api';
 
-import {
-  UserDetails,
+import type {
   RewardResponse,
   AverageScoreResult,
   RedemptionResponse,
@@ -18,23 +16,155 @@ import {
 } from '../interfaces/types';
 
 import { createEmptyEmojiBreakdown } from './utils';
+import {
+  getAccessToken,
+  getRefreshToken,
+  isAccessTokenExpired,
+  updateAccessToken,
+  clearAuthData,
+} from './auth';
 
+// Track if we're currently refreshing the token to prevent multiple refresh calls
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+/**
+ * Subscribe to token refresh completion
+ * Used to queue failed requests during token refresh
+ */
+function subscribeTokenRefresh(callback: (token: string) => void): void {
+  refreshSubscribers.push(callback);
+}
+
+/**
+ * Notify all subscribers when token refresh completes
+ */
+function onTokenRefreshed(token: string): void {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+}
+
+/**
+ * Refresh the access token using the refresh token
+ * @returns New access token or null if refresh fails
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+
+  if (!refreshToken) {
+    console.error('No refresh token available');
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_BASE_URL}${API_AUTH_REFRESH}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error('Token refresh failed');
+    }
+
+    const data = await response.json();
+
+    if (data.accessToken) {
+      updateAccessToken(data.accessToken);
+      return data.accessToken;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    clearAuthData(); // Clear invalid tokens
+    window.location.href = '/login'; // Redirect to login
+    return null;
+  }
+}
+
+/**
+ * Enhanced fetch wrapper with JWT authentication and automatic token refresh
+ */
 export async function apiFetch<T>(
   url: string,
   options?: RequestInit,
 ): Promise<T> {
+  // Check if access token is expired
+  if (isAccessTokenExpired()) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      const newToken = await refreshAccessToken();
+      isRefreshing = false;
+
+      if (newToken) {
+        onTokenRefreshed(newToken);
+      } else {
+        throw new Error('Authentication expired. Please login again.');
+      }
+    } else {
+      // Wait for ongoing refresh to complete
+      await new Promise<void>((resolve) => {
+        subscribeTokenRefresh(() => resolve());
+      });
+    }
+  }
+
+  const accessToken = getAccessToken();
+
   const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(options?.headers || {}),
+      ...options?.headers,
+      ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
     },
   });
+
+  // Handle 401 Unauthorized - token might be invalid
+  if (response.status === 401) {
+    // Try to refresh token once
+    if (!isRefreshing) {
+      isRefreshing = true;
+      const newToken = await refreshAccessToken();
+      isRefreshing = false;
+
+      if (newToken) {
+        // Retry the original request with new token
+        const retryResponse = await fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers,
+            Authorization: `Bearer ${newToken}`,
+          },
+        });
+
+        if (!retryResponse.ok) {
+          const error = await retryResponse.json().catch(() => ({}));
+          throw new Error(error.message || 'API Error');
+        }
+
+        return retryResponse.json();
+      }
+    }
+
+    // If refresh failed, clear auth and redirect
+    clearAuthData();
+    window.location.href = '/login';
+    throw new Error('Authentication required');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'API Error');
   }
+
   return response.json();
 }
 
@@ -126,31 +256,6 @@ export const fetchPeopleImpacted = async (
   }
 };
 
-/**
- * Fetches user details from the server using email
- * @param email - The user's email address
- * @returns Promise resolving to user details
- */
-export const getUserDetails = async (email: string) => {
-  const fullUrl = buildApiUrl(API_USER_DETAILS, { email });
-
-  return apiFetch<{ user: UserDetails }>(fullUrl);
-};
-
-/**
- * Calls the logout API for the user
- * @param email - The user's email address
- * @returns Promise resolving when logout is complete
- */
-export const logoutUser = async (email: string) => {
-  const fullUrl = buildApiUrl(API_USER_LOGOUT, {});
-
-  return apiFetch(fullUrl, {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
-};
-
 // Karma Redemption API Functions
 
 /**
@@ -167,13 +272,12 @@ export const getAvailableRewards = async (): Promise<{
 /**
  * Redeem a reward for karma points
  * @param rewardId - The ID of the reward to redeem
- * @param userId - The user's ID
  * @param rewardData - The reward data from frontend
  * @returns Promise resolving to redemption response
+ * @note userId is no longer needed - backend extracts it from JWT token
  */
 export const redeemReward = async (
   rewardId: string,
-  userId: number,
   rewardData: { name: string; points: number; description: string },
 ): Promise<RedemptionResponse> => {
   const fullUrl = buildApiUrl(API_KARMA_REDEEM, {});
@@ -185,7 +289,7 @@ export const redeemReward = async (
       rewardName: rewardData.name,
       karmaPointsCost: rewardData.points,
       description: rewardData.description,
-      userId,
+      // userId removed - backend gets it from JWT token
     }),
   });
 };

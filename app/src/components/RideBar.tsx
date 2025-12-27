@@ -23,6 +23,7 @@ import { rideFormSchema } from '../schemas/formSchema';
 import { apiFetch } from '../utils/api';
 import { useSocket } from '../utils/useSocket';
 import { useRideEvent } from '../utils/useRideEvent';
+import { getUserId, getUserData } from '../utils/auth';
 
 import { RideFormData, RideBarProps, UserDetails } from '../interfaces/types';
 
@@ -49,7 +50,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   const [ridesFound, setRidesFound] = useState<RideFormData[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showRideStatusModal, setShowRideStatusModal] = useState(false);
-  const [user, setUser] = useState<{ id: number } | null>(null);
+  const [user, setUser] = useState<UserDetails | null>(null);
 
   const navigate = useNavigate();
   const { socket } = useSocket();
@@ -182,8 +183,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   };
 
   const onSubmit = async (data: RideFormData) => {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
+    const userId = getUserId();
+    if (!userId) {
       // Include coordinates in the stored data for non-logged-in users
       const dataWithCoordinates = {
         ...data,
@@ -204,7 +205,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
       return;
     }
-    const user = JSON.parse(userStr);
+
     const rideWithTimestamp = {
       ...data,
       fromLat: fromCoords ? fromCoords[1] : undefined,
@@ -212,7 +213,7 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
       toLat: toCoords ? toCoords[1] : undefined,
       toLng: toCoords ? toCoords[0] : undefined,
       timestamp: new Date().toISOString(),
-      createdBy: user.id, // Changed from riderId to createdBy
+      createdBy: userId,
     };
 
     const loadingToastId = toast.loading('Submitting your ride route...');
@@ -310,9 +311,16 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   };
 
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      setUser(JSON.parse(userStr));
+    const userId = getUserId();
+    const userData = getUserData();
+
+    if (userId && userData) {
+      setUser({
+        id: userData.id,
+        fullname: userData.fullname,
+        email: userData.email,
+        role: userData.role as USER_ROLE,
+      });
     }
   }, []);
 
@@ -364,13 +372,12 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
   const handleConfirm = async (ride: RideFormData) => {
     try {
-      const userStr = localStorage.getItem('user');
-      if (!userStr) {
+      const userId = getUserId();
+
+      if (!userId || !user) {
         toast.error('You must be logged in to confirm a ride.');
         return;
       }
-
-      const user = JSON.parse(userStr);
 
       // First, we need to find the current user's own ride to get the proper IDs
       try {
@@ -383,9 +390,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         // Find the user's most recent active ride where they are creator, rider, or passenger
         const currentUserRide = userRides.find(
           (r) =>
-            (r.createdBy === user.id ||
-              r.riderId === user.id ||
-              r.passengerId === user.id) &&
+            (Number(r.createdBy) === user.id ||
+              Number(r.riderId) === user.id ||
+              Number(r.passengerId) === user.id) &&
             (r.status === RIDE_STATUS.ACTIVE || r.status === undefined),
         );
 
@@ -484,13 +491,12 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
   const handleReject = async (ride: RideFormData) => {
     try {
-      const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
+      const userId = getUserId();
       await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/reject`, // TODO: Centralize API path if used in multiple places
+        `${import.meta.env.VITE_API_BASE_URL}/rides/${ride.id}/reject`,
         {
           method: 'POST',
-          body: JSON.stringify({ userId: user?.id }),
+          body: JSON.stringify({ userId }),
         },
       );
       localStorage.removeItem('lastSearchParams');
@@ -504,12 +510,12 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
   // Cancel Ride handler
   const handleCancelRide = async () => {
     try {
-      const userStr = localStorage.getItem('user');
-      if (!userStr) {
+      const userId = getUserId();
+
+      if (!userId || !user) {
         toast.error('You must be logged in to cancel a ride.');
         return;
       }
-      const user = JSON.parse(userStr);
 
       // Use current ride data if available, otherwise fallback to API call
       let rideIdToCancel = currentRide?.id;
@@ -522,9 +528,9 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
         const rides = res.rides || [];
         const cancellableRide = rides.find(
           (r) =>
-            (r.createdBy === user.id ||
-              r.riderId === user.id ||
-              r.passengerId === user.id) &&
+            (Number(r.createdBy) === user.id ||
+              Number(r.riderId) === user.id ||
+              Number(r.passengerId) === user.id) &&
             r.status !== undefined &&
             r.status !== RIDE_STATUS.CANCELLED &&
             r.status !== RIDE_STATUS.REJECTED,
@@ -574,18 +580,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
     await refetchCurrentRide();
   };
 
-  // Determine if the user's role matches the RideBar's role (case-insensitive)m
-  let userRole: string | null = null;
-  if (typeof window !== 'undefined') {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        userRole = JSON.parse(userStr).role;
-      } catch {
-        // Ignore JSON parse errors
-      }
-    }
-  }
+  // Determine if the user's role matches the RideBar's role (case-insensitive)
+  const userRole = user?.role;
   const roleMismatch =
     userRole && role && userRole.toLowerCase() !== role.toLowerCase();
 

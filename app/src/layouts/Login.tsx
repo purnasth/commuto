@@ -4,12 +4,13 @@ import { toast } from 'react-toastify';
 import { useForm } from 'react-hook-form';
 import ReCAPTCHA from 'react-google-recaptcha';
 import 'react-toastify/dist/ReactToastify.css';
+// import { useNavigate } from 'react-router-dom';
 import { yupResolver } from '@hookform/resolvers/yup';
 
-import { LoginFormData, UserDetails } from '../interfaces/types';
-// import { useNavigate } from 'react-router-dom';
+import type { LoginFormData, AuthResponse } from '../interfaces/types';
 import { getFirstNameFromEmail } from '../utils/functions';
-import { apiFetch } from '../utils/api';
+import { setAuthData } from '../utils/auth';
+import { API_AUTH_LOGIN } from '../constants/api';
 
 // Validation schema
 const schema = yup.object().shape({
@@ -40,10 +41,13 @@ const Login = () => {
     }
 
     try {
-      const result = await apiFetch<{ message: string; user: UserDetails }>(
-        `${import.meta.env.VITE_API_BASE_URL}/auth/login`, // TODO: Centralize API path if used in multiple places
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}${API_AUTH_LOGIN}`,
         {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             email: data.email,
             password: data.password,
@@ -52,23 +56,26 @@ const Login = () => {
         },
       );
 
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'Login failed');
+      }
+
+      const result: AuthResponse = await response.json();
+
+      setAuthData(result);
+
       const firstName = getFirstNameFromEmail(data.email);
-
-      // Store user info in localStorage
-      const userWithTimestamp = {
-        ...result.user,
-        loginTimestamp: Date.now(),
-      };
-      localStorage.setItem('user', JSON.stringify(userWithTimestamp));
-
       toast.success(`Login successful! Welcome, ${firstName}!`);
 
       const redirectAfterLogin = localStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         localStorage.removeItem('redirectAfterLogin');
         window.location.href = redirectAfterLogin;
+        // navigate(redirectAfterLogin);
       } else {
         window.location.href = '/';
+        // navigate('/');
       }
     } catch (err: unknown) {
       if (err instanceof Error) {

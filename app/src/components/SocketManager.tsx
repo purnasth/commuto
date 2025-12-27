@@ -5,6 +5,7 @@ import { useEffect, useState, ReactNode } from 'react';
 
 import { RIDE_STATUS, CUSTOM_EVENTS, USER_ROLE } from '../constants/enums';
 
+import { getUserId } from '../utils/auth';
 import { getFeedbackKey } from '../utils/functions';
 import { useRideEvent } from '../utils/useRideEvent';
 import { SocketContext } from '../utils/SocketContext';
@@ -28,8 +29,7 @@ export const SocketManager = ({ children }: SocketManagerProps) => {
   const [rideStatus, setRideStatus] = useState<RIDE_STATUS>(
     (localStorage.getItem('rideStatus') as RIDE_STATUS) || RIDE_STATUS.IDLE,
   );
-  const user = localStorage.getItem('user');
-  const userId = user ? JSON.parse(user).id : null;
+  const userId = getUserId();
 
   const log = (msg: string, extra = '') => {
     const full = `${msg}${extra ? ` - ${extra}` : ''}`;
@@ -181,15 +181,15 @@ export const SocketManager = ({ children }: SocketManagerProps) => {
           console.log('✅ Ride completed via socket:', ride);
           localStorage.setItem('rideStatus', RIDE_STATUS.COMPLETED);
           setRideStatus(RIDE_STATUS.COMPLETED);
-          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          const currentUserId = getUserId();
 
-          if (!user || !user.id) {
+          if (!currentUserId) {
             console.error('User not found or invalid user data');
             return;
           }
 
           // Check if user has already submitted feedback
-          const feedbackKey = getFeedbackKey({ id: ride.id }, user.id);
+          const feedbackKey = getFeedbackKey({ id: ride.id }, currentUserId);
           const hasSubmittedFeedback =
             localStorage.getItem(feedbackKey) === 'true';
 

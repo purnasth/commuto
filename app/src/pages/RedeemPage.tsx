@@ -52,9 +52,9 @@ const RedeemPage = () => {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Get real user data from localStorage
   useEffect(() => {
     const storedUser = getStoredUser();
+
     if (storedUser) {
       setUser(storedUser);
     }
@@ -77,7 +77,7 @@ const RedeemPage = () => {
 
     try {
       // Call the API to redeem the reward
-      const response = await redeemReward(selectedReward.id, user.id, {
+      const response = await redeemReward(selectedReward.id, {
         name: selectedReward.name,
         points: selectedReward.points,
         description: selectedReward.description,

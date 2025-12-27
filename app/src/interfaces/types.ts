@@ -80,6 +80,37 @@ export interface LoginFormData {
   password: string;
 }
 
+export interface SignupFormData {
+  fullname: string;
+  email: string;
+  password: string;
+  phone?: string;
+  address?: string;
+  role: USER_ROLE;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface StoredUserData {
+  id: number;
+  email: string;
+  fullname: string;
+  role: string;
+}
+
+export interface AuthResponse {
+  user: UserDetails;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  accessToken: string;
+}
+
 export interface UserDetails {
   id: number;
   user_id?: number;
