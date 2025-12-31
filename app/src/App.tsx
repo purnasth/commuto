@@ -26,6 +26,9 @@ import RoleBasedPage from './pages/RoleBasedPage';
 import LogsDashboard from './pages/LogsDashboard';
 import SelfReflection from './pages/SelfReflection';
 
+import { GuestRoute } from './guards/GuestRoute';
+import { ProtectedRoute } from './guards/ProtectedRoute';
+
 import { SocketManager } from './components/SocketManager';
 
 import {
@@ -60,21 +63,82 @@ const App: React.FC = () => {
               <RouterToTop />
               <Navbar />
               <Routes>
+                {/* Public Routes */}
                 <Route path={ROUTE_HOME} element={<Home />} />
                 <Route path={ROUTE_HELP} element={<FAQPage />} />
                 <Route path={ROUTE_ABOUT} element={<AboutPage />} />
-                <Route path={ROUTE_LOGIN} element={<Login />} />
-                <Route path={ROUTE_PROFILE} element={<SelfReflection />} />
-                <Route path={ROUTE_RIDE_DETAILS} element={<RideDetails />} />
-                <Route path={ROUTE_ROLE} element={<RoleBasedPage />} />
                 <Route path={ROUTE_BRAND} element={<Brand />} />
                 <Route path={ROUTE_LEGAL} element={<LegalPage />} />
-                <Route path={ROUTE_LOGS_DASHBOARD} element={<LogsDashboard />} />
-                <Route path={ROUTE_REDEEM} element={<RedeemPage />} />
-                <Route path={ROUTE_VIEW_SCORE} element={<ViewScore />} />
-                <Route path={ROUTE_EARN_KARMA} element={<ViewKarma />} />
                 <Route path={ROUTE_LEADERBOARD} element={<Leaderboard />} />
                 <Route path={ROUTE_404} element={<Error404 />} />
+
+                {/* Guest Routes - Only for unauthenticated users */}
+                <Route
+                  path={ROUTE_LOGIN}
+                  element={
+                    <GuestRoute>
+                      <Login />
+                    </GuestRoute>
+                  }
+                />
+
+                {/* Protected Routes - Require authentication */}
+                <Route
+                  path={ROUTE_PROFILE}
+                  element={
+                    <ProtectedRoute>
+                      <SelfReflection />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={ROUTE_RIDE_DETAILS}
+                  element={
+                    <ProtectedRoute>
+                      <RideDetails />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={ROUTE_ROLE}
+                  element={
+                    <ProtectedRoute>
+                      <RoleBasedPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={ROUTE_LOGS_DASHBOARD}
+                  element={
+                    <ProtectedRoute>
+                      <LogsDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={ROUTE_REDEEM}
+                  element={
+                    <ProtectedRoute>
+                      <RedeemPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={ROUTE_VIEW_SCORE}
+                  element={
+                    <ProtectedRoute>
+                      <ViewScore />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path={ROUTE_EARN_KARMA}
+                  element={
+                    <ProtectedRoute>
+                      <ViewKarma />
+                    </ProtectedRoute>
+                  }
+                />
               </Routes>
               <Footer />
             </SocketManager>
