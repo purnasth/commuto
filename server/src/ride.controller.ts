@@ -29,6 +29,16 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RideGateway } from './rides/rides.gateway';
 
 import { UpdateRideDto } from './dto/update-ride.dto';
+import { CreateRideDto } from './dto/ride/create-ride.dto';
+import { CreateFeedbackDto } from './dto/ride/feedback.dto';
+import { ConfirmRideDto } from './dto/ride/confirm-ride.dto';
+import {
+  toRideListResponse,
+  toRideListResponses,
+  toRideDetailResponse,
+  toCurrentRideResponse,
+  toRideHistoryResponses,
+} from './utils/dto-transformer.util';
 
 import {
   USER_ROLE,
@@ -40,9 +50,7 @@ import {
 import { TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING } from './constants/constants';
 
 import {
-  RideDto,
   FeedbackDto,
-  ConfirmRideDto,
   AverageScoreResult,
   KarmaCalculationResult,
   AuthenticatedRequest,
@@ -250,7 +258,7 @@ export class RideController {
    * Now protected with JWT authentication - fromUserId comes from authenticated user
    */
   async submitFeedback(
-    @Body() body: Omit<FeedbackDto, 'fromUserId'>,
+    @Body() body: CreateFeedbackDto,
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId; // From JWT token
@@ -613,16 +621,13 @@ export class RideController {
       return false;
     });
 
-    return { rides: matchedRides };
-    // TODO (data_exposure_security): CRITICAL - matchedRides contains full Prisma objects with sensitive data
-    // Potential exposure: user emails, passwords (if included), internal IDs, timestamps, etc.
-    // Fix: Create proper RideDto mapping that only exposes safe fields
+    return { rides: toRideListResponses(matchedRides) };
   }
 
   @Post()
   @UseGuards(JwtAuthGuard)
   async createRide(
-    @Body() body: Omit<RideDto, 'createdBy'>,
+    @Body() body: CreateRideDto,
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId;
@@ -727,10 +732,7 @@ export class RideController {
       userId: authenticatedUserId,
       rideId: ride.id,
     });
-    return { message: 'Ride created', ride };
-    // TODO (data_exposure_security): CRITICAL - Full Prisma Ride object exposed
-    // Potential exposure: internal database IDs, creation timestamps, user objects with sensitive data
-    // Fix: Map to safe RideDto fields only
+    return { message: 'Ride created', ride: toRideListResponse(ride) };
   }
 
   @Get()
@@ -774,10 +776,7 @@ export class RideController {
       role,
       rideCount: rides.length,
     });
-    return { rides: ridesWithExpiry };
-    // TODO (data_exposure_security): CRITICAL - ridesWithExpiry contains full Prisma objects with sensitive data
-    // Potential exposure: user emails, passwords, phone numbers, addresses, internal IDs, etc.
-    // Fix: Create proper RideDto mapping for public ride listings
+    return { rides: toRideListResponses(ridesWithExpiry) };
   }
 
   // Get all ride history for a user (as rider or passenger)
@@ -871,10 +870,8 @@ export class RideController {
       rideCount: uniqueRides.length,
       originalRideCount: rides.length,
     });
-    return { rides: uniqueRides };
-    // TODO (data_exposure_security): CRITICAL - uniqueRides contains full Prisma objects with ALL user data
-    // Potential exposure: user emails, passwords, phone, addresses, karma points, credit scores, etc.
-    // Fix: Create RideHistoryDto with only safe fields for ride history
+
+    return { rides: toRideHistoryResponses(uniqueRides) };
   }
 
   @Get(':id')
@@ -923,15 +920,11 @@ export class RideController {
     });
 
     return {
-      ride: {
+      ride: toRideDetailResponse({
         ...ride,
         role: userRole, // Override the role based on current user's perspective
-      },
+      }),
     };
-    // TODO (data_exposure_security): CRITICAL - Full Prisma Ride object with ALL included relations exposed
-    // Potential exposure: Complete user objects (rider, passengers, createdByUser) with emails, passwords, etc.
-    // Also exposes: requests, ratings, messages which may contain sensitive data
-    // Fix: Create detailed RideDetailDto that maps only safe fields from relations
   }
 
   @Put(':id')
@@ -1451,10 +1444,7 @@ export class RideController {
       status: activeRide.status,
     });
 
-    return { hasActiveRide: true, ride: rideWithExpiry };
-    // TODO (data_exposure_security): CRITICAL - rideWithExpiry contains full Prisma object with ALL user data
-    // Potential exposure: Complete user objects (rider, createdByUser, passengers) with emails, passwords, etc.
-    // Fix: Create CurrentRideDto that maps only essential fields for current ride display
+    return { hasActiveRide: true, ride: toCurrentRideResponse(rideWithExpiry) };
   }
 
   /**

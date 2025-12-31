@@ -22,12 +22,14 @@ import { AuthService } from './services/auth.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { AuthenticatedRequest } from './interfaces/types';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
+import { toUserResponse } from './utils/dto-transformer.util';
 import {
   LoginDto,
   SignupDto,
   RefreshTokenDto,
   DeleteAccountDto,
 } from './dto/auth.dto';
+import { UpdateUserRequestDto } from './dto/user/update-user.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -151,11 +153,6 @@ export class AuthController {
       user.id,
     );
 
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(user).filter(([key]) => key !== 'password'),
-    );
-
     this.logger.log({
       level: 'info',
       message: `Login successful for email: ${body.email}`,
@@ -166,7 +163,7 @@ export class AuthController {
 
     return {
       message: 'Login successful',
-      user: userWithoutPassword,
+      user: toUserResponse(user),
       accessToken,
       refreshToken,
     };
@@ -231,14 +228,9 @@ export class AuthController {
       userId: user.id,
     });
 
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(user).filter(([key]) => key !== 'password'),
-    );
-
     return {
       message: 'Signup successful',
-      user: userWithoutPassword,
+      user: toUserResponse(user),
       accessToken,
       refreshToken,
     };
@@ -371,21 +363,13 @@ export class AuthController {
       });
       throw new BadRequestException('User not found');
     }
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(user).filter(([key]) => key !== 'password'),
-    );
-    return { user: userWithoutPassword };
+    return { user: toUserResponse(user) };
   }
 
   @Put('update')
   @UseGuards(JwtAuthGuard)
   async updateUser(
-    @Body()
-    body: {
-      password: string;
-      updates: Partial<SignupDto>;
-    },
+    @Body() body: UpdateUserRequestDto,
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId;
@@ -421,14 +405,12 @@ export class AuthController {
       });
       throw new UnauthorizedException('Invalid password');
     }
-    // Prevent updating email and password directly here for security
-    const allowedUpdates = { ...body.updates };
-    delete allowedUpdates.email;
-    delete allowedUpdates.password;
+
     const updatedUser = await this.prisma.user.update({
       where: { id: authenticatedUserId },
-      data: allowedUpdates,
+      data: body.updates,
     });
+
     this.logger.log({
       level: 'info',
       message: `User updated for email: ${authenticatedEmail}`,
@@ -436,10 +418,10 @@ export class AuthController {
       email: authenticatedEmail,
       userId: authenticatedUserId,
     });
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(updatedUser).filter(([key]) => key !== 'password'),
-    );
-    return { message: 'User updated successfully', user: userWithoutPassword };
+
+    return {
+      message: 'User updated successfully',
+      user: toUserResponse(updatedUser),
+    };
   }
 }
