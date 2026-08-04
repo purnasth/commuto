@@ -25,10 +25,12 @@ import { Ride, User, Feedback } from 'generated/prisma';
 import { PrismaService } from './prisma.service';
 import { KarmaCalculationService } from './services/karma-calculation.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './auth/optional-jwt-auth.guard';
 
 import { RideGateway } from './rides/rides.gateway';
 
 import { UpdateRideDto } from './dto/update-ride.dto';
+import { toRideDto, toRideDtoList } from './dto/ride-response.dto';
 
 import {
   USER_ROLE,
@@ -46,6 +48,7 @@ import {
   AverageScoreResult,
   KarmaCalculationResult,
   AuthenticatedRequest,
+  OptionalAuthenticatedRequest,
 } from './interfaces/types';
 
 import {
@@ -60,130 +63,6 @@ import { processFeedbackData } from './utils/feedback.util';
 
 @Controller('rides')
 export class RideController {
-  // TODO (data_exposure_security): CRITICAL SECURITY AUDIT REQUIRED
-  //
-  // PROBLEM: Most endpoints in this controller return raw Prisma objects which expose
-  // sensitive database fields and complete user relations to the frontend/API consumers.
-  //
-  // EXPOSED DATA INCLUDES:
-  // - Database internal IDs (id, createdAt, updatedAt)
-  // - Complete User objects with: emails, password hashes, phone numbers, addresses
-  // - Internal karma/credit scores, transaction history
-  // - Private ride messages, ratings, requests
-  // - System timestamps and audit trails
-  //
-  // AFFECTED ENDPOINTS:
-  // - GET /rides (public ride listings) - exposes all user data in ride relations
-  // - GET /rides/match - exposes user data in matched rides
-  // - GET /rides/history - exposes complete user history with all relations
-  // - GET /rides/:id - exposes everything including messages, ratings, requests
-  // - POST /rides - exposes full ride object after creation
-  // - POST /rides/:id/confirm - exposes full user objects in confirmed rides
-  // - POST /rides/:id/complete - exposes complete ride data
-  // - GET /rides/user/:userId/current - exposes full current ride with all user data
-  //
-  // SOLUTION: Create proper DTOs for each endpoint that map only safe, public fields:
-  // - PublicRideDto (for listings) - basic ride info + safe user fields (name, rating only)
-  // - RideDetailDto (for single ride) - more details but still filtered
-  // - RideHistoryDto (for history) - historical data without sensitive fields
-  // - CurrentRideDto (for current ride) - essential fields only
-  //
-  // PRIORITY: CRITICAL - This is a major security vulnerability
-  // IMPACT: All user data is potentially exposed to any API consumer
-  // TIMELINE: Should be fixed before production deployment
-  //
-
-  // TODO (authentication_security): CRITICAL AUTHENTICATION SYSTEM MISSING
-  //
-  // PROBLEM: This application lacks proper JWT authentication, causing severe security vulnerabilities.
-  // Multiple endpoints trust client-provided userId values without any authentication verification.
-  //
-  // MISSING AUTHENTICATION AFFECTS:
-  // - POST /rides/:id/complete - trusts body.userId for ride completion authorization
-  // - POST /rides/:id/reject - trusts body.userId for ride rejection authorization
-  // - POST /rides/:id/cancel - trusts body.userId for ride cancellation authorization
-  // - POST /rides/feedback - trusts body.fromUserId for feedback submission authorization
-  //
-  // SECURITY IMPACT:
-  // - Any user can perform actions on behalf of other users
-  // - Complete bypass of user authorization for critical ride management operations
-  // - Manipulation of karma points, credit scores, and ride statistics
-  // - Fraudulent feedback and rating manipulation
-  //
-  // REQUIRED IMPLEMENTATION:
-  //
-  // 1. INSTALL JWT AUTHENTICATION:
-  //    npm install @nestjs/jwt @nestjs/passport passport passport-jwt
-  //    npm install -D @types/passport-jwt
-  //
-  // 2. CREATE JWT MODULE (auth/jwt.module.ts):
-  //    ```typescript
-  //    import { Module } from '@nestjs/common';
-  //    import { JwtModule } from '@nestjs/jwt';
-  //    import { PassportModule } from '@nestjs/passport';
-  //    import { JwtStrategy } from './jwt.strategy';
-  //    import { JwtAuthGuard } from './jwt-auth.guard';
-  //
-  //    @Module({
-  //      imports: [
-  //        PassportModule,
-  //        JwtModule.register({
-  //          secret: process.env.JWT_SECRET,
-  //          signOptions: { expiresIn: '24h' },
-  //        }),
-  //      ],
-  //      providers: [JwtStrategy, JwtAuthGuard],
-  //      exports: [JwtAuthGuard],
-  //    })
-  //    export class JwtAuthModule {}
-  //    ```
-  //
-  // 3. CREATE JWT STRATEGY (auth/jwt.strategy.ts):
-  //    ```typescript
-  //    import { Injectable } from '@nestjs/common';
-  //    import { PassportStrategy } from '@nestjs/passport';
-  //    import { ExtractJwt, Strategy } from 'passport-jwt';
-  //
-  //    @Injectable()
-  //    export class JwtStrategy extends PassportStrategy(Strategy) {
-  //      constructor() {
-  //        super({
-  //          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  //          ignoreExpiration: false,
-  //          secretOrKey: process.env.JWT_SECRET,
-  //        });
-  //      }
-  //
-  //      async validate(payload: any) {
-  //        return { userId: payload.sub, email: payload.email };
-  //      }
-  //    }
-  //    ```
-  //
-  // 4. UPDATE AUTH CONTROLLER to issue JWT tokens on login/signup
-  //
-  // 5. PROTECT VULNERABLE ENDPOINTS:
-  //    ```typescript
-  //    import { UseGuards, Request } from '@nestjs/common';
-  //    import { JwtAuthGuard } from './auth/jwt-auth.guard';
-  //
-  //    @UseGuards(JwtAuthGuard)
-  //    @Post(':id/complete')
-  //    async completeRide(@Param('id') id: string, @Request() req: any) {
-  //      const authenticatedUserId = req.user.userId; // From JWT token
-  //      // Remove body.userId parameter completely
-  //      // Use authenticatedUserId for all authorization checks
-  //    }
-  //    ```
-  //
-  // 6. REMOVE userId FROM REQUEST BODIES:
-  //    - Remove { userId: number } from all @Body() parameters
-  //    - Extract user ID from JWT authentication context only
-  //    - Update frontend to send JWT tokens in Authorization header
-  //
-  // PRIORITY: CRITICAL - Must be implemented before production deployment
-  // ESTIMATED EFFORT: 1-2 days for complete authentication system implementation
-  //
   constructor(
     private prisma: PrismaService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
@@ -191,21 +70,43 @@ export class RideController {
     private readonly rideGateway: RideGateway,
   ) {}
 
-  @Get('/user/:id/karma-points')
   /**
-   * Retrieves the karma points for a user by their ID.
+   * Rejects any attempt to read another user's private figures.
+   * These endpoints are keyed by a sequential user id, so without this check
+   * anyone could walk the range and harvest every account's scores.
+   */
+  private assertSelf(requestedUserId: number, authenticatedUserId: number) {
+    if (requestedUserId !== authenticatedUserId) {
+      this.logger.log({
+        level: 'warn',
+        message: `Denied cross-user access: userId=${authenticatedUserId} requested data for userId=${requestedUserId}`,
+        tag: 'ride',
+        authenticatedUserId,
+        requestedUserId,
+      });
+      throw new ForbiddenException('You can only access your own data');
+    }
+  }
+
+  @Get('/user/:id/karma-points')
+  @UseGuards(JwtAuthGuard)
+  /**
+   * Retrieves the karma points for the authenticated user.
    *
-   * @param id - The ID of the user as a string.
+   * @param id - The ID of the user as a string. Must match the caller.
    * @returns An object containing the user's karma points.
-   * @throws {BadRequestException} If the provided ID is missing or invalid.
+   * @throws {ForbiddenException} If the caller requests another user's points.
    * @throws {NotFoundException} If the user with the given ID does not exist.
    *
    * TODO (refactor priority):
    *   - Annotate return type with DTO (GetKarmaPointsResponseDto)
    *   - Add @Throttle() decorator for rate limiting
-   *   - Consider access control/auth guard for this endpoint
    */
-  async getUserKarmaPoints(@Param('id', ParseIntPipe) userId: number) {
+  async getUserKarmaPoints(
+    @Param('id', ParseIntPipe) userId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.assertSelf(userId, req.user.userId);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { karmaPoints: true },
@@ -218,20 +119,24 @@ export class RideController {
 
   // TODO: this informations is already available on userDetails endpoint, consider removing this endpoint and using that one instead
   @Get('/user/:id/credit-score')
+  @UseGuards(JwtAuthGuard)
   /**
-   * Retrieves the credit score for a user by their ID.
+   * Retrieves the credit score for the authenticated user.
    *
-   * @param id - The ID of the user as a string.
+   * @param id - The ID of the user as a string. Must match the caller.
    * @returns An object containing the user's credit score.
-   * @throws {BadRequestException} If the provided ID is missing or invalid.
+   * @throws {ForbiddenException} If the caller requests another user's score.
    * @throws {NotFoundException} If the user with the given ID does not exist.
    *
    * TODO (refactor priority):
    *   - Annotate return type with DTO (GetCreditScoreResponseDto)
    *   - Add @Throttle() decorator for rate limiting
-   *   - Consider access control/auth guard for this endpoint
    */
-  async getUserCreditScore(@Param('id', ParseIntPipe) userId: number) {
+  async getUserCreditScore(
+    @Param('id', ParseIntPipe) userId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.assertSelf(userId, req.user.userId);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { creditScore: true },
@@ -310,6 +215,11 @@ export class RideController {
       throw new BadRequestException('User is not part of this ride');
     }
 
+    // Derive the role from this ride's own records rather than trusting
+    // body.role. The role selects which balance gets credited, so accepting it
+    // from the client would let a passenger claim the rider payout.
+    const effectiveRole = isRider ? USER_ROLE.RIDER : USER_ROLE.PASSENGER;
+
     // Check for duplicate feedback
     let existingFeedback: Feedback | null;
     try {
@@ -342,7 +252,7 @@ export class RideController {
           rideId: body.rideId,
           fromUserId: authenticatedUserId,
           toUserId: body.toUserId,
-          role: body.role,
+          role: effectiveRole,
           emoji: body.emoji,
           comment: body.comment,
         },
@@ -399,7 +309,7 @@ export class RideController {
     });
 
     // Update user scores based on their role
-    if (body.role === USER_ROLE.RIDER) {
+    if (effectiveRole === USER_ROLE.RIDER) {
       // Update rider's karma points
       await this.prisma.user.update({
         where: { id: authenticatedUserId },
@@ -434,7 +344,7 @@ export class RideController {
           formula: karmaResult.formula,
         },
       });
-    } else if (body.role === USER_ROLE.PASSENGER) {
+    } else if (effectiveRole === USER_ROLE.PASSENGER) {
       // Update passenger's credit score
       await this.prisma.user.update({
         where: { id: authenticatedUserId },
@@ -613,10 +523,9 @@ export class RideController {
       return false;
     });
 
-    return { rides: matchedRides };
-    // TODO (data_exposure_security): CRITICAL - matchedRides contains full Prisma objects with sensitive data
-    // Potential exposure: user emails, passwords (if included), internal IDs, timestamps, etc.
-    // Fix: Create proper RideDto mapping that only exposes safe fields
+    // Match results are always still ACTIVE, so participants are exposed as
+    // public profiles only — no contact details before a ride is confirmed.
+    return { rides: toRideDtoList(matchedRides) };
   }
 
   @Post()
@@ -722,19 +631,24 @@ export class RideController {
     });
     this.logger.log({
       level: 'info',
-      message: `Ride created by userId=${authenticatedUserId}: ${JSON.stringify(ride)}`,
+      message: `Ride created by userId=${authenticatedUserId}`,
       tag: 'ride',
       userId: authenticatedUserId,
       rideId: ride.id,
     });
-    return { message: 'Ride created', ride };
-    // TODO (data_exposure_security): CRITICAL - Full Prisma Ride object exposed
-    // Potential exposure: internal database IDs, creation timestamps, user objects with sensitive data
-    // Fix: Map to safe RideDto fields only
+    return {
+      message: 'Ride created',
+      ride: toRideDto(ride, authenticatedUserId),
+    };
   }
 
   @Get()
-  async getRides(@Query('role') role?: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getRides(
+    @Request() req: OptionalAuthenticatedRequest,
+    @Query('role') role?: string,
+  ) {
+    const viewerId = req.user?.userId;
     const now = getNow();
     // Expire rides whose timestamp is in the past and still ACTIVE
     await this.expireOldRides();
@@ -760,9 +674,9 @@ export class RideController {
       orderBy: { timestamp: 'desc' },
     });
 
-    // Add expiry information to each ride
+    // Map to the safe projection, then add expiry information to each ride
     const ridesWithExpiry = rides.map((ride) => ({
-      ...ride,
+      ...toRideDto(ride, viewerId),
       expiryTimeSeconds: this.calculateExpiryTimeSeconds(),
       remainingTimeSeconds: this.calculateRemainingTimeSeconds(ride.timestamp),
     }));
@@ -775,9 +689,6 @@ export class RideController {
       rideCount: rides.length,
     });
     return { rides: ridesWithExpiry };
-    // TODO (data_exposure_security): CRITICAL - ridesWithExpiry contains full Prisma objects with sensitive data
-    // Potential exposure: user emails, passwords, phone numbers, addresses, internal IDs, etc.
-    // Fix: Create proper RideDto mapping for public ride listings
   }
 
   // Get all ride history for a user (as rider or passenger)
@@ -836,9 +747,6 @@ export class RideController {
         rider: true,
         passengers: true,
         createdByUser: true,
-        requests: true,
-        ratings: true,
-        messages: true,
       },
       orderBy: { timestamp: 'desc' },
     });
@@ -871,14 +779,18 @@ export class RideController {
       rideCount: uniqueRides.length,
       originalRideCount: rides.length,
     });
-    return { rides: uniqueRides };
-    // TODO (data_exposure_security): CRITICAL - uniqueRides contains full Prisma objects with ALL user data
-    // Potential exposure: user emails, passwords, phone, addresses, karma points, credit scores, etc.
-    // Fix: Create RideHistoryDto with only safe fields for ride history
+    return { rides: toRideDtoList(uniqueRides, authenticatedUserId) };
   }
 
   @Get(':id')
-  async getRide(@Param('id') id: string, @Query('userId') userId?: string) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getRide(
+    @Param('id') id: string,
+    @Request() req: OptionalAuthenticatedRequest,
+  ) {
+    // The viewer is taken from the JWT only. A client-supplied userId cannot be
+    // trusted to decide whose contact details are visible.
+    const viewerId = req.user?.userId;
     const rideId = Number(id);
     if (!id || isNaN(rideId)) {
       this.logger.log({
@@ -895,20 +807,16 @@ export class RideController {
         rider: true,
         passengers: true,
         createdByUser: true,
-        requests: true,
-        ratings: true,
-        messages: true,
       },
     });
     if (!ride) throw new NotFoundException('Ride not found');
 
     // Determine the role from the current user's perspective
     let userRole = ride.role; // Default to the original creator's role
-    if (userId) {
-      const currentUserId = Number(userId);
-      if (currentUserId === ride.riderId) {
+    if (viewerId) {
+      if (viewerId === ride.riderId) {
         userRole = USER_ROLE.RIDER;
-      } else if (currentUserId === ride.passengerId) {
+      } else if (viewerId === ride.passengerId) {
         userRole = USER_ROLE.PASSENGER;
       }
     }
@@ -918,20 +826,16 @@ export class RideController {
       message: `Fetched ride details`,
       tag: 'ride',
       rideId,
-      requestedByUser: userId,
+      requestedByUser: viewerId,
       userRole,
     });
 
     return {
       ride: {
-        ...ride,
+        ...toRideDto(ride, viewerId),
         role: userRole, // Override the role based on current user's perspective
       },
     };
-    // TODO (data_exposure_security): CRITICAL - Full Prisma Ride object with ALL included relations exposed
-    // Potential exposure: Complete user objects (rider, passengers, createdByUser) with emails, passwords, etc.
-    // Also exposes: requests, ratings, messages which may contain sensitive data
-    // Fix: Create detailed RideDetailDto that maps only safe fields from relations
   }
 
   @Put(':id')
@@ -971,10 +875,10 @@ export class RideController {
       rideId: id,
       updates,
     });
-    return { message: 'Ride updated', ride };
-    // TODO (data_exposure_security): CRITICAL - Full updated Prisma Ride object exposed
-    // Potential exposure: internal database fields, timestamps, related user data
-    // Fix: Map to safe RideDto fields only
+    return {
+      message: 'Ride updated',
+      ride: toRideDto(ride, authenticatedUserId),
+    };
   }
 
   @Delete(':id')
@@ -1112,34 +1016,47 @@ export class RideController {
     // Generate a unique match group ID for these paired rides
     const matchGroupId = randomUUID();
 
-    // Update both rides with confirmed status and proper rider/passenger assignments
-    await this.prisma.ride.updateMany({
-      where: { id: { in: [rideId, targetRideId] } },
-      data: {
-        status: RIDE_STATUS.CONFIRMED,
-        riderId: updatedRiderId,
-        passengerId: updatedPassengerId,
-        matchGroupId: matchGroupId,
-      },
-    });
-
-    // Now connect the passenger to both rides in the many-to-many relationship
-    await this.prisma.ride.update({
-      where: { id: rideId },
-      data: {
-        passengers: {
-          connect: { id: updatedPassengerId },
+    // Claim both rides and link the passenger in one transaction.
+    //
+    // The ACTIVE requirement lives in the WHERE clause, so whichever request
+    // commits first wins and the loser matches fewer than two rows. Without
+    // it, two passengers confirming the same rider at once would both succeed
+    // and silently overwrite each other. Throwing inside the transaction rolls
+    // back a partial claim rather than leaving one ride confirmed alone.
+    await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.ride.updateMany({
+        where: {
+          id: { in: [rideId, targetRideId] },
+          status: RIDE_STATUS.ACTIVE,
         },
-      },
-    });
-
-    await this.prisma.ride.update({
-      where: { id: targetRideId },
-      data: {
-        passengers: {
-          connect: { id: updatedPassengerId },
+        data: {
+          status: RIDE_STATUS.CONFIRMED,
+          riderId: updatedRiderId,
+          passengerId: updatedPassengerId,
+          matchGroupId: matchGroupId,
         },
-      },
+      });
+
+      if (claimed.count < 2) {
+        this.logger.log({
+          level: 'warn',
+          message: `Confirm ride failed: a ride was no longer active`,
+          tag: 'ride',
+          rideIds: [rideId, targetRideId],
+          claimedCount: claimed.count,
+        });
+        throw new BadRequestException(
+          'This ride is no longer available. It may have just been matched by someone else.',
+        );
+      }
+
+      // Connect the passenger to both rides in the many-to-many relationship
+      for (const id of [rideId, targetRideId]) {
+        await tx.ride.update({
+          where: { id },
+          data: { passengers: { connect: { id: updatedPassengerId } } },
+        });
+      }
     });
 
     this.logger.log({
@@ -1168,11 +1085,8 @@ export class RideController {
 
     return {
       message: 'Rides confirmed successfully',
-      rides: updatedRides,
+      rides: toRideDtoList(updatedRides, authenticatedUserId),
     };
-    // TODO (data_exposure_security): CRITICAL - updatedRides contains full Prisma objects with ALL user data
-    // Potential exposure: Complete user objects (rider, passengers, createdByUser) with sensitive information
-    // Fix: Create ConfirmedRideDto that maps only safe fields from confirmed rides
   }
 
   @UseGuards(JwtAuthGuard)
@@ -1307,12 +1221,10 @@ export class RideController {
     return {
       message:
         'Ride completed successfully. Both users should now provide feedback.',
-      ride: updatedRides[0], // Return the first ride (both should have same essential data)
+      // Return the first ride (both should have same essential data)
+      ride: toRideDto(updatedRides[0], authenticatedUserId),
       totalRidesUpdated: updatedRides.length,
     };
-    // TODO (data_exposure_security): CRITICAL - updatedRides[0] contains full Prisma object with ALL user data
-    // Potential exposure: Complete user objects (passengers, rider, createdByUser) with sensitive data
-    // Fix: Create CompletedRideDto that maps only safe fields
   }
 
   @UseGuards(JwtAuthGuard)
@@ -1341,11 +1253,8 @@ export class RideController {
       message: 'Ride rejected. You can now post a new ride.',
       rideId: id,
       userId: authenticatedUserId,
-      ride,
+      ride: toRideDto(ride, authenticatedUserId),
     };
-    // TODO (data_exposure_security): MEDIUM - ride object contains Prisma fields that may not be needed
-    // Potential exposure: internal database fields, timestamps
-    // Fix: Return minimal ride info or just confirmation message
   }
 
   @UseGuards(JwtAuthGuard)
@@ -1374,11 +1283,8 @@ export class RideController {
       message: 'Ride cancelled. You can now post a new ride.',
       rideId: id,
       userId: authenticatedUserId,
-      ride,
+      ride: toRideDto(ride, authenticatedUserId),
     };
-    // TODO (data_exposure_security): MEDIUM - ride object contains Prisma fields that may not be needed
-    // Potential exposure: internal database fields, timestamps
-    // Fix: Return minimal ride info or just confirmation message
   }
 
   // Get current user's active ride with expiry information
@@ -1433,7 +1339,7 @@ export class RideController {
     );
 
     const rideWithExpiry = {
-      ...activeRide,
+      ...toRideDto(activeRide, authenticatedUserId),
       expiryTimeSeconds: this.calculateExpiryTimeSeconds(),
       remainingTimeSeconds,
     };
@@ -1452,9 +1358,6 @@ export class RideController {
     });
 
     return { hasActiveRide: true, ride: rideWithExpiry };
-    // TODO (data_exposure_security): CRITICAL - rideWithExpiry contains full Prisma object with ALL user data
-    // Potential exposure: Complete user objects (rider, createdByUser, passengers) with emails, passwords, etc.
-    // Fix: Create CurrentRideDto that maps only essential fields for current ride display
   }
 
   /**
@@ -1502,15 +1405,18 @@ export class RideController {
   }
 
   @Get('/user/:userId/average-score')
+  @UseGuards(JwtAuthGuard)
   /**
-   * Get average feedback score for a user
+   * Get average feedback score for the authenticated user
    * Calculates the average emoji feedback received by a user across all rides
-   * @param userId The user ID to calculate average score for
+   * @param userId The user ID to calculate average score for. Must match the caller.
    * @returns Object containing average score, total feedback count, and emoji breakdown
    */
   async getUserAverageScore(
     @Param('userId', ParseIntPipe) userId: number,
+    @Request() req: AuthenticatedRequest,
   ): Promise<AverageScoreResult> {
+    this.assertSelf(userId, req.user.userId);
     this.logger.log({
       level: 'info',
       message: `Getting average score for user ${userId}`,
@@ -1551,15 +1457,21 @@ export class RideController {
   }
 
   @Get('/user/:userId/people-impacted')
+  @UseGuards(JwtAuthGuard)
   /**
-   * Get people impacted by a user (users they've ridden with and ride counts)
+   * Get people impacted by the authenticated user (who they've ridden with)
    * Returns users ranked by number of rides completed together
    * Properly handles matchGroupId to avoid double-counting matched rides
-   * @param userId The user ID to get people impacted data for
+   *
+   * Restricted to the caller's own data: this is effectively their social
+   * graph, and exposing it by user id would let anyone map who rides with whom.
+   *
+   * @param userId The user ID to get people impacted data for. Must match the caller.
    * @returns Object containing people array and total count
    */
   async getPeopleImpacted(
     @Param('userId', ParseIntPipe) userId: number,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{
     people: Array<{
       id: number;
@@ -1569,6 +1481,7 @@ export class RideController {
     }>;
     totalImpacted: number;
   }> {
+    this.assertSelf(userId, req.user.userId);
     try {
       // Get all completed rides where user was involved (as rider or passenger)
       const allRides = await this.prisma.ride.findMany({

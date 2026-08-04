@@ -87,12 +87,22 @@ export class KarmaController {
   /**
    * Update redemption status by code
    * PUT /karma/:code/status
+   *
+   * Requires authentication and ownership of the redemption: the code alone
+   * must not be enough, or anyone could enumerate codes and burn, expire or
+   * unlock other users' vouchers.
    */
   @Put(':code/status')
+  @UseGuards(JwtAuthGuard)
   async updateRedemptionStatus(
     @Param('code') code: string,
     @Body(ValidationPipe) data: UpdateRedemptionStatusDto,
+    @Request() req: AuthenticatedRequest,
   ) {
-    return await this.karmaService.updateRedemptionStatus(code, data);
+    return await this.karmaService.updateRedemptionStatus(
+      code,
+      data,
+      req.user.userId,
+    );
   }
 }

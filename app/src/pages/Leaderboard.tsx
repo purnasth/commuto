@@ -333,7 +333,6 @@ const Leaderboard: React.FC = () => {
                           user={{
                             id: user.id,
                             profilePicture: user.profilePicture,
-                            email: `${user.name.replace(/\s+/g, '.').toLowerCase()}@example.com`,
                             fullname: user.name,
                           }}
                           showProfilePicture={true}

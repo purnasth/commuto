@@ -11,7 +11,7 @@ import { LogsController } from './logs.controller';
 import { RideController } from './ride.controller';
 
 import { AppService } from './app.service';
-import { EnvService } from './env.service';
+import { EnvService, requireSecret } from './env.service';
 import { PrismaService } from './prisma.service';
 import { AuthService } from './services/auth.service';
 import { KarmaRedemptionService } from './services/karma-redemption.service';
@@ -28,7 +28,7 @@ import { winstonLoggerConfig } from './logger.config';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService): JwtModuleOptions => ({
-        secret: configService.get<string>('JWT_SECRET') || '',
+        secret: requireSecret(configService, 'JWT_SECRET'),
         signOptions: {
           expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ||
             '1h') as StringValue,

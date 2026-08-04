@@ -1,15 +1,23 @@
 import {
   Min,
   Max,
-  IsEnum,
   IsString,
   IsNumber,
   IsOptional,
   IsDateString,
 } from 'class-validator';
 
-import { USER_ROLE, RIDE_STATUS } from '../constants/enums';
-
+/**
+ * Fields the owner of a ride may edit while it is still theirs to edit.
+ *
+ * `status` and `role` are deliberately excluded. Status transitions happen
+ * through the dedicated confirm/complete/cancel/reject endpoints, which check
+ * who is asking and apply the matching side effects; allowing a status here
+ * would let an owner mark a ride COMPLETED and farm karma without a ride.
+ * The relational columns (riderId, passengerId, createdBy, matchGroupId) and
+ * the derived statistics (distance, co2Saved, peopleImpacted) are server-owned
+ * for the same reason.
+ */
 export class UpdateRideDto {
   @IsOptional()
   @IsString()
@@ -48,10 +56,6 @@ export class UpdateRideDto {
   message?: string;
 
   @IsOptional()
-  @IsEnum(USER_ROLE)
-  role?: USER_ROLE;
-
-  @IsOptional()
   @IsNumber()
   @Min(0)
   estimatedTimeOfArrival?: number;
@@ -59,8 +63,4 @@ export class UpdateRideDto {
   @IsOptional()
   @IsDateString()
   timestamp?: string;
-
-  @IsOptional()
-  @IsEnum(RIDE_STATUS)
-  status?: RIDE_STATUS;
 }

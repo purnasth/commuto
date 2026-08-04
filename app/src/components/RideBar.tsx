@@ -330,7 +330,8 @@ const RideBar: React.FC<RideBarProps> = ({ fromHome = false, role }) => {
 
     const registerUserOnConnect = () => {
       if (user?.id && socket) {
-        socket.emit('registerUser', user.id.toString());
+        // Identity comes from the token sent in the socket handshake.
+        socket.emit('registerUser');
       }
     };
 

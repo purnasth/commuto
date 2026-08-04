@@ -9,9 +9,18 @@ import {
 } from '@nestjs/websockets';
 import { Ride } from 'generated/prisma';
 import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+
+import { requireSecret } from '../env.service';
 import { Server, Socket } from 'socket.io';
 
 const userSocketMap = new Map<string, string>();
+
+interface AccessTokenPayload {
+  sub: number;
+  email: string;
+}
 
 @WebSocketGateway({
   cors: {
@@ -23,6 +32,11 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
   private readonly logger = new Logger(RideGateway.name);
+
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
@@ -40,11 +54,47 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * Resolves the user id a socket may register as, from its access token.
+   *
+   * The token is the only accepted source of identity here. Trusting a
+   * client-supplied id would let anyone claim another user's socket and
+   * receive their ride confirmations, which carry pickup and drop-off
+   * locations and schedules.
+   */
+  private resolveUserId(client: Socket): number | null {
+    const auth = client.handshake.auth as { token?: string } | undefined;
+    const header = client.handshake.headers.authorization;
+    const token =
+      auth?.token ?? (header?.startsWith('Bearer ') ? header.slice(7) : header);
+
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = this.jwtService.verify<AccessTokenPayload>(token, {
+        secret: requireSecret(this.configService, 'JWT_SECRET'),
+      });
+
+      return payload.sub;
+    } catch {
+      return null;
+    }
+  }
+
   @SubscribeMessage('registerUser')
-  handleRegisterUser(
-    @MessageBody() userId: string,
-    @ConnectedSocket() client: Socket,
-  ): void {
+  handleRegisterUser(@ConnectedSocket() client: Socket): void {
+    const userId = this.resolveUserId(client);
+
+    if (userId === null) {
+      this.logger.warn(
+        `Socket ${client.id} attempted to register without a valid access token.`,
+      );
+      client.emit('error', 'Authentication required to register.');
+      return;
+    }
+
     userSocketMap.set(userId.toString(), client.id);
     this.logger.log(`User ${userId} registered with socket ${client.id}`);
 
@@ -63,36 +113,10 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return `Server received: ${data}`;
   }
 
-  @SubscribeMessage('sendToAll')
-  handleSendToAll(
-    @MessageBody() message: string,
-    @ConnectedSocket() client: Socket,
-  ): void {
-    this.server.emit('messageToAll', { sender: client.id, message: message });
-  }
-
-  @SubscribeMessage('sendToRegisteredUser')
-  handleSendToRegisteredUser(
-    @MessageBody() data: { targetUserId: string; message: string },
-    @ConnectedSocket() client: Socket,
-  ): void {
-    const targetSocketId = userSocketMap.get(data.targetUserId);
-    if (targetSocketId) {
-      this.server.to(targetSocketId).emit('privateMessage', {
-        senderUserId: 'Server',
-        message: data.message,
-      });
-      this.logger.log(`Sent private message to user ${data.targetUserId}`);
-    } else {
-      client.emit(
-        'error',
-        `User ${data.targetUserId} not found or not registered.`,
-      );
-      this.logger.warn(
-        `User ${data.targetUserId} not found for private message.`,
-      );
-    }
-  }
+  // The 'sendToAll' and 'sendToRegisteredUser' debug handlers were removed:
+  // any anonymous socket could broadcast to every connected user, or address a
+  // user by id and learn from the error reply whether they were online.
+  // Nothing in the app emitted them.
 
   notifyRideConfirmation(confirmedRide: Ride) {
     const payload = {

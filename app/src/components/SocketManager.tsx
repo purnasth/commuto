@@ -5,7 +5,7 @@ import { useEffect, useState, ReactNode } from 'react';
 
 import { RIDE_STATUS, CUSTOM_EVENTS, USER_ROLE } from '../constants/enums';
 
-import { getUserId } from '../utils/auth';
+import { getUserId, getAccessToken } from '../utils/auth';
 import { getFeedbackKey } from '../utils/functions';
 import { useRideEvent } from '../utils/useRideEvent';
 import { SocketContext } from '../utils/SocketContext';
@@ -218,6 +218,9 @@ export const SocketManager = ({ children }: SocketManagerProps) => {
       transports: ['websocket'],
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      // The server derives the socket's identity from this token, so a client
+      // cannot claim to be another user.
+      auth: (cb) => cb({ token: getAccessToken() ?? '' }),
     });
 
     setSocket(newSocket);
@@ -226,7 +229,7 @@ export const SocketManager = ({ children }: SocketManagerProps) => {
       setIsConnected(true);
       log('[Socket] Connected to server', newSocket.id);
 
-      newSocket.emit('registerUser', userId);
+      newSocket.emit('registerUser');
       log(`[Socket] Registering as user: ${userId}`);
     });
 
