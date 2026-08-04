@@ -17,7 +17,75 @@ interface LogEntry {
   expirationTime?: string;
 }
 
-// TODO: Add role-based authorization guard to restrict logs to admin users only
+/**
+ * Fields a log line is allowed to surface over the API.
+ *
+ * Log records are free-form objects, so parsing a line yields whatever the
+ * caller happened to attach. Projecting onto this whitelist keeps any
+ * credential or personal detail that reaches the log files from being served
+ * back out, rather than trusting every call site to log carefully.
+ */
+const EXPOSED_LOG_FIELDS = [
+  'from',
+  'to',
+  'level',
+  'message',
+  'role',
+  'tag',
+  'timestamp',
+  'userId',
+  'rideId',
+  'expirationTime',
+] as const satisfies readonly (keyof LogEntry)[];
+
+/** Patterns whose presence marks a whole line as unsafe to return. */
+const SECRET_PATTERNS = [
+  /\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/, // bcrypt hash
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/, // JWT
+];
+
+function redactLogEntry(raw: unknown): LogEntry | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+
+  const source = raw as Record<string, unknown>;
+  const entry: Record<string, unknown> = {};
+
+  for (const field of EXPOSED_LOG_FIELDS) {
+    if (source[field] !== undefined) {
+      entry[field] = source[field];
+    }
+  }
+
+  // A free-text message can still embed a token or hash; drop the line entirely.
+  if (
+    typeof entry.message === 'string' &&
+    SECRET_PATTERNS.some((pattern) => pattern.test(entry.message as string))
+  ) {
+    return undefined;
+  }
+
+  return entry as unknown as LogEntry;
+}
+
+export function parseLogLines(data: string): LogEntry[] {
+  return data
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return redactLogEntry(JSON.parse(line));
+      } catch {
+        return undefined;
+      }
+    })
+    .filter((entry): entry is LogEntry => !!entry);
+}
+
+// TODO: Add role-based authorization guard to restrict logs to admin users only.
+// The User model has no admin role yet, so this currently only keeps logs from
+// anonymous callers - any authenticated user can still read them.
 @Controller('logs')
 @UseGuards(JwtAuthGuard)
 export class LogsController {
@@ -49,17 +117,7 @@ export class LogsController {
 
     try {
       const data = await fs.promises.readFile(logFile, 'utf-8');
-      const lines = data.split('\n').filter(Boolean);
-      const entries: LogEntry[] = lines
-        .map((line) => {
-          try {
-            return JSON.parse(line) as LogEntry;
-          } catch {
-            return undefined;
-          }
-        })
-        .filter((entry): entry is LogEntry => !!entry);
-      return entries;
+      return parseLogLines(data);
     } catch {
       return [];
     }
@@ -92,17 +150,7 @@ export class LogsController {
         try {
           await fs.promises.access(filePath, fs.constants.F_OK);
           const data = await fs.promises.readFile(filePath, 'utf-8');
-          const lines = data.split('\n').filter(Boolean);
-          const entries: LogEntry[] = lines
-            .map((line) => {
-              try {
-                return JSON.parse(line) as LogEntry;
-              } catch {
-                return undefined;
-              }
-            })
-            .filter((entry): entry is LogEntry => !!entry);
-          return entries;
+          return parseLogLines(data);
         } catch {
           // skip unreadable files
           return [];

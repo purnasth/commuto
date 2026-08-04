@@ -19,7 +19,7 @@ import {
 } from 'react-icons/tb';
 
 import {
-  UserDetails,
+  RideParticipant,
   RideFormData,
   RideStatusChangedEventDetail,
 } from '../interfaces/types';
@@ -39,7 +39,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 /**
  * Component to display matched user information
  */
-const MatchedUserCard: React.FC<{ matchedUser: UserDetails }> = ({
+const MatchedUserCard: React.FC<{ matchedUser: RideParticipant }> = ({
   matchedUser,
 }) => (
   <div className="!mt-0 space-y-3 rounded-xl border border-teal-200/50 bg-teal-50 p-4 shadow-sm dark:border-teal-300/30 dark:bg-teal-950">
@@ -75,19 +75,24 @@ const MatchedUserCard: React.FC<{ matchedUser: UserDetails }> = ({
         </div>
       </div>
 
+      {/* Contact details are only present once the ride is confirmed */}
       <div className="mt-1 flex items-center gap-2">
-        <Link
-          to={`tel:${matchedUser.phone}`}
-          className="transition-150 flex w-full items-center justify-center rounded-full border bg-green-600 px-6 py-2.5 text-lg text-green-50 transition hover:bg-green-400 hover:text-green-900 dark:bg-green-500 dark:text-green-950 dark:hover:bg-green-700 dark:hover:text-green-100"
-        >
-          <MdLocalPhone className="scale-125" />
-        </Link>
-        <Link
-          to={`mailto:${matchedUser.email}`}
-          className="transition-150 flex w-1/2 items-center justify-center rounded-full border bg-amber-400 px-6 py-2.5 text-lg text-amber-50 transition hover:bg-amber-200 hover:text-amber-600 dark:bg-amber-300 dark:text-amber-900 dark:hover:bg-amber-400 dark:hover:text-amber-950 sm:w-full"
-        >
-          <MdEmail className="scale-125" />
-        </Link>
+        {matchedUser.phone && (
+          <Link
+            to={`tel:${matchedUser.phone}`}
+            className="transition-150 flex w-full items-center justify-center rounded-full border bg-green-600 px-6 py-2.5 text-lg text-green-50 transition hover:bg-green-400 hover:text-green-900 dark:bg-green-500 dark:text-green-950 dark:hover:bg-green-700 dark:hover:text-green-100"
+          >
+            <MdLocalPhone className="scale-125" />
+          </Link>
+        )}
+        {matchedUser.email && (
+          <Link
+            to={`mailto:${matchedUser.email}`}
+            className="transition-150 flex w-1/2 items-center justify-center rounded-full border bg-amber-400 px-6 py-2.5 text-lg text-amber-50 transition hover:bg-amber-200 hover:text-amber-600 dark:bg-amber-300 dark:text-amber-900 dark:hover:bg-amber-400 dark:hover:text-amber-950 sm:w-full"
+          >
+            <MdEmail className="scale-125" />
+          </Link>
+        )}
       </div>
     </div>
   </div>
@@ -185,7 +190,7 @@ const RideDetails: React.FC = () => {
   const [showMap, setShowMap] = useState(false);
   const { showFeedbackPopup, setShowFeedbackPopup } = useSocket();
   const [user, setUser] = useState<{ id: number } | null>(null);
-  const [matchedUser, setMatchedUser] = useState<UserDetails | null>(null);
+  const [matchedUser, setMatchedUser] = useState<RideParticipant | null>(null);
 
   const [rideDetails, setRideDetails] = useState(() => {
     const savedRide = localStorage.getItem('activeRide');

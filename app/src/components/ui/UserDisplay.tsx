@@ -8,8 +8,7 @@ import { truncateText } from '../../utils/functions';
 interface UserInfo {
   id: number;
   fullname?: string;
-  email: string;
-  profilePicture?: string;
+  profilePicture?: string | null;
 }
 
 interface UserDisplayProps {

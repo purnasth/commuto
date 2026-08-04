@@ -1,4 +1,4 @@
-import { RideFormData, UserDetails } from '../interfaces/types';
+import { RideFormData, RideParticipant } from '../interfaces/types';
 import {
   SCORE_CONFIG,
   FEEDBACK_EMOJI,
@@ -15,7 +15,7 @@ import {
 export const determineMatchedUser = (
   ride: RideFormData,
   currentUserId: number,
-): UserDetails | null => {
+): RideParticipant | null => {
   const isRider = currentUserId.toString() === ride.riderId?.toString();
   const isPassenger = currentUserId.toString() === ride.passengerId?.toString();
 

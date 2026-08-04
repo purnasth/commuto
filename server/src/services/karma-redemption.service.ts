@@ -41,7 +41,16 @@ export class KarmaRedemptionService {
         throw new NotFoundException('User not found');
       }
 
-      if (user.karmaPoints < data.karmaPointsCost) {
+      // Deduct first, with the balance requirement expressed in the WHERE
+      // clause so the check and the decrement are a single atomic statement.
+      // Reading the balance and then decrementing lets two concurrent
+      // redemptions both pass the check and spend the same points twice.
+      const deducted = await prisma.user.updateMany({
+        where: { id: userId, karmaPoints: { gte: data.karmaPointsCost } },
+        data: { karmaPoints: { decrement: data.karmaPointsCost } },
+      });
+
+      if (deducted.count === 0) {
         throw new BadRequestException(
           `Insufficient karma points. Required: ${data.karmaPointsCost}, Available: ${user.karmaPoints}`,
         );
@@ -63,12 +72,6 @@ export class KarmaRedemptionService {
           expiresAt,
           // usedAt is null initially, set when status becomes USED
         },
-      });
-
-      // Deduct karma points from user
-      await prisma.user.update({
-        where: { id: userId },
-        data: { karmaPoints: { decrement: data.karmaPointsCost } },
       });
 
       return {
@@ -120,9 +123,15 @@ export class KarmaRedemptionService {
     };
   }
 
-  async updateRedemptionStatus(code: string, data: UpdateRedemptionStatusDto) {
+  async updateRedemptionStatus(
+    code: string,
+    data: UpdateRedemptionStatusDto,
+    userId: number,
+  ) {
+    // Scope the lookup to the caller so a wrong code and someone else's code
+    // are indistinguishable, leaving no way to probe for valid codes.
     const redemption = await this.prisma.karmaTransaction.findFirst({
-      where: { redemptionCode: code, type: 'redeemed' },
+      where: { redemptionCode: code, type: 'redeemed', userId },
     });
 
     if (!redemption) {

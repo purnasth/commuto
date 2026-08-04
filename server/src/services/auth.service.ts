@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { StringValue } from 'ms';
 import { PrismaService } from '../prisma.service';
 import { AUTH_CONSTANTS } from '../constants/auth.constants';
+import { requireSecret } from '../env.service';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 @Injectable()
@@ -23,7 +24,7 @@ export class AuthService {
     return this.jwtService.sign(
       { sub: userId, email },
       {
-        secret: this.configService.get<string>('JWT_SECRET'),
+        secret: requireSecret(this.configService, 'JWT_SECRET'),
         expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ||
           '1h') as StringValue,
       },
@@ -37,7 +38,7 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(
       { sub: userId, type: 'refresh' },
       {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: requireSecret(this.configService, 'JWT_REFRESH_SECRET'),
         expiresIn: (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ||
           '30d') as StringValue,
       },
@@ -68,7 +69,7 @@ export class AuthService {
     // Verify the refresh token
     try {
       this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: requireSecret(this.configService, 'JWT_REFRESH_SECRET'),
       });
     } catch (error) {
       this.logger.error(
