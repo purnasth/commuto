@@ -61,20 +61,19 @@ export const SocketManager = ({ children }: SocketManagerProps) => {
       handleCustomStatusChange,
     );
 
-    // Also check on component mount/update and set up interval for local changes
+    // Pick up whatever was already stored before this mounted.
     handleStorageChange();
 
-    // Check for localStorage changes every 100ms to catch same-tab updates
-    const interval = setInterval(handleStorageChange, 100);
-
+    // No polling here. The `storage` event covers other tabs, and same-tab
+    // writes are announced through RIDE_STATUS_CHANGED. Anything that writes
+    // rideStatus must dispatch that event -- or, like this component's own
+    // socket handlers, call setRideStatus directly.
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener(
         CUSTOM_EVENTS.RIDE_STATUS_CHANGED,
         handleCustomStatusChange,
       );
-
-      clearInterval(interval);
     };
   }, []);
 

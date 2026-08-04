@@ -27,6 +27,9 @@ import { KarmaCalculationService } from './services/karma-calculation.service';
 import { RideExpiryService } from './services/ride-expiry.service';
 import { RideStatsService } from './services/ride-stats.service';
 import { RideHistoryService } from './services/ride-history.service';
+import { RideLifecycleService } from './services/ride-lifecycle.service';
+import { assertTransition } from './rides/ride-lifecycle';
+import { RideMatchingService } from './services/ride-matching.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './auth/optional-jwt-auth.guard';
 
@@ -51,7 +54,6 @@ import {
   USER_ROLE,
   RIDE_STATUS,
   FEEDBACK_EMOJI,
-  RIDE_MATCH_WINDOW_MINUTES,
   RIDE_EXPIRATION_GRACE_MINUTES,
 } from './constants/enums';
 import { TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING } from './constants/constants';
@@ -67,13 +69,10 @@ import {
 } from './interfaces/types';
 
 import {
-  calculateETA,
   haversineDistance,
-  MAX_RIDE_PROXIMITY_KM,
   estimateCO2FromDistance,
 } from './utils/rideStats.util';
 import { getNow } from './utils/date.util';
-import { getTimeWindow } from './utils/timeWindow.util';
 import { processFeedbackData } from './utils/feedback.util';
 
 @Controller('rides')
@@ -85,6 +84,8 @@ export class RideController {
     private readonly rideGateway: RideGateway,
     private readonly rideStats: RideStatsService,
     private readonly rideHistory: RideHistoryService,
+    private readonly rideLifecycle: RideLifecycleService,
+    private readonly rideMatching: RideMatchingService,
   ) {}
 
   /**
@@ -465,84 +466,21 @@ export class RideController {
     @Query('role') role: USER_ROLE,
   ) {
     if (!fromLat || !fromLng || !timestamp || !role) {
-      this.logger.log({
-        level: 'warn',
-        message: `Match rides failed: Missing required query params`,
-        tag: 'ride',
-        fromLat,
-        fromLng,
-        timestamp,
-        role,
-      });
       throw new BadRequestException(
         'fromLat, fromLng, timestamp, and role are required',
       );
     }
-    const fromLatNum = Number(fromLat);
-    const fromLngNum = Number(fromLng);
 
-    // Use global constant and utility for time window
-    const { min: minTime, max: maxTime } = getTimeWindow(
+    const matches = await this.rideMatching.findMatches({
+      fromLat: Number(fromLat),
+      fromLng: Number(fromLng),
       timestamp,
-      RIDE_MATCH_WINDOW_MINUTES,
-    );
-
-    // Always match rides with the OPPOSITE role
-    const normalizedRole = role;
-    const oppositeRole =
-      normalizedRole === USER_ROLE.RIDER
-        ? USER_ROLE.PASSENGER
-        : USER_ROLE.RIDER;
-    const rides = await this.prisma.ride.findMany({
-      where: {
-        role: oppositeRole,
-        status: RIDE_STATUS.ACTIVE,
-        timestamp: { gte: minTime, lte: maxTime },
-        fromLat: { not: null },
-        fromLng: { not: null },
-      },
-      include: { rider: true, passengers: true, createdByUser: true },
-    });
-
-    this.logger.log({
-      level: 'info',
-      message: `Matching rides for role=${role}, location=(${fromLat},${fromLng}), time=${timestamp}`,
-      tag: 'ride',
       role,
-      fromLat,
-      fromLng,
-      timestamp,
-      matchedCount: rides.length,
-    });
-
-    const matchedRides = rides.filter((ride) => {
-      if (!Number.isFinite(ride.fromLat) || !Number.isFinite(ride.fromLng)) {
-        return false;
-      }
-      // Calculate distance between the current user's "From" location and the matched ride's "From" location
-      const dist = haversineDistance(
-        fromLatNum,
-        fromLngNum,
-        ride.fromLat as number,
-        ride.fromLng as number,
-      );
-
-      if (dist <= MAX_RIDE_PROXIMITY_KM) {
-        // Calculate ETA based on the mode of transport of the current user
-        const estimatedTimeOfArrival = calculateETA(dist);
-
-        ride.estimatedTimeOfArrival = estimatedTimeOfArrival;
-        ride.distance = dist;
-
-        return true;
-      }
-
-      return false;
     });
 
     // Match results are always still ACTIVE, so participants are exposed as
-    // public profiles only — no contact details before a ride is confirmed.
-    return { rides: toRideDtoList(matchedRides) };
+    // public profiles only - no contact details before a ride is confirmed.
+    return { rides: toRideDtoList(matches) };
   }
 
   @Post()
@@ -968,17 +906,9 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
-    // Verify user owns the current ride they're confirming from
-    if (currentRide.createdBy !== authenticatedUserId) {
-      this.logger.log({
-        level: 'warn',
-        message: `Confirm ride denied: userId=${authenticatedUserId} does not own ride ${id}`,
-        tag: 'ride',
-        userId: authenticatedUserId,
-        rideId: id,
-      });
-      throw new ForbiddenException('You can only confirm your own rides');
-    }
+    // Ownership and current state are both decided by the transition table,
+    // so confirm follows the same rules as every other status change.
+    assertTransition(currentRide, RIDE_STATUS.CONFIRMED, authenticatedUserId);
 
     let targetRideId: number;
     let updatedRiderId: number;
@@ -1123,26 +1053,10 @@ export class RideController {
       throw new NotFoundException('Ride not found');
     }
 
-    // Verify that the authenticated user is part of this ride
+    assertTransition(ride, RIDE_STATUS.COMPLETED, authenticatedUserId);
+
     const isRider = ride.riderId === authenticatedUserId;
     const isPassenger = ride.passengerId === authenticatedUserId;
-
-    if (!isRider && !isPassenger) {
-      throw new BadRequestException(
-        'You are not authorized to complete this ride',
-      );
-    }
-
-    if (ride.status !== RIDE_STATUS.CONFIRMED) {
-      this.logger.log({
-        level: 'warn',
-        message: `Complete ride failed: Ride not confirmed`,
-        tag: 'ride',
-        rideId,
-        status: ride.status,
-      });
-      throw new BadRequestException('Only confirmed rides can be completed');
-    }
 
     let distance: number | null = null;
     if (
@@ -1230,24 +1144,15 @@ export class RideController {
   @UseGuards(JwtAuthGuard)
   @Post(':id/reject')
   async rejectRide(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest,
   ) {
-    const authenticatedUserId = req.user.userId; // From JWT token
-
-    // Mark ride as rejected
-    const ride = await this.prisma.ride.update({
-      where: { id: Number(id) },
-      data: { status: RIDE_STATUS.REJECTED },
-    });
-
-    this.logger.log({
-      level: 'info',
-      message: `Ride rejected`,
-      tag: 'ride',
-      rideId: id,
-      userId: authenticatedUserId,
-    });
+    const authenticatedUserId = req.user.userId;
+    const ride = await this.rideLifecycle.retire(
+      id,
+      RIDE_STATUS.REJECTED,
+      authenticatedUserId,
+    );
 
     return {
       message: 'Ride rejected. You can now post a new ride.',
@@ -1260,24 +1165,15 @@ export class RideController {
   @UseGuards(JwtAuthGuard)
   @Post(':id/cancel')
   async cancelRide(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest,
   ) {
-    const authenticatedUserId = req.user.userId; // From JWT token
-
-    // Mark ride as cancelled
-    const ride = await this.prisma.ride.update({
-      where: { id: Number(id) },
-      data: { status: RIDE_STATUS.CANCELLED },
-    });
-
-    this.logger.log({
-      level: 'info',
-      message: `Ride cancelled`,
-      tag: 'ride',
-      rideId: id,
-      userId: authenticatedUserId,
-    });
+    const authenticatedUserId = req.user.userId;
+    const ride = await this.rideLifecycle.retire(
+      id,
+      RIDE_STATUS.CANCELLED,
+      authenticatedUserId,
+    );
 
     return {
       message: 'Ride cancelled. You can now post a new ride.',

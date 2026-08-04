@@ -17,6 +17,7 @@ import { USER_ROLE, LS_RIDE_FORM_DATA_KEY } from '../constants/enums';
 
 import { ROUTE_HOME, ROUTE_ROLE } from '../constants/routes';
 
+import { getRideCounterpart } from '../utils/utils';
 import { RideHistory } from '../interfaces/types';
 
 import {
@@ -60,44 +61,8 @@ const Dashboard: React.FC<DashboardProps> = ({ rides }) => {
    * For passengers: shows the rider who matched with them
    * Since there's only one passenger per ride (bike), we take the first passenger from the array.
    */
-  const getUserToDisplay = (ride: RideHistory) => {
-    if (!currentUser) return null;
-
-    const currentUserId = currentUser.id;
-
-    // If current user is the rider, show the passenger
-    if (
-      ride.riderId === currentUserId &&
-      ride.passengers &&
-      ride.passengers.length > 0
-    ) {
-      return ride.passengers[0]; // Since there's only one passenger per ride
-    }
-
-    // If current user is the passenger, show the rider
-    if (ride.passengerId === currentUserId && ride.rider) {
-      return ride.rider;
-    }
-
-    // If current user is the creator but neither rider nor passenger (edge case),
-    // show the opposite role based on the ride's role
-    if (ride.createdBy === currentUserId) {
-      if (
-        ride.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase() &&
-        ride.passengers &&
-        ride.passengers.length > 0
-      ) {
-        return ride.passengers[0];
-      } else if (
-        ride.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase() &&
-        ride.rider
-      ) {
-        return ride.rider;
-      }
-    }
-
-    return null;
-  };
+  const getUserToDisplay = (ride: RideHistory) =>
+    getRideCounterpart(ride, currentUser?.id);
 
   /**
    * Determines the column label based on what type of users will be displayed.

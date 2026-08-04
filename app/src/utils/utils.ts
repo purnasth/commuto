@@ -1,5 +1,6 @@
 import { RideFormData, RideParticipant } from '../interfaces/types';
 import {
+  USER_ROLE,
   SCORE_CONFIG,
   FEEDBACK_EMOJI,
   FEEDBACK_EMOJI_CHARS,
@@ -7,30 +8,69 @@ import {
 } from '../constants/enums';
 
 /**
- * Determines which user should be shown as the matched user based on the current user's role
- * @param ride - The complete ride data from the API
- * @param currentUserId - The ID of the currently logged-in user
- * @returns The matched user to display, or null if no match found
+ * The subset of a ride needed to work out who the other party is.
+ * Accepts both RideFormData and RideHistory, whose id fields differ in type.
  */
-export const determineMatchedUser = (
-  ride: RideFormData,
-  currentUserId: number,
-): RideParticipant | null => {
-  const isRider = currentUserId.toString() === ride.riderId?.toString();
-  const isPassenger = currentUserId.toString() === ride.passengerId?.toString();
+interface CounterpartSource {
+  role: string;
+  riderId?: number | string | null;
+  passengerId?: number | string | null;
+  createdBy?: number | string | null;
+  rider?: RideParticipant | null;
+  passengers?: RideParticipant[] | null;
+}
 
-  // If current user is the rider, show the passenger
-  if (isRider && ride.passengers && ride.passengers.length > 0) {
-    return ride.passengers[0]; // Return the first (and typically only) passenger
+/** Ids arrive as number or string depending on the endpoint. */
+const sameId = (
+  a: number | string | null | undefined,
+  b: number | string | null | undefined,
+): boolean => a !== null && a !== undefined && String(a) === String(b);
+
+/**
+ * Returns the other person in a ride, from the current user's point of view:
+ * the passenger if you are the rider, the rider if you are the passenger.
+ *
+ * This was previously reimplemented in five places -- identically in Dashboard
+ * and MobileDashboard, and in a subtly reduced form in determineMatchedUser,
+ * which omitted the creator fallback below and so returned null on rides the
+ * dashboards resolved. One definition means the views cannot disagree.
+ *
+ * A ride carries only one passenger today; `passengers[0]` reflects that, and
+ * is the assumption to revisit if group rides ever land.
+ */
+export const getRideCounterpart = (
+  ride: CounterpartSource,
+  currentUserId: number | null | undefined,
+): RideParticipant | null => {
+  if (currentUserId === null || currentUserId === undefined) return null;
+
+  const firstPassenger = ride.passengers?.[0] ?? null;
+
+  if (sameId(ride.riderId, currentUserId) && firstPassenger) {
+    return firstPassenger;
   }
 
-  // If current user is the passenger, show the rider
-  if (isPassenger && ride.rider) {
+  if (sameId(ride.passengerId, currentUserId) && ride.rider) {
     return ride.rider;
+  }
+
+  // The creator is neither rider nor passenger on some rides; fall back to
+  // whichever side is opposite the role the ride was posted under.
+  if (sameId(ride.createdBy, currentUserId)) {
+    const postedAsRider =
+      ride.role?.toLowerCase() === USER_ROLE.RIDER.toLowerCase();
+
+    return postedAsRider ? firstPassenger : (ride.rider ?? null);
   }
 
   return null;
 };
+
+/** @deprecated Use {@link getRideCounterpart}. */
+export const determineMatchedUser = (
+  ride: RideFormData,
+  currentUserId: number,
+): RideParticipant | null => getRideCounterpart(ride, currentUserId);
 
 /**
  * Maps an average score to the most appropriate emoji

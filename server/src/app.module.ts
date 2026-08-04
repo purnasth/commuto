@@ -22,6 +22,8 @@ import { KarmaRedemptionService } from './services/karma-redemption.service';
 import { RideExpiryService } from './services/ride-expiry.service';
 import { RideStatsService } from './services/ride-stats.service';
 import { RideHistoryService } from './services/ride-history.service';
+import { RideLifecycleService } from './services/ride-lifecycle.service';
+import { RideMatchingService } from './services/ride-matching.service';
 
 import { RideGateway } from './rides/rides.gateway';
 import { JwtStrategy } from './auth/jwt.strategy';
@@ -67,6 +69,8 @@ import { winstonLoggerConfig } from './logger.config';
     RideExpiryService,
     RideStatsService,
     RideHistoryService,
+    RideLifecycleService,
+    RideMatchingService,
     RideGateway,
     JwtStrategy,
   ],
