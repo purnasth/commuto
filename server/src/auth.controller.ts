@@ -264,9 +264,10 @@ export class AuthController {
     }
 
     try {
-      const accessToken = await this.authService.refreshAccessToken(
-        body.refreshToken,
-      );
+      // Rotating: the presented token is spent here and a replacement is
+      // returned, so the client must store both values.
+      const { accessToken, refreshToken } =
+        await this.authService.rotateRefreshToken(body.refreshToken);
 
       this.logger.log({
         level: 'info',
@@ -277,6 +278,7 @@ export class AuthController {
       return {
         message: 'Token refreshed successfully',
         accessToken,
+        refreshToken,
       };
     } catch (error) {
       this.logger.log({
@@ -284,6 +286,12 @@ export class AuthController {
         message: `Refresh token verification failed: ${error}`,
         tag: 'error',
       });
+
+      // Preserve the service's reason ("already been used") so the client can
+      // tell a replay apart from an ordinary expiry and force a fresh login.
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
 
       throw new UnauthorizedException('Invalid or expired refresh token');
     }

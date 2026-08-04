@@ -7,6 +7,7 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { AppController } from './app.controller';
+import { HealthController } from './health.controller';
 import { AuthController } from './auth.controller';
 import { KarmaController } from './karma.controller';
 import { LogsController } from './logs.controller';
@@ -29,6 +30,7 @@ import { FeedbackService } from './services/feedback.service';
 import { PeopleImpactedService } from './services/people-impacted.service';
 
 import { RideGateway } from './rides/rides.gateway';
+import { PresenceStore, InMemoryPresenceStore } from './rides/presence.store';
 import { JwtStrategy } from './auth/jwt.strategy';
 
 import { winstonLoggerConfig } from './logger.config';
@@ -55,6 +57,7 @@ import { winstonLoggerConfig } from './logger.config';
   ],
   controllers: [
     AppController,
+    HealthController,
     AuthController,
     KarmaController,
     LogsController,
@@ -78,6 +81,9 @@ import { winstonLoggerConfig } from './logger.config';
     FeedbackService,
     PeopleImpactedService,
     RideGateway,
+    // Single-process presence. Swapping this binding for a shared store is
+    // what makes the API horizontally scalable.
+    { provide: PresenceStore, useClass: InMemoryPresenceStore },
     JwtStrategy,
   ],
 })

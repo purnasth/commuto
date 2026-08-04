@@ -39,18 +39,27 @@ model User {
   feedbackGiven     Feedback[]         @relation("FromUser")
   feedbackReceived  Feedback[]         @relation("ToUser")
   refreshTokens     RefreshToken[] // JWT refresh tokens
+  tripsAsRider      Trip[]             @relation("TripRider")
+  tripsAsPassenger  Trip[]             @relation("TripPassenger")
 }
 
+/// A refresh token, stored only as a hash.
+///
+/// `familyId` groups every token descended from one login. Rotation issues a
+/// new token and revokes the old one, so a token presented twice means the
+/// value leaked -- and the whole family is revoked rather than just that row.
 model RefreshToken {
-  id        Int      @id @default(autoincrement())
-  token     String   @unique
+  id        Int       @id @default(autoincrement())
+  tokenHash String    @unique
+  familyId  String
   userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
-  @@index([token])
+  @@index([familyId])
 }
 
 model Ride {
@@ -98,6 +107,41 @@ model Ride {
 enum UserRole {
   rider
   passenger
+}
+
+/// A matched journey: the thing that actually happens once two postings pair
+/// up.
+///
+/// A `Ride` is an *intent* to travel. Until now the matched journey had no
+/// representation of its own -- it was two Ride rows sharing a `matchGroupId`,
+/// with status, distance and CO2 duplicated across both. Every query that
+/// asked "how many trips has this user taken" therefore had to collapse those
+/// pairs first, which is why the same COALESCE(matchGroupId, ...) expression
+/// appeared in three separate services.
+///
+/// Modelled as exactly one rider and one passenger. That is what the product
+/// already assumes everywhere: each code path reads `passengers[0]`, and the
+/// UI describes one passenger per bike. Group rides would need this widened.
+model Trip {
+  id             Int        @id @default(autoincrement())
+  /// Links back to the Ride rows this was derived from, while both models coexist.
+  matchGroupId   String     @unique
+  riderId        Int
+  passengerId    Int
+  rider          User       @relation("TripRider", fields: [riderId], references: [id])
+  passenger      User       @relation("TripPassenger", fields: [passengerId], references: [id])
+  status         RideStatus
+  from           String
+  to             String
+  timestamp      DateTime
+  distance       Float?
+  co2Saved       Float?
+  peopleImpacted Int?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([riderId, status])
+  @@index([passengerId, status])
 }
 
 enum RideStatus {

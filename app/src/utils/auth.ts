@@ -165,6 +165,26 @@ class TokenManager {
   }
 
   /**
+   * Stores the replacement pair handed back by a refresh.
+   *
+   * Refresh tokens rotate: the one just sent is spent server-side, so keeping
+   * the old value would make the next refresh look like a replay and revoke
+   * the whole session.
+   */
+  updateTokens(accessToken: string, refreshToken?: string): void {
+    try {
+      localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+
+      if (refreshToken) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      }
+    } catch (error) {
+      console.error('Error updating tokens:', error);
+      throw new Error('Failed to update tokens');
+    }
+  }
+
+  /**
    * Decode JWT token payload without verification
    * Useful for checking token expiration
    * @param token - JWT token string
@@ -306,6 +326,9 @@ export const clearAuthData = () => tokenManager.clearAuthData();
 
 export const updateAccessToken = (token: string) =>
   tokenManager.updateAccessToken(token);
+
+export const updateTokens = (accessToken: string, refreshToken?: string) =>
+  tokenManager.updateTokens(accessToken, refreshToken);
 
 export const isAccessTokenExpired = () => tokenManager.isAccessTokenExpired();
 

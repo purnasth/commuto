@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import type { Socket } from 'socket.io';
 
 import { RideGateway } from './rides.gateway';
+import { PresenceStore, InMemoryPresenceStore } from './presence.store';
 
 const JWT_SECRET = 'test-secret';
 const OTHER_SECRET = 'not-the-real-secret';
@@ -40,7 +41,10 @@ describe('RideGateway registration', () => {
         }),
         JwtModule.register({ secret: JWT_SECRET }),
       ],
-      providers: [RideGateway],
+      providers: [
+        RideGateway,
+        { provide: PresenceStore, useClass: InMemoryPresenceStore },
+      ],
     }).compile();
 
     gateway = moduleRef.get(RideGateway);

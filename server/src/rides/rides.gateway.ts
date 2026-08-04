@@ -13,9 +13,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
 import { requireSecret } from '../env.service';
+import { PresenceStore } from './presence.store';
 import { Server, Socket } from 'socket.io';
-
-const userSocketMap = new Map<string, string>();
 
 interface AccessTokenPayload {
   sub: number;
@@ -46,7 +45,22 @@ type CompletableRide = NotifiableRide &
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    // Mirrors the HTTP policy; the gateway previously accepted every origin.
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      const allowed = process.env.CORS_ORIGINS?.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+
+      if (!allowed?.length) {
+        callback(null, process.env.NODE_ENV === 'development');
+        return;
+      }
+
+      callback(null, !origin || allowed.includes(origin));
+    },
     methods: ['GET', 'POST'],
   },
 })
@@ -58,22 +72,36 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly presence: PresenceStore,
   ) {}
 
+  /**
+   * Authenticates at the handshake and registers the socket immediately.
+   *
+   * Identity used to be established per message, on `registerUser`, which
+   * meant an unauthenticated socket could stay connected indefinitely and
+   * consume a slot. Rejecting here closes the connection before that.
+   */
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    const userId = this.resolveUserId(client);
+
+    if (userId === null) {
+      this.logger.warn(
+        `Socket ${client.id} rejected: missing or invalid access token.`,
+      );
+      client.emit('error', 'Authentication required.');
+      client.disconnect(true);
+      return;
+    }
+
+    void this.presence.set(userId.toString(), client.id);
+    this.logger.log(`User ${userId} connected on socket ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
 
-    for (const [userId, socketId] of userSocketMap.entries()) {
-      if (socketId === client.id) {
-        userSocketMap.delete(userId);
-        this.logger.log(`User ${userId} deregistered on disconnect.`);
-        break;
-      }
-    }
+    void this.presence.removeSocket(client.id);
   }
 
   /**
@@ -105,20 +133,20 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * Retained so existing clients keep working; the socket is already
+   * registered by `handleConnection`, so this only confirms it.
+   */
   @SubscribeMessage('registerUser')
   handleRegisterUser(@ConnectedSocket() client: Socket): void {
     const userId = this.resolveUserId(client);
 
     if (userId === null) {
-      this.logger.warn(
-        `Socket ${client.id} attempted to register without a valid access token.`,
-      );
       client.emit('error', 'Authentication required to register.');
       return;
     }
 
-    userSocketMap.set(userId.toString(), client.id);
-    this.logger.log(`User ${userId} registered with socket ${client.id}`);
+    void this.presence.set(userId.toString(), client.id);
 
     client.emit(
       'registrationSuccess',
@@ -140,7 +168,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // user by id and learn from the error reply whether they were online.
   // Nothing in the app emitted them.
 
-  notifyRideConfirmation(confirmedRide: NotifiableRide) {
+  async notifyRideConfirmation(confirmedRide: NotifiableRide): Promise<void> {
     const payload = {
       id: confirmedRide.id,
       from: confirmedRide.from,
@@ -155,7 +183,9 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Notify the rider if present
     if (confirmedRide.riderId !== null) {
-      const riderSocketId = userSocketMap.get(confirmedRide.riderId.toString());
+      const riderSocketId = await this.presence.get(
+        confirmedRide.riderId.toString(),
+      );
 
       if (riderSocketId) {
         this.server.to(riderSocketId).emit('rideConfirmed', payload);
@@ -171,7 +201,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Notify the passenger if present
     if (confirmedRide.passengerId !== null) {
-      const passengerSocketId = userSocketMap.get(
+      const passengerSocketId = await this.presence.get(
         confirmedRide.passengerId.toString(),
       );
       if (passengerSocketId) {
@@ -193,7 +223,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  notifyRideCompletion(ride: CompletableRide) {
+  async notifyRideCompletion(ride: CompletableRide): Promise<void> {
     const payload = {
       id: ride.id,
       from: ride.from,
@@ -210,7 +240,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
 
     if (ride.riderId !== null) {
-      const riderSocketId = userSocketMap.get(ride.riderId.toString());
+      const riderSocketId = await this.presence.get(ride.riderId.toString());
 
       if (riderSocketId) {
         this.server.to(riderSocketId).emit('rideCompleted', payload);
@@ -226,7 +256,9 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Also notify passenger if present
     if (ride.passengerId !== null) {
-      const passengerSocketId = userSocketMap.get(ride.passengerId.toString());
+      const passengerSocketId = await this.presence.get(
+        ride.passengerId.toString(),
+      );
 
       if (passengerSocketId) {
         this.server.to(passengerSocketId).emit('rideCompleted', payload);
@@ -241,10 +273,10 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  notifyRideConfirmationForPassenger(
+  async notifyRideConfirmationForPassenger(
     confirmedRide: NotifiableRide,
     passengerId: number,
-  ) {
+  ): Promise<void> {
     if (!passengerId) {
       this.logger.warn(
         `Ride ${confirmedRide.id} confirmation cannot be emitted to passenger: Missing passengerId.`,
@@ -263,7 +295,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
       riderId: confirmedRide.riderId,
     };
 
-    const passengerSocketId = userSocketMap.get(passengerId.toString());
+    const passengerSocketId = await this.presence.get(passengerId.toString());
 
     if (passengerSocketId) {
       this.server.to(passengerSocketId).emit('rideConfirmed', payload);

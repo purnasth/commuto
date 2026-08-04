@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { LoggerService, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+import { resolveCorsOrigins } from './env.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -20,7 +23,11 @@ async function bootstrap() {
     }),
   );
 
-  app.enableCors();
+  // Previously enableCors() with no arguments, which reflects every origin.
+  app.enableCors({
+    origin: resolveCorsOrigins(app.get(ConfigService)),
+    credentials: true,
+  });
   const port = process.env.PORT ?? 3000;
   const logger = app.get<LoggerService>(WINSTON_MODULE_NEST_PROVIDER);
   await app.listen(port);

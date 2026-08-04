@@ -18,10 +18,13 @@ export interface RideStats {
   peopleImpacted: number;
 }
 
-/** Shape returned by the aggregate query; COUNT/SUM arrive as bigint or null. */
-interface StatsRow {
+/** COUNT/SUM arrive as bigint or null from Postgres. */
+interface PostedRow {
   rider_posted: bigint;
   passenger_posted: bigint;
+}
+
+interface CompletedRow {
   rider_completed: bigint;
   passenger_completed: bigint;
   rider_distance: number | null;
@@ -35,51 +38,48 @@ export class RideStatsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Aggregates a user's ride totals in a single query.
+   * Aggregates a user's totals in two queries.
    *
-   * A matched trip is stored as two rows sharing a `matchGroupId`, so the CTE
-   * collapses each group to one row before counting -- mirroring the
-   * deduplication the history endpoint performs, so the totals and the list
-   * agree. Rides with no group fall back to their own id as the key, which
-   * keeps them distinct from each other (a plain DISTINCT ON matchGroupId
-   * would treat every NULL as the same group and collapse them all).
+   * Completed journeys are counted from `Trip`, which already holds one row
+   * each; the old version had to collapse pairs of Ride rows sharing a
+   * `matchGroupId` first. Postings are still counted from `Ride`, because an
+   * unmatched posting never becomes a Trip and would otherwise vanish from
+   * the total.
    */
   async getStatsForUser(userId: number, role: USER_ROLE): Promise<RideStats> {
-    const rows = await this.prisma.$queryRaw<StatsRow[]>`
-      WITH involved AS (
+    // Postings: every ride the user put up, matched or not. A matched pair
+    // still contributes one row per side, and only the user's own side counts.
+    const posted = await this.prisma.$queryRaw<PostedRow[]>`
+      SELECT
+        COUNT(*) FILTER (WHERE "riderId" = ${userId})     AS rider_posted,
+        COUNT(*) FILTER (WHERE "passengerId" = ${userId}) AS passenger_posted
+      FROM (
         SELECT DISTINCT ON (COALESCE("matchGroupId", 'ride_' || "id"))
-               "id", "status", "distance", "co2Saved", "riderId", "passengerId"
+               "riderId", "passengerId"
         FROM "Ride"
         WHERE "riderId" = ${userId}
            OR "passengerId" = ${userId}
            OR "createdBy" = ${userId}
         ORDER BY COALESCE("matchGroupId", 'ride_' || "id"), "timestamp" DESC
-      )
-      SELECT
-        COUNT(*) FILTER (WHERE "riderId" = ${userId})     AS rider_posted,
-        COUNT(*) FILTER (WHERE "passengerId" = ${userId}) AS passenger_posted,
-        COUNT(*) FILTER (
-          WHERE "riderId" = ${userId} AND "status"::text = 'COMPLETED'
-        ) AS rider_completed,
-        COUNT(*) FILTER (
-          WHERE "passengerId" = ${userId} AND "status"::text = 'COMPLETED'
-        ) AS passenger_completed,
-        SUM("distance") FILTER (
-          WHERE "riderId" = ${userId} AND "status"::text = 'COMPLETED'
-        ) AS rider_distance,
-        SUM("distance") FILTER (
-          WHERE "passengerId" = ${userId} AND "status"::text = 'COMPLETED'
-        ) AS passenger_distance,
-        SUM("co2Saved") FILTER (
-          WHERE "riderId" = ${userId} AND "status"::text = 'COMPLETED'
-        ) AS rider_co2,
-        SUM("co2Saved") FILTER (
-          WHERE "passengerId" = ${userId} AND "status"::text = 'COMPLETED'
-        ) AS passenger_co2
-      FROM involved
+      ) postings
     `;
 
-    const row = rows[0];
+    // Completed journeys: one Trip row each, so a plain aggregate.
+    const completed = await this.prisma.$queryRaw<CompletedRow[]>`
+      SELECT
+        COUNT(*) FILTER (WHERE "riderId" = ${userId})     AS rider_completed,
+        COUNT(*) FILTER (WHERE "passengerId" = ${userId}) AS passenger_completed,
+        SUM("distance") FILTER (WHERE "riderId" = ${userId})     AS rider_distance,
+        SUM("distance") FILTER (WHERE "passengerId" = ${userId}) AS passenger_distance,
+        SUM("co2Saved") FILTER (WHERE "riderId" = ${userId})     AS rider_co2,
+        SUM("co2Saved") FILTER (WHERE "passengerId" = ${userId}) AS passenger_co2
+      FROM "Trip"
+      WHERE "status"::text = 'COMPLETED'
+        AND ("riderId" = ${userId} OR "passengerId" = ${userId})
+    `;
+
+    const row =
+      posted[0] && completed[0] ? { ...posted[0], ...completed[0] } : undefined;
 
     if (!row) {
       return {

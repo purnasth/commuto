@@ -23,7 +23,7 @@ import {
   getAccessToken,
   getRefreshToken,
   isAccessTokenExpired,
-  updateAccessToken,
+  updateTokens,
   clearAuthData,
 } from './auth';
 
@@ -67,7 +67,8 @@ async function refreshAccessToken(): Promise<string | null> {
       const data = await response.json();
 
       if (data.accessToken) {
-        updateAccessToken(data.accessToken);
+        // The server rotates the refresh token, so store both halves.
+        updateTokens(data.accessToken, data.refreshToken);
         return data.accessToken;
       }
 

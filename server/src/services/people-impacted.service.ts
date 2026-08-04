@@ -21,40 +21,29 @@ export class PeopleImpactedService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Lists the people a user has completed rides with, most frequent first.
+   * Lists the people a user has completed trips with, most frequent first.
    *
-   * Counting happens in SQL. The previous implementation loaded every
-   * completed ride the user had taken, deduplicated matched pairs into a Map,
-   * tallied partners in a second Map and sorted in memory -- roughly 90 lines
-   * that grew with the user's whole history.
-   *
-   * A matched trip is stored as two rows sharing a `matchGroupId`, so the
-   * inner query collapses each group to one row before counting; otherwise
-   * every shared ride would count twice. Rides without a group fall back to
-   * their own id, since a plain DISTINCT ON would treat all NULLs as one group.
+   * Reads from `Trip`, which already holds one row per journey. The previous
+   * version had to collapse pairs of Ride rows sharing a `matchGroupId` before
+   * it could count anything -- first with two Maps in application code, then
+   * with a DISTINCT ON subquery. Neither is needed now: counting a table whose
+   * rows already mean "one trip" is a plain GROUP BY.
    */
   async getForUser(userId: number): Promise<{
     people: ImpactedPerson[];
     totalImpacted: number;
   }> {
     const partners = await this.prisma.$queryRaw<PartnerRow[]>`
-      WITH trips AS (
-        SELECT DISTINCT ON (COALESCE("matchGroupId", 'ride_' || "id"))
-               "riderId", "passengerId"
-        FROM "Ride"
-        WHERE "status"::text = ${RIDE_STATUS.COMPLETED}
-          AND ("riderId" = ${userId} OR "passengerId" = ${userId})
-        ORDER BY COALESCE("matchGroupId", 'ride_' || "id")
-      )
       SELECT partner AS "partnerId", COUNT(*) AS "rideCount"
       FROM (
         SELECT CASE
                  WHEN "riderId" = ${userId} THEN "passengerId"
                  ELSE "riderId"
                END AS partner
-        FROM trips
+        FROM "Trip"
+        WHERE "status"::text = ${RIDE_STATUS.COMPLETED}
+          AND ("riderId" = ${userId} OR "passengerId" = ${userId})
       ) paired
-      WHERE partner IS NOT NULL
       GROUP BY partner
       ORDER BY COUNT(*) DESC, partner
     `;

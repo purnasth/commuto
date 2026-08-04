@@ -105,6 +105,20 @@ export class RideLifecycleService {
           data: { passengers: { connect: { id: pairing.passengerId } } },
         });
       }
+
+      // Record the journey itself, in the same transaction as the claim so a
+      // confirmed pair can never exist without its Trip.
+      await tx.trip.create({
+        data: {
+          matchGroupId,
+          riderId: pairing.riderId,
+          passengerId: pairing.passengerId,
+          status: RIDE_STATUS.CONFIRMED,
+          from: currentRide.from,
+          to: currentRide.to,
+          timestamp: currentRide.timestamp,
+        },
+      });
     });
 
     this.logger.log({
@@ -122,7 +136,7 @@ export class RideLifecycleService {
     });
 
     for (const confirmedRide of updatedRides) {
-      this.rideGateway.notifyRideConfirmation(confirmedRide);
+      await this.rideGateway.notifyRideConfirmation(confirmedRide);
     }
 
     return updatedRides;
@@ -217,9 +231,21 @@ export class RideLifecycleService {
       ? { matchGroupId: ride.matchGroupId }
       : { id: rideId };
 
-    await this.prisma.ride.updateMany({
-      where: { ...scope, status: RIDE_STATUS.CONFIRMED },
-      data: completion,
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ride.updateMany({
+        where: { ...scope, status: RIDE_STATUS.CONFIRMED },
+        data: completion,
+      });
+
+      if (ride.matchGroupId) {
+        await tx.trip.updateMany({
+          where: {
+            matchGroupId: ride.matchGroupId,
+            status: RIDE_STATUS.CONFIRMED,
+          },
+          data: completion,
+        });
+      }
     });
 
     const rides = await this.prisma.ride.findMany({
@@ -239,7 +265,7 @@ export class RideLifecycleService {
     });
 
     if (rides.length > 0) {
-      this.rideGateway.notifyRideCompletion(rides[0]);
+      await this.rideGateway.notifyRideCompletion(rides[0]);
     }
 
     return { rides, isRider: ride.riderId === userId };
@@ -280,9 +306,18 @@ export class RideLifecycleService {
       ? { matchGroupId: ride.matchGroupId }
       : { id: rideId };
 
-    await this.prisma.ride.updateMany({
-      where: { ...scope, status: ride.status },
-      data: { status: target },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ride.updateMany({
+        where: { ...scope, status: ride.status },
+        data: { status: target },
+      });
+
+      if (ride.matchGroupId) {
+        await tx.trip.updateMany({
+          where: { matchGroupId: ride.matchGroupId, status: ride.status },
+          data: { status: target },
+        });
+      }
     });
 
     this.logger.log({
