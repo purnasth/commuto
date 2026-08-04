@@ -5,11 +5,13 @@ import {
   API_USER_AVERAGE_SCORE,
   API_KARMA_UPDATE_STATUS,
   API_USER_PEOPLE_IMPACTED,
+  API_USER_RIDE_STATS,
   API_KARMA_USER_REDEMPTIONS,
 } from '../constants/api';
 import { ROUTE_LOGIN } from '../constants/routes';
 
 import type {
+  RideStatsResponse,
   RewardResponse,
   AverageScoreResult,
   RedemptionResponse,
@@ -21,7 +23,7 @@ import {
   getAccessToken,
   getRefreshToken,
   isAccessTokenExpired,
-  updateAccessToken,
+  updateTokens,
   clearAuthData,
 } from './auth';
 
@@ -65,7 +67,8 @@ async function refreshAccessToken(): Promise<string | null> {
       const data = await response.json();
 
       if (data.accessToken) {
-        updateAccessToken(data.accessToken);
+        // The server rotates the refresh token, so store both halves.
+        updateTokens(data.accessToken, data.refreshToken);
         return data.accessToken;
       }
 
@@ -179,6 +182,23 @@ function buildApiUrl(
 
   return `${import.meta.env.VITE_API_BASE_URL}${url}`;
 }
+
+/**
+ * Fetches a user's aggregate ride totals from the server.
+ *
+ * These totals are computed in SQL across the user's whole history. They are
+ * deliberately not derived from the paginated /rides/history response, which
+ * only ever holds one page.
+ */
+export const fetchRideStats = async (
+  userId: number,
+): Promise<RideStatsResponse> => {
+  const fullUrl = buildApiUrl(API_USER_RIDE_STATS, {
+    userId: userId.toString(),
+  });
+
+  return apiFetch<RideStatsResponse>(fullUrl);
+};
 
 /**
  * Fetches the average score for a user from the server

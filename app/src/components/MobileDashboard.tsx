@@ -21,6 +21,7 @@ import StatusBadge from './ui/StatusBadge';
 import { USER_ROLE, LS_RIDE_FORM_DATA_KEY } from '../constants/enums';
 import { ROUTE_HOME, ROUTE_ROLE } from '../constants/routes';
 
+import { getRideCounterpart } from '../utils/utils';
 import { RideHistory } from '../interfaces/types';
 
 import {
@@ -51,44 +52,8 @@ const MobileDashboard: React.FC<MobileDashboardProps> = ({ rides }) => {
    * For riders: shows the passenger who matched with them
    * For passengers: shows the rider who matched with them
    */
-  const getUserToDisplay = (ride: RideHistory) => {
-    if (!currentUser) return null;
-
-    const currentUserId = currentUser.id;
-
-    // If current user is the rider, show the passenger
-    if (
-      ride.riderId === currentUserId &&
-      ride.passengers &&
-      ride.passengers.length > 0
-    ) {
-      return ride.passengers[0];
-    }
-
-    // If current user is the passenger, show the rider
-    if (ride.passengerId === currentUserId && ride.rider) {
-      return ride.rider;
-    }
-
-    // If current user is the creator but neither rider nor passenger (edge case),
-    // show the opposite role based on the ride's role
-    if (ride.createdBy === currentUserId) {
-      if (
-        ride.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase() &&
-        ride.passengers &&
-        ride.passengers.length > 0
-      ) {
-        return ride.passengers[0];
-      } else if (
-        ride.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase() &&
-        ride.rider
-      ) {
-        return ride.rider;
-      }
-    }
-
-    return null;
-  };
+  const getUserToDisplay = (ride: RideHistory) =>
+    getRideCounterpart(ride, currentUser?.id);
 
   /**
    * Determines the label for the user section based on what type of users will be displayed.

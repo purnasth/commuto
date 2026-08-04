@@ -14,6 +14,7 @@ import {
 import axios from 'axios';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { EnvService } from './env.service';
@@ -25,31 +26,14 @@ import { AUTH_CONSTANTS } from './constants/auth.constants';
 import {
   LoginDto,
   SignupDto,
+  UpdateUserDto,
   RefreshTokenDto,
   DeleteAccountDto,
 } from './dto/auth.dto';
+import { toAuthUser } from './dto/user-response.dto';
 
 @Controller('auth')
 export class AuthController {
-  // TODO (data_exposure_security): MEDIUM-HIGH SECURITY REVIEW NEEDED
-  //
-  // CURRENT ISSUE: userWithoutPassword removes only the password field but still exposes:
-  // - Internal database IDs (id, createdAt, updatedAt)
-  // - Potentially sensitive data: phone numbers, addresses, exact karma/credit scores
-  // - Email addresses (which might not always be appropriate for all API responses)
-  //
-  // RECOMMENDATION: Create proper UserDto/PublicUserDto that only exposes safe fields:
-  // - For login/signup: id, fullname, email, role (essential for auth)
-  // - For public profiles: id, fullname, role, ratings (no email, phone, address)
-  //
-  // AFFECTED ENDPOINTS:
-  // - POST /auth/login - exposes user object with all fields except password
-  // - POST /auth/signup - exposes complete user object except password
-  // - GET /auth/me - exposes all user data except password
-  // - PUT /auth/user - exposes updated user object except password
-  //
-  // PRIORITY: MEDIUM-HIGH (less critical than ride controller but still important)
-  //
   constructor(
     private prisma: PrismaService,
     private authService: AuthService,
@@ -59,6 +43,9 @@ export class AuthController {
     private readonly logger: WinstonLogger,
   ) {}
 
+  // Credential guessing is cheap without a ceiling: reCAPTCHA is skipped
+  // entirely in development and is not a substitute for rate limiting.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   async login(@Body() body: LoginDto) {
     this.logger.log({
@@ -123,6 +110,8 @@ export class AuthController {
     const user = await this.prisma.user.findUnique({
       where: { email: body.email },
     });
+    // The reason is logged but never returned: distinct "user not found" and
+    // "invalid password" replies let anyone test which emails hold an account.
     if (!user) {
       this.logger.log({
         level: 'warn',
@@ -130,7 +119,7 @@ export class AuthController {
         tag: 'error',
         email: body.email,
       });
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('Invalid email or password');
     }
     const isPasswordValid = await bcrypt.compare(body.password, user.password);
     if (!isPasswordValid) {
@@ -140,7 +129,7 @@ export class AuthController {
         tag: 'error',
         email: body.email,
       });
-      throw new UnauthorizedException('Invalid password');
+      throw new UnauthorizedException('Invalid email or password');
     }
     // Generate JWT tokens
     const accessToken = this.authService.generateAccessToken(
@@ -151,10 +140,8 @@ export class AuthController {
       user.id,
     );
 
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(user).filter(([key]) => key !== 'password'),
-    );
+    // Explicit whitelist: new columns on User are not exposed by default
+    const userWithoutPassword = toAuthUser(user);
 
     this.logger.log({
       level: 'info',
@@ -172,6 +159,7 @@ export class AuthController {
     };
   }
 
+  @Throttle({ default: { ttl: 3_600_000, limit: 10 } })
   @Post('signup')
   async signup(@Body() body: SignupDto) {
     this.logger.log({
@@ -211,7 +199,8 @@ export class AuthController {
         phone: body.phone,
         address: body.address,
         profilePicture: body.profilePicture,
-        ratings: body.ratings,
+        // ratings is intentionally not set from the request: it is earned
+        // from other users' feedback, not self-declared.
       },
     });
     // Generate JWT tokens
@@ -231,10 +220,8 @@ export class AuthController {
       userId: user.id,
     });
 
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(user).filter(([key]) => key !== 'password'),
-    );
+    // Explicit whitelist: new columns on User are not exposed by default
+    const userWithoutPassword = toAuthUser(user);
 
     return {
       message: 'Signup successful',
@@ -246,11 +233,12 @@ export class AuthController {
 
   @Post('logout')
   async logout(@Body() body: RefreshTokenDto) {
+    // Never log the refresh token itself: it is a bearer credential valid for
+    // 30 days, and application logs are readable over the /logs endpoints.
     this.logger.log({
       level: 'info',
       message: `Logout attempt`,
       tag: 'auth',
-      refreshToken: body.refreshToken,
     });
 
     if (!body.refreshToken) {
@@ -262,6 +250,7 @@ export class AuthController {
     return { message: 'Logout successful' };
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Post('refresh')
   async refreshToken(@Body() body: RefreshTokenDto) {
     this.logger.log({
@@ -275,9 +264,10 @@ export class AuthController {
     }
 
     try {
-      const accessToken = await this.authService.refreshAccessToken(
-        body.refreshToken,
-      );
+      // Rotating: the presented token is spent here and a replacement is
+      // returned, so the client must store both values.
+      const { accessToken, refreshToken } =
+        await this.authService.rotateRefreshToken(body.refreshToken);
 
       this.logger.log({
         level: 'info',
@@ -288,6 +278,7 @@ export class AuthController {
       return {
         message: 'Token refreshed successfully',
         accessToken,
+        refreshToken,
       };
     } catch (error) {
       this.logger.log({
@@ -296,10 +287,17 @@ export class AuthController {
         tag: 'error',
       });
 
+      // Preserve the service's reason ("already been used") so the client can
+      // tell a replay apart from an ordinary expiry and force a fresh login.
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Delete('delete')
   async deleteAccount(@Body() body: DeleteAccountDto) {
     this.logger.log({
@@ -371,21 +369,15 @@ export class AuthController {
       });
       throw new BadRequestException('User not found');
     }
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(user).filter(([key]) => key !== 'password'),
-    );
+    // Explicit whitelist: new columns on User are not exposed by default
+    const userWithoutPassword = toAuthUser(user);
     return { user: userWithoutPassword };
   }
 
   @Put('update')
   @UseGuards(JwtAuthGuard)
   async updateUser(
-    @Body()
-    body: {
-      password: string;
-      updates: Partial<SignupDto>;
-    },
+    @Body() body: UpdateUserDto,
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId;
@@ -421,10 +413,17 @@ export class AuthController {
       });
       throw new UnauthorizedException('Invalid password');
     }
-    // Prevent updating email and password directly here for security
-    const allowedUpdates = { ...body.updates };
-    delete allowedUpdates.email;
-    delete allowedUpdates.password;
+    // Build the update explicitly rather than spreading the request body: only
+    // these four columns are ever writable here, whatever else was sent.
+    // Email and password have their own flows; role, ratings, karmaPoints and
+    // creditScore are system-owned.
+    const { fullname, phone, address, profilePicture } = body.updates;
+    const allowedUpdates = {
+      ...(fullname !== undefined && { fullname }),
+      ...(phone !== undefined && { phone }),
+      ...(address !== undefined && { address }),
+      ...(profilePicture !== undefined && { profilePicture }),
+    };
     const updatedUser = await this.prisma.user.update({
       where: { id: authenticatedUserId },
       data: allowedUpdates,
@@ -436,10 +435,8 @@ export class AuthController {
       email: authenticatedEmail,
       userId: authenticatedUserId,
     });
-    // Remove password field from user object for response
-    const userWithoutPassword = Object.fromEntries(
-      Object.entries(updatedUser).filter(([key]) => key !== 'password'),
-    );
+    // Explicit whitelist: new columns on User are not exposed by default
+    const userWithoutPassword = toAuthUser(updatedUser);
     return { message: 'User updated successfully', user: userWithoutPassword };
   }
 }

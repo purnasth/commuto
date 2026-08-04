@@ -5,9 +5,13 @@ import { RIDE_STATUS, USER_ROLE } from '../constants/enums';
 import { ROUTE_LOGIN } from '../constants/routes';
 import { API_RIDES_HISTORY } from '../constants/api';
 
-import { RideHistory, ReflectionStats } from '../interfaces/types';
+import {
+  RideHistory,
+  ReflectionStats,
+  RideStatsResponse,
+} from '../interfaces/types';
 
-import { apiFetch } from '../utils/api';
+import { apiFetch, fetchRideStats } from '../utils/api';
 import { getStoredUser } from '../utils/functions';
 import { useKarmaPoints } from '../hooks/useKarmaPoints';
 import { useCreditScore } from '../hooks/useCreditScore';
@@ -15,14 +19,21 @@ import { useCreditScore } from '../hooks/useCreditScore';
 import Dashboard from '../components/Dashboard';
 import ReflectionDashboard from '../components/ReflectionDashboard';
 
-// TODO: Implement infinite scroll for ride history (pagination, fetch more on scroll)
-// TODO: Backend checklist for infinite scroll:
-//   1. Add pagination support to /rides/history endpoint (accept page, limit params)
-//   2. Return total count or hasMore flag in response
-//   3. Optimize query for large datasets (indexes, limits)
-//   4. Document API changes for frontend
+const EMPTY_TOTALS: RideStatsResponse = {
+  postedCount: 0,
+  completedCount: 0,
+  distanceTravelled: 0,
+  co2Reduced: 0,
+  peopleImpacted: 0,
+};
+
 const SelfReflection = () => {
   const [rides, setRides] = useState<RideHistory[]>([]);
+  // Totals come from the server so they cover the whole history, not just the
+  // page of rides currently loaded below.
+  const [totals, setTotals] = useState<RideStatsResponse>(EMPTY_TOTALS);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
   const [userRole, setUserRole] = useState<USER_ROLE>(USER_ROLE.RIDER);
 
@@ -30,7 +41,6 @@ const SelfReflection = () => {
   const { creditScore } = useCreditScore();
   const navigate = useNavigate();
 
-  // TODO: Refactor ride history fetching to support pagination and infinite scroll
   useEffect(() => {
     let cancelled = false;
     const storedUser = getStoredUser();
@@ -52,8 +62,14 @@ const SelfReflection = () => {
 
       for (let attempt = 0; attempt < retries; attempt++) {
         try {
-          const res = await apiFetch<{ rides: RideHistory[] }>(url);
-          if (!cancelled) setRides(res.rides);
+          const res = await apiFetch<{
+            rides: RideHistory[];
+            nextCursor: string | null;
+          }>(url);
+          if (!cancelled) {
+            setRides(res.rides);
+            setNextCursor(res.nextCursor);
+          }
           break;
         } catch {
           if (attempt === retries - 1 && !cancelled) setRides([]);
@@ -61,57 +77,64 @@ const SelfReflection = () => {
       }
     };
 
+    const fetchTotals = async () => {
+      try {
+        const result = await fetchRideStats(storedUser.id);
+        if (!cancelled) setTotals(result);
+      } catch {
+        if (!cancelled) setTotals(EMPTY_TOTALS);
+      }
+    };
+
     fetchWithRetry();
+    fetchTotals();
 
     return () => {
       cancelled = true;
     };
   }, [navigate]);
 
-  const getTotalRideCountByRole = (
-    userRole: USER_ROLE,
-    userId: number | null,
-  ) => {
-    if (userRole === USER_ROLE.RIDER) {
-      return rides.filter(({ rider }) => rider?.id === userId).length;
-    } else {
-      return rides.filter(({ passengerId }) => passengerId === userId).length;
+  const loadMore = async () => {
+    const storedUser = getStoredUser();
+    if (!storedUser || !nextCursor || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL;
+      const url = `${baseUrl}${API_RIDES_HISTORY}?userId=${storedUser.id}&cursor=${encodeURIComponent(nextCursor)}`;
+      const res = await apiFetch<{
+        rides: RideHistory[];
+        nextCursor: string | null;
+      }>(url);
+      setRides((current) => [...current, ...res.rides]);
+      setNextCursor(res.nextCursor);
+    } catch {
+      // Leave the cursor in place so the user can retry.
+    } finally {
+      setLoadingMore(false);
     }
   };
 
-  const getUserCompletedRides = (
-    userRole: USER_ROLE,
-    userId: number | null,
-  ) => {
-    return rides.filter(({ status, rider, passengers }) => {
-      if (status !== RIDE_STATUS.COMPLETED) return false;
+  // Only the rides currently loaded -- used for the completed-rides list, not
+  // for any total. Totals come from `totals`, which covers the full history.
+  const completedRides = rides.filter(({ status, rider, passengers }) => {
+    if (status !== RIDE_STATUS.COMPLETED) return false;
 
-      if (userRole === USER_ROLE.RIDER) {
-        return rider?.id === userId;
-      } else {
-        return (
-          Array.isArray(passengers) && passengers.some((p) => p.id === userId)
-        );
-      }
-    });
-  };
+    if (userRole === USER_ROLE.RIDER) {
+      return rider?.id === userId;
+    }
 
-  const completedRides = getUserCompletedRides(userRole, userId);
+    return Array.isArray(passengers) && passengers.some((p) => p.id === userId);
+  });
 
   const stats: ReflectionStats = {
-    postedCount: getTotalRideCountByRole(userRole, userId),
-    confirmedCount: completedRides.length,
+    postedCount: totals.postedCount,
+    confirmedCount: totals.completedCount,
     karmaPoints: karmaPoints ?? 0,
     creditScore: creditScore ?? 0,
-    distanceTravelled: completedRides.reduce(
-      (sum, ride) => sum + (ride.distance ?? 0),
-      0,
-    ),
-    co2Reduced: completedRides.reduce(
-      (sum, ride) => sum + (ride.co2Saved ?? 0),
-      0,
-    ),
-    peopleImpacted: completedRides.length,
+    distanceTravelled: totals.distanceTravelled,
+    co2Reduced: totals.co2Reduced,
+    peopleImpacted: totals.peopleImpacted,
   };
 
   return (
@@ -126,8 +149,20 @@ const SelfReflection = () => {
           currentUserId={userId || 0}
           userRole={userRole}
         />
-        {/* TODO: Update Dashboard to support incremental loading (infinite scroll) */}
         <Dashboard rides={rides} />
+
+        {nextCursor && (
+          <div className="flex justify-center py-6">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="transition-150 rounded-full border border-teal-300 bg-teal-100 px-6 py-2.5 text-sm font-medium text-teal-700 transition hover:bg-teal-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-teal-700 dark:bg-teal-900 dark:text-teal-100 dark:hover:bg-teal-800"
+            >
+              {loadingMore ? 'Loading…' : 'Show more rides'}
+            </button>
+          </div>
+        )}
       </main>
     </>
   );

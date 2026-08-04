@@ -24,9 +24,9 @@ export interface RideFormData {
   createdBy?: string;
   estimatedTimeOfArrival?: number;
   distance?: number;
-  rider?: UserDetails;
-  passengers?: UserDetails[];
-  createdByUser?: UserDetails;
+  rider?: RideParticipant;
+  passengers?: RideParticipant[];
+  createdByUser?: RideParticipant;
 }
 
 export interface AvailableListProps {
@@ -123,6 +123,34 @@ export interface UserDetails {
   ratings?: number;
 }
 
+/**
+ * Another user as returned on a ride's rider/passengers/createdByUser relations.
+ *
+ * The server only fills in the contact fields (email, phone, address) for the
+ * counterparty of a CONFIRMED or COMPLETED ride the current user takes part in.
+ * On public listings and match results they are absent, so always guard before
+ * rendering them.
+ */
+export interface RideParticipant {
+  id: number;
+  fullname: string;
+  role: USER_ROLE;
+  profilePicture?: string | null;
+  ratings?: number | null;
+  email?: string;
+  phone?: string | null;
+  address?: string | null;
+}
+
+/** Aggregate ride totals returned by GET /rides/user/:userId/stats. */
+export interface RideStatsResponse {
+  postedCount: number;
+  completedCount: number;
+  distanceTravelled: number;
+  co2Reduced: number;
+  peopleImpacted: number;
+}
+
 export interface ReflectionStats {
   postedCount: number;
   confirmedCount: number;
@@ -148,25 +176,9 @@ export interface RideHistory {
   riderId?: number;
   passengerId?: number;
   createdBy: number;
-  rider?: {
-    id: number;
-    fullname: string;
-    email: string;
-    karmaPoints?: number;
-    profilePicture?: string;
-  };
-  passengers?: {
-    id: number;
-    fullname: string;
-    email: string;
-    profilePicture?: string;
-  }[];
-  createdByUser?: {
-    id: number;
-    fullname: string;
-    email: string;
-    profilePicture?: string;
-  };
+  rider?: RideParticipant;
+  passengers?: RideParticipant[];
+  createdByUser?: RideParticipant;
   distance?: number;
   co2Saved?: number;
   peopleImpacted?: number;

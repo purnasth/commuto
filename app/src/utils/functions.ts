@@ -5,6 +5,7 @@ import { USER_ROLE } from '../constants/enums';
 import { API_USER_KARMA_POINTS, API_USER_CREDIT_SCORE } from '../constants/api';
 
 import { getUserData } from './auth';
+import { apiFetch } from './api';
 
 /**
  * Truncates a location string to its first three comma-separated parts.
@@ -233,15 +234,15 @@ export function getRedeemProgressBarColor(
 export async function fetchUserKarmaPoints(userId: number): Promise<number> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const url = `${baseUrl}${API_USER_KARMA_POINTS.replace(':userId', String(userId))}`;
-  const res = await fetch(url);
 
-  if (!res.ok) {
+  try {
+    // Authenticated: the server only returns the caller's own karma points.
+    const data = await apiFetch<{ karmaPoints?: number }>(url);
+
+    return typeof data.karmaPoints === 'number' ? data.karmaPoints : 0;
+  } catch {
     return 0;
   }
-
-  const data = await res.json();
-
-  return typeof data.karmaPoints === 'number' ? data.karmaPoints : 0;
 }
 
 /**
@@ -256,15 +257,15 @@ export async function fetchUserKarmaPoints(userId: number): Promise<number> {
 export async function fetchUserCreditScore(userId: number): Promise<number> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const url = `${baseUrl}${API_USER_CREDIT_SCORE.replace(':userId', String(userId))}`;
-  const res = await fetch(url);
 
-  if (!res.ok) {
+  try {
+    // Authenticated: the server only returns the caller's own credit score.
+    const data = await apiFetch<{ creditScore?: number }>(url);
+
+    return typeof data.creditScore === 'number' ? data.creditScore : 0;
+  } catch {
     return 0;
   }
-
-  const data = await res.json();
-
-  return typeof data.creditScore === 'number' ? data.creditScore : 0;
 }
 
 /**

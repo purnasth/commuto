@@ -2,14 +2,14 @@ import React from 'react';
 import { TbCircleDashed, TbMapPin, TbAlarm } from 'react-icons/tb';
 import {
   RideFormData as BaseRideFormData,
-  UserDetails,
+  RideParticipant,
 } from '../interfaces/types';
 import { USER_ROLE } from '../constants/enums';
 
 type RideFormData = BaseRideFormData & {
-  createdByUser: UserDetails; // Always required - the person who created the ride
-  rider?: UserDetails; // Optional - only for confirmed rides
-  passengers?: UserDetails[]; // Optional - only for confirmed rides
+  createdByUser: RideParticipant; // Always required - the person who created the ride
+  rider?: RideParticipant; // Optional - only for confirmed rides
+  passengers?: RideParticipant[]; // Optional - only for confirmed rides
 };
 
 interface RideResultsListProps {
@@ -65,7 +65,10 @@ const RideResultsList: React.FC<RideResultsListProps> = ({
                       <p className="text-sm font-medium text-dark dark:text-light">
                         {userToShow.fullname}
                       </p>
-                      <p className="text-xs opacity-70">{userToShow.email}</p>
+                      {/* Contact details are only shared once the ride is confirmed */}
+                      <p className="text-xs capitalize opacity-70">
+                        {userToShow.role}
+                      </p>
                     </div>
                   </>
                 );

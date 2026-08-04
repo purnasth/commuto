@@ -15,6 +15,14 @@ export interface AuthenticatedRequest {
 }
 
 /**
+ * Request on an endpoint guarded by OptionalJwtAuthGuard: `user` is populated
+ * when a valid Bearer token was supplied and undefined for anonymous callers.
+ */
+export interface OptionalAuthenticatedRequest {
+  user?: JwtUser;
+}
+
+/**
  * DTO for ride creation and updates
  */
 export interface RideDto {
