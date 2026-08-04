@@ -3,10 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { PrismaService } from '../prisma.service';
-import {
-  RIDE_STATUS,
-  RIDE_EXPIRATION_GRACE_MINUTES,
-} from '../constants/enums';
+import { RIDE_STATUS, RIDE_EXPIRATION_GRACE_MINUTES } from '../constants/enums';
 import { getNow } from '../utils/date.util';
 
 /**

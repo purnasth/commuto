@@ -20,17 +20,32 @@ import {
 } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
-import { Ride, User, Feedback } from 'generated/prisma';
+import { Prisma, Feedback } from 'generated/prisma';
 
 import { PrismaService } from './prisma.service';
 import { KarmaCalculationService } from './services/karma-calculation.service';
+import { RideExpiryService } from './services/ride-expiry.service';
+import { RideStatsService } from './services/ride-stats.service';
+import { RideHistoryService } from './services/ride-history.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './auth/optional-jwt-auth.guard';
 
 import { RideGateway } from './rides/rides.gateway';
 
 import { UpdateRideDto } from './dto/update-ride.dto';
-import { toRideDto, toRideDtoList } from './dto/ride-response.dto';
+import {
+  toRideDto,
+  toRideDtoList,
+  RIDE_WITH_GROUP_SELECT,
+  RIDE_WITH_PARTICIPANTS_SELECT,
+} from './dto/ride-response.dto';
+import {
+  PaginationQueryDto,
+  cursorFilter,
+  decodeCursor,
+  encodeCursor,
+  resolveLimit,
+} from './dto/pagination.dto';
 
 import {
   USER_ROLE,
@@ -68,6 +83,8 @@ export class RideController {
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: WinstonLogger,
     private readonly rideGateway: RideGateway,
+    private readonly rideStats: RideStatsService,
+    private readonly rideHistory: RideHistoryService,
   ) {}
 
   /**
@@ -574,11 +591,15 @@ export class RideController {
         `Role mismatch: You're a '${user.role}', not a '${body.role}'.`,
       );
     }
-    // Prevent posting if user has an active or confirmed ride (regardless of time)
+    // Prevent posting while the user still has a live ride. The timestamp
+    // bound matters because the expiry sweep is scheduled: without it, a ride
+    // already past its grace period would keep blocking new posts until the
+    // next sweep happened to run.
     const existingActiveRide = await this.prisma.ride.findFirst({
       where: {
         createdBy: authenticatedUserId,
         status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
+        timestamp: { gte: RideExpiryService.expiryCutoff() },
       },
     });
     if (existingActiveRide) {
@@ -624,10 +645,7 @@ export class RideController {
         timestamp: body.timestamp ? new Date(body.timestamp) : undefined,
         status: RIDE_STATUS.ACTIVE,
       },
-      include: {
-        createdByUser: true,
-        rider: true,
-      },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
     });
     this.logger.log({
       level: 'info',
@@ -646,27 +664,36 @@ export class RideController {
   @UseGuards(OptionalJwtAuthGuard)
   async getRides(
     @Request() req: OptionalAuthenticatedRequest,
+    @Query() pagination: PaginationQueryDto,
     @Query('role') role?: string,
   ) {
     const viewerId = req.user?.userId;
     const now = getNow();
-    // Only show active and confirmed rides with timestamp in the future
+    const limit = resolveLimit(pagination.limit);
+    const cursor = decodeCursor(pagination.cursor);
+
+    // Fetch one extra row: if it comes back there is a further page, and it
+    // supplies the cursor without needing a second COUNT query.
     const rides = await this.prisma.ride.findMany({
       where: {
         ...(role ? { role } : {}),
         status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
         timestamp: { gte: now },
+        ...cursorFilter(cursor),
       },
-      include: {
-        rider: true,
-        createdByUser: true,
-        passengers: true,
-      },
-      orderBy: { timestamp: 'desc' },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
+      orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
     });
 
+    const page = rides.slice(0, limit);
+    const nextCursor =
+      rides.length > limit && page.length > 0
+        ? encodeCursor(page[page.length - 1])
+        : null;
+
     // Map to the safe projection, then add expiry information to each ride
-    const ridesWithExpiry = rides.map((ride) => ({
+    const ridesWithExpiry = page.map((ride) => ({
       ...toRideDto(ride, viewerId),
       expiryTimeSeconds: this.calculateExpiryTimeSeconds(),
       remainingTimeSeconds: this.calculateRemainingTimeSeconds(ride.timestamp),
@@ -677,21 +704,50 @@ export class RideController {
       message: `Fetched rides`,
       tag: 'ride',
       role,
-      rideCount: rides.length,
+      rideCount: page.length,
     });
-    return { rides: ridesWithExpiry };
+    return { rides: ridesWithExpiry, nextCursor };
   }
 
-  // Get all ride history for a user (as rider or passenger)
-  // TODO: Infinite scroll backend checklist:
-  //   1. Add pagination support to /rides/history endpoint (accept page, limit params)
-  //   2. Return total count or hasMore flag in response
-  //   3. Optimize query for large datasets (indexes, limits)
-  //   4. Document API changes for frontend
+  /**
+   * Aggregate ride totals for the reflection dashboard.
+   *
+   * Kept separate from the history list so that history can be paginated
+   * without the totals changing with the page size.
+   */
+  @Get('/user/:userId/stats')
+  @UseGuards(JwtAuthGuard)
+  async getUserRideStats(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    this.assertSelf(userId, req.user.userId);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // User.role is a free-text column ("Rider"/"rider"), so normalise before
+    // comparing against the enum.
+    const role =
+      user.role.toLowerCase() === String(USER_ROLE.RIDER)
+        ? USER_ROLE.RIDER
+        : USER_ROLE.PASSENGER;
+
+    return this.rideStats.getStatsForUser(userId, role);
+  }
+
+  // Get ride history for a user (as rider or passenger), newest first.
   @Get('history')
   @UseGuards(JwtAuthGuard)
   async getRideHistory(
     @Query('userId') userId: string,
+    @Query() pagination: PaginationQueryDto,
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId;
@@ -716,41 +772,27 @@ export class RideController {
       });
       throw new ForbiddenException('You can only fetch your own ride history');
     }
+    const limit = resolveLimit(pagination.limit);
+    const cursor = decodeCursor(pagination.cursor);
+
+    // One row per trip, already deduplicated and ordered by the database.
+    const keys = await this.rideHistory.getTripKeys(userIdNum, cursor, limit);
+    const pageKeys = keys.slice(0, limit);
+    const nextCursor =
+      keys.length > limit && pageKeys.length > 0
+        ? encodeCursor(pageKeys[pageKeys.length - 1])
+        : null;
+
     const rides = await this.prisma.ride.findMany({
-      where: {
-        OR: [
-          { riderId: userIdNum },
-          { passengerId: userIdNum },
-          { createdBy: userIdNum },
-        ],
-      },
-      include: {
-        rider: true,
-        passengers: true,
-        createdByUser: true,
-      },
-      orderBy: { timestamp: 'desc' },
+      where: { id: { in: pageKeys.map((key) => key.id) } },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
     });
 
-    // Group rides by matchGroupId to prevent duplicates
-    // TODO (Performance): Optimize by handling deduplication at database level using
-    // GROUP BY or DISTINCT ON to reduce memory usage and improve performance for large datasets
-    // instead of filtering in memory. This becomes critical with 1000+ rides.
-    const uniqueRides: typeof rides = [];
-    const seenMatchGroups = new Set();
-
-    for (const ride of rides) {
-      if (ride.matchGroupId) {
-        // If this ride has a matchGroupId and we haven't seen it yet
-        if (!seenMatchGroups.has(ride.matchGroupId)) {
-          seenMatchGroups.add(ride.matchGroupId);
-          uniqueRides.push(ride);
-        }
-      } else {
-        // If no matchGroupId, include the ride (not a matched ride)
-        uniqueRides.push(ride);
-      }
-    }
+    // `IN` does not preserve order, so restore the sequence the keys defined.
+    const byId = new Map(rides.map((ride) => [ride.id, ride]));
+    const uniqueRides = pageKeys
+      .map((key) => byId.get(key.id))
+      .filter((ride): ride is (typeof rides)[number] => ride !== undefined);
 
     this.logger.log({
       level: 'info',
@@ -758,9 +800,11 @@ export class RideController {
       tag: 'ride',
       userId,
       rideCount: uniqueRides.length,
-      originalRideCount: rides.length,
     });
-    return { rides: toRideDtoList(uniqueRides, authenticatedUserId) };
+    return {
+      rides: toRideDtoList(uniqueRides, authenticatedUserId),
+      nextCursor,
+    };
   }
 
   @Get(':id')
@@ -784,11 +828,7 @@ export class RideController {
     }
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: {
-        rider: true,
-        passengers: true,
-        createdByUser: true,
-      },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
     });
     if (!ride) throw new NotFoundException('Ride not found');
 
@@ -915,11 +955,7 @@ export class RideController {
     const rideId = Number(id);
     const currentRide = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: {
-        createdByUser: true,
-        rider: true,
-        passengers: true,
-      },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
     });
 
     if (!currentRide) {
@@ -984,10 +1020,7 @@ export class RideController {
     // Verify the target ride exists
     const targetRide = await this.prisma.ride.findUnique({
       where: { id: targetRideId },
-      include: {
-        createdByUser: true,
-        rider: true,
-      },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
     });
 
     if (!targetRide) {
@@ -1052,11 +1085,7 @@ export class RideController {
     // Fetch the updated rides
     const updatedRides = await this.prisma.ride.findMany({
       where: { id: { in: [rideId, targetRideId] } },
-      include: {
-        createdByUser: true,
-        rider: true,
-        passengers: true,
-      },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
     });
 
     // Notify clients about the confirmation
@@ -1081,7 +1110,7 @@ export class RideController {
 
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: { passengers: true, rider: true, createdByUser: true },
+      select: RIDE_WITH_GROUP_SELECT,
     });
 
     if (!ride) {
@@ -1135,11 +1164,9 @@ export class RideController {
     const peopleImpacted = ride.passengers.length;
 
     // Update ALL rides in the same match group to COMPLETED status
-    let updatedRides: (Ride & {
-      passengers: User[];
-      rider: User | null;
-      createdByUser: User | null;
-    })[];
+    let updatedRides: Prisma.RideGetPayload<{
+      select: typeof RIDE_WITH_GROUP_SELECT;
+    }>[];
     if (ride.matchGroupId) {
       // Update all rides with the same matchGroupId
       await this.prisma.ride.updateMany({
@@ -1155,11 +1182,7 @@ export class RideController {
       // Fetch the updated rides for response
       updatedRides = await this.prisma.ride.findMany({
         where: { matchGroupId: ride.matchGroupId },
-        include: {
-          passengers: true,
-          rider: true,
-          createdByUser: true,
-        },
+        select: RIDE_WITH_GROUP_SELECT,
       });
     } else {
       // Fallback: update only the current ride if no matchGroupId
@@ -1171,11 +1194,7 @@ export class RideController {
           co2Saved,
           peopleImpacted,
         },
-        include: {
-          passengers: true,
-          rider: true,
-          createdByUser: true,
-        },
+        select: RIDE_WITH_GROUP_SELECT,
       });
       updatedRides = [updatedRide];
     }
@@ -1197,7 +1216,7 @@ export class RideController {
 
     // Notify both users via socket that the ride is completed and they should show feedback modal
     // Use the first ride for notification (both should have same essential data)
-    this.rideGateway.notifyRideCompletion(updatedRides[0] as Ride);
+    this.rideGateway.notifyRideCompletion(updatedRides[0]);
 
     return {
       message:
@@ -1291,12 +1310,10 @@ export class RideController {
       where: {
         createdBy: userId,
         status: RIDE_STATUS.ACTIVE,
+        // Excludes rides the scheduled sweep has not yet marked EXPIRED.
+        timestamp: { gte: RideExpiryService.expiryCutoff() },
       },
-      include: {
-        rider: true,
-        createdByUser: true,
-        passengers: true,
-      },
+      select: RIDE_WITH_PARTICIPANTS_SELECT,
       orderBy: { timestamp: 'desc' },
     });
 

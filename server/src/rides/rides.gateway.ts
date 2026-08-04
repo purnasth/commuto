@@ -22,6 +22,28 @@ interface AccessTokenPayload {
   email: string;
 }
 
+/**
+ * The ride fields the notification payloads actually read.
+ *
+ * Declared as a Pick rather than the full `Ride` so callers can pass rows
+ * fetched with a narrowed `select`; a complete row still satisfies it.
+ */
+type NotifiableRide = Pick<
+  Ride,
+  | 'id'
+  | 'from'
+  | 'to'
+  | 'message'
+  | 'role'
+  | 'timestamp'
+  | 'status'
+  | 'riderId'
+  | 'passengerId'
+>;
+
+type CompletableRide = NotifiableRide &
+  Pick<Ride, 'distance' | 'co2Saved' | 'peopleImpacted'>;
+
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -118,7 +140,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // user by id and learn from the error reply whether they were online.
   // Nothing in the app emitted them.
 
-  notifyRideConfirmation(confirmedRide: Ride) {
+  notifyRideConfirmation(confirmedRide: NotifiableRide) {
     const payload = {
       id: confirmedRide.id,
       from: confirmedRide.from,
@@ -171,7 +193,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  notifyRideCompletion(ride: Ride) {
+  notifyRideCompletion(ride: CompletableRide) {
     const payload = {
       id: ride.id,
       from: ride.from,
@@ -219,7 +241,10 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  notifyRideConfirmationForPassenger(confirmedRide: Ride, passengerId: number) {
+  notifyRideConfirmationForPassenger(
+    confirmedRide: NotifiableRide,
+    passengerId: number,
+  ) {
     if (!passengerId) {
       this.logger.warn(
         `Ride ${confirmedRide.id} confirmation cannot be emitted to passenger: Missing passengerId.`,

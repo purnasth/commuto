@@ -1,6 +1,24 @@
 import { User } from 'generated/prisma';
 
 /**
+ * The user columns the participant projections read.
+ *
+ * Declared as a Pick rather than the full `User` so queries can `select` just
+ * these columns and still satisfy the mappers -- a full row remains assignable.
+ */
+export type ParticipantSource = Pick<
+  User,
+  | 'id'
+  | 'fullname'
+  | 'role'
+  | 'profilePicture'
+  | 'ratings'
+  | 'email'
+  | 'phone'
+  | 'address'
+>;
+
+/**
  * Minimal user projection safe to expose to any API consumer, including
  * unauthenticated ones (public ride listings, match results).
  *
@@ -40,12 +58,12 @@ export interface AuthUserDto extends ContactUserDto {
   creditScore: number;
 }
 
-export function toPublicUser(user: User): PublicUserDto;
+export function toPublicUser(user: ParticipantSource): PublicUserDto;
 export function toPublicUser(
-  user: User | null | undefined,
+  user: ParticipantSource | null | undefined,
 ): PublicUserDto | null;
 export function toPublicUser(
-  user: User | null | undefined,
+  user: ParticipantSource | null | undefined,
 ): PublicUserDto | null {
   if (!user) {
     return null;
@@ -60,12 +78,12 @@ export function toPublicUser(
   };
 }
 
-export function toContactUser(user: User): ContactUserDto;
+export function toContactUser(user: ParticipantSource): ContactUserDto;
 export function toContactUser(
-  user: User | null | undefined,
+  user: ParticipantSource | null | undefined,
 ): ContactUserDto | null;
 export function toContactUser(
-  user: User | null | undefined,
+  user: ParticipantSource | null | undefined,
 ): ContactUserDto | null {
   if (!user) {
     return null;
@@ -84,15 +102,15 @@ export function toContactUser(
  * Callers pass the result of `canViewContactDetails` for the ride in question.
  */
 export function toRideParticipant(
-  user: User,
+  user: ParticipantSource,
   includeContact: boolean,
 ): PublicUserDto | ContactUserDto;
 export function toRideParticipant(
-  user: User | null | undefined,
+  user: ParticipantSource | null | undefined,
   includeContact: boolean,
 ): PublicUserDto | ContactUserDto | null;
 export function toRideParticipant(
-  user: User | null | undefined,
+  user: ParticipantSource | null | undefined,
   includeContact: boolean,
 ): PublicUserDto | ContactUserDto | null {
   return includeContact ? toContactUser(user) : toPublicUser(user);

@@ -142,6 +142,15 @@ export interface RideParticipant {
   address?: string | null;
 }
 
+/** Aggregate ride totals returned by GET /rides/user/:userId/stats. */
+export interface RideStatsResponse {
+  postedCount: number;
+  completedCount: number;
+  distanceTravelled: number;
+  co2Reduced: number;
+  peopleImpacted: number;
+}
+
 export interface ReflectionStats {
   postedCount: number;
   confirmedCount: number;

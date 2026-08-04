@@ -14,6 +14,7 @@ import {
 import axios from 'axios';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { EnvService } from './env.service';
@@ -42,6 +43,9 @@ export class AuthController {
     private readonly logger: WinstonLogger,
   ) {}
 
+  // Credential guessing is cheap without a ceiling: reCAPTCHA is skipped
+  // entirely in development and is not a substitute for rate limiting.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   async login(@Body() body: LoginDto) {
     this.logger.log({
@@ -155,6 +159,7 @@ export class AuthController {
     };
   }
 
+  @Throttle({ default: { ttl: 3_600_000, limit: 10 } })
   @Post('signup')
   async signup(@Body() body: SignupDto) {
     this.logger.log({
@@ -245,6 +250,7 @@ export class AuthController {
     return { message: 'Logout successful' };
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @Post('refresh')
   async refreshToken(@Body() body: RefreshTokenDto) {
     this.logger.log({
@@ -283,6 +289,7 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Delete('delete')
   async deleteAccount(@Body() body: DeleteAccountDto) {
     this.logger.log({
