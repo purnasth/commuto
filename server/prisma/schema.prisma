@@ -80,6 +80,17 @@ model Ride {
   co2Saved               Float? // CO2 saved in kg
   peopleImpacted         Int? // Number of people impacted (passengers)
   matchGroupId           String? // UUID to group matched rides together
+
+  // Public listings and the matcher both filter on status and then order or
+  // window on timestamp, so this pair carries the hottest read path.
+  @@index([status, timestamp])
+  // "Does this user already have an open ride?" on every ride creation.
+  @@index([createdBy, status])
+  // Ride history: the three OR'd ownership lookups.
+  @@index([riderId])
+  @@index([passengerId])
+  // Grouping the two rows that make up one matched trip.
+  @@index([matchGroupId])
 }
 
 enum RideStatus {

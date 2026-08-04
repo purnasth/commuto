@@ -650,15 +650,6 @@ export class RideController {
   ) {
     const viewerId = req.user?.userId;
     const now = getNow();
-    // Expire rides whose timestamp is in the past and still ACTIVE
-    await this.expireOldRides();
-
-    this.logger.log({
-      level: 'info',
-      message: `Expired past active rides`,
-      tag: 'ride',
-      timestamp: now,
-    });
     // Only show active and confirmed rides with timestamp in the future
     const rides = await this.prisma.ride.findMany({
       where: {
@@ -725,16 +716,6 @@ export class RideController {
       });
       throw new ForbiddenException('You can only fetch your own ride history');
     }
-    // Expire old rides using the centralized helper
-    await this.expireOldRides();
-
-    this.logger.log({
-      level: 'info',
-      message: `Expired rides older than grace period for history fetch`,
-      tag: 'ride',
-      timestamp: getNow(),
-      userId,
-    });
     const rides = await this.prisma.ride.findMany({
       where: {
         OR: [
@@ -1306,9 +1287,6 @@ export class RideController {
       });
       throw new ForbiddenException('You can only fetch your own ride');
     }
-    // First expire any old rides
-    await this.expireOldRides();
-
     const activeRide = await this.prisma.ride.findFirst({
       where: {
         createdBy: userId,
@@ -1358,50 +1336,6 @@ export class RideController {
     });
 
     return { hasActiveRide: true, ride: rideWithExpiry };
-  }
-
-  /**
-   * Helper method to expire old rides
-   */
-  private async expireOldRides(): Promise<void> {
-    const now = getNow();
-    // Calculate the cutoff time: rides created before (now - GRACE_MINUTES) should be expired
-    const cutoffTime = new Date(
-      now.getTime() - RIDE_EXPIRATION_GRACE_MINUTES * 60 * 1000,
-    );
-
-    const ridesToExpire = await this.prisma.ride.findMany({
-      where: {
-        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] }, // Expire both ACTIVE and CONFIRMED rides
-        timestamp: { lt: cutoffTime },
-      },
-      select: { id: true, timestamp: true, createdBy: true, status: true },
-    });
-
-    if (ridesToExpire.length > 0) {
-      this.logger.log({
-        level: 'info',
-        message: `Expiring ${ridesToExpire.length} old rides`,
-        tag: 'ride',
-        now: now.toISOString(),
-        cutoffTime: cutoffTime.toISOString(),
-        graceMinutes: RIDE_EXPIRATION_GRACE_MINUTES,
-        ridesToExpire: ridesToExpire.map((r) => ({
-          id: r.id,
-          createdBy: r.createdBy,
-          timestamp: r.timestamp.toISOString(),
-          status: r.status,
-        })),
-      });
-    }
-
-    await this.prisma.ride.updateMany({
-      where: {
-        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] }, // Expire both ACTIVE and CONFIRMED rides
-        timestamp: { lt: cutoffTime },
-      },
-      data: { status: RIDE_STATUS.EXPIRED },
-    });
   }
 
   @Get('/user/:userId/average-score')
