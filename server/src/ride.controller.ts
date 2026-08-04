@@ -1,5 +1,3 @@
-import { randomUUID } from 'crypto';
-
 import {
   Get,
   Put,
@@ -16,11 +14,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER, WinstonLogger } from 'nest-winston';
-
-import { Prisma, Feedback } from 'generated/prisma';
 
 import { PrismaService } from './prisma.service';
 import { KarmaCalculationService } from './services/karma-calculation.service';
@@ -28,8 +23,10 @@ import { RideExpiryService } from './services/ride-expiry.service';
 import { RideStatsService } from './services/ride-stats.service';
 import { RideHistoryService } from './services/ride-history.service';
 import { RideLifecycleService } from './services/ride-lifecycle.service';
-import { assertTransition } from './rides/ride-lifecycle';
 import { RideMatchingService } from './services/ride-matching.service';
+import { RideService } from './services/ride.service';
+import { FeedbackService } from './services/feedback.service';
+import { PeopleImpactedService } from './services/people-impacted.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './auth/optional-jwt-auth.guard';
 
@@ -37,9 +34,13 @@ import { RideGateway } from './rides/rides.gateway';
 
 import { UpdateRideDto } from './dto/update-ride.dto';
 import {
+  CreateRideDto,
+  ListRidesQueryDto,
+  MatchRidesQueryDto,
+} from './dto/create-ride.dto';
+import {
   toRideDto,
   toRideDtoList,
-  RIDE_WITH_GROUP_SELECT,
   RIDE_WITH_PARTICIPANTS_SELECT,
 } from './dto/ride-response.dto';
 import {
@@ -53,25 +54,18 @@ import {
 import {
   USER_ROLE,
   RIDE_STATUS,
-  FEEDBACK_EMOJI,
   RIDE_EXPIRATION_GRACE_MINUTES,
 } from './constants/enums';
 import { TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING } from './constants/constants';
 
 import {
-  RideDto,
   FeedbackDto,
   ConfirmRideDto,
   AverageScoreResult,
-  KarmaCalculationResult,
   AuthenticatedRequest,
   OptionalAuthenticatedRequest,
 } from './interfaces/types';
 
-import {
-  haversineDistance,
-  estimateCO2FromDistance,
-} from './utils/rideStats.util';
 import { getNow } from './utils/date.util';
 import { processFeedbackData } from './utils/feedback.util';
 
@@ -86,6 +80,9 @@ export class RideController {
     private readonly rideHistory: RideHistoryService,
     private readonly rideLifecycle: RideLifecycleService,
     private readonly rideMatching: RideMatchingService,
+    private readonly rideService: RideService,
+    private readonly feedbackService: FeedbackService,
+    private readonly peopleImpacted: PeopleImpactedService,
   ) {}
 
   /**
@@ -168,278 +165,37 @@ export class RideController {
   @UseGuards(JwtAuthGuard)
   @Post('/feedback')
   /**
-   * Submit feedback for a completed ride
-   * Updates karma points for riders and credit score for passengers
-   * Now protected with JWT authentication - fromUserId comes from authenticated user
+   * Submit feedback for a completed ride.
+   * Credits karma to riders and credit score to passengers.
    */
   async submitFeedback(
     @Body() body: Omit<FeedbackDto, 'fromUserId'>,
     @Request() req: AuthenticatedRequest,
   ) {
-    const authenticatedUserId = req.user.userId; // From JWT token
-
-    this.logger.log({
-      level: 'info',
-      message: `Feedback submission attempt for ride ${body.rideId} from authenticated user ${authenticatedUserId} to user ${body.toUserId}`,
-      tag: 'feedback',
-      rideId: body.rideId,
-      fromUserId: authenticatedUserId,
-      toUserId: body.toUserId,
-      role: body.role,
-      emoji: body.emoji,
-    });
-
-    // Validate required fields (fromUserId comes from JWT, not body)
-    if (
-      !body.rideId ||
-      !body.toUserId ||
-      !body.role ||
-      body.emoji === undefined ||
-      body.emoji === null
-    ) {
-      throw new BadRequestException('Missing required feedback fields');
-    }
-
-    const validFeedbackRatings = Object.values(FEEDBACK_EMOJI);
-
-    if (!validFeedbackRatings.includes(body.emoji)) {
-      throw new BadRequestException(
-        `Invalid feedback rating. Must be one of: ${validFeedbackRatings.join(', ')} (0=Satisfied, 1=Neutral, 2=Dissatisfied)`,
-      );
-    }
-
-    // Check if ride exists and is completed
-    const ride = await this.prisma.ride.findUnique({
-      where: { id: body.rideId },
-      include: { rider: true, passengers: true },
-    });
-
-    if (!ride) {
-      throw new NotFoundException('Ride not found');
-    }
-
-    // Only allow feedback for completed rides
-    if (ride.status !== RIDE_STATUS.COMPLETED) {
-      throw new BadRequestException(
-        'Feedback can only be submitted for completed rides',
-      );
-    }
-
-    // Verify that authenticated user is part of this ride
-    const isRider = ride.riderId === authenticatedUserId;
-    const isPassenger = ride.passengerId === authenticatedUserId;
-
-    if (!isRider && !isPassenger) {
-      throw new BadRequestException('User is not part of this ride');
-    }
-
-    // Derive the role from this ride's own records rather than trusting
-    // body.role. The role selects which balance gets credited, so accepting it
-    // from the client would let a passenger claim the rider payout.
-    const effectiveRole = isRider ? USER_ROLE.RIDER : USER_ROLE.PASSENGER;
-
-    // Check for duplicate feedback
-    let existingFeedback: Feedback | null;
-    try {
-      existingFeedback = await this.prisma.feedback.findFirst({
-        where: {
-          rideId: body.rideId,
-          fromUserId: authenticatedUserId,
-          toUserId: body.toUserId,
-        },
-      });
-    } catch (error) {
-      this.logger.error({
-        level: 'error',
-        message: 'Error checking for existing feedback',
-        tag: 'feedback',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      throw new BadRequestException('Error checking feedback status');
-    }
-
-    if (existingFeedback) {
-      throw new BadRequestException('Feedback already submitted for this ride');
-    }
-
-    // Create feedback record
-    let feedback: Feedback;
-    try {
-      feedback = await this.prisma.feedback.create({
-        data: {
-          rideId: body.rideId,
-          fromUserId: authenticatedUserId,
-          toUserId: body.toUserId,
-          role: effectiveRole,
-          emoji: body.emoji,
-          comment: body.comment,
-        },
-      });
-    } catch (error) {
-      this.logger.error({
-        level: 'error',
-        message: 'Error creating feedback record',
-        tag: 'feedback',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      throw new BadRequestException('Error creating feedback');
-    }
-
-    const rideDistance = ride.distance;
-
-    if (!rideDistance) {
-      this.logger.log({
-        level: 'warn',
-        message: `Distance not found for completed ride (rideId=${body.rideId}, status=${ride.status})`,
-        tag: 'feedback',
-        rideId: body.rideId,
-        rideStatus: ride.status,
-      });
-    }
-
-    const karmaResult: KarmaCalculationResult =
-      KarmaCalculationService.calculateKarmaPoints({
-        distance: rideDistance,
-        feedbackRating: body.emoji,
-      });
-
-    const totalPoints = karmaResult.totalPoints;
-
-    this.logger.log({
-      level: 'info',
-      message: `Karma calculation completed using ${TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING} algorithm`,
-      tag: 'feedback',
-      rideId: body.rideId,
-      fromUserId: authenticatedUserId,
-      algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
-      calculation: {
-        distance: rideDistance,
-        rating: body.emoji,
-        ratingDescription: KarmaCalculationService.getFeedbackRatingDescription(
-          body.emoji,
-        ),
-        distanceTier: karmaResult.distanceTier,
-        distanceMultiplier: karmaResult.distanceMultiplier,
-        sentimentBonus: karmaResult.sentimentBonus,
-        totalPoints: karmaResult.totalPoints,
-        formula: karmaResult.formula,
-      },
-    });
-
-    // Update user scores based on their role
-    if (effectiveRole === USER_ROLE.RIDER) {
-      // Update rider's karma points
-      await this.prisma.user.update({
-        where: { id: authenticatedUserId },
-        data: { karmaPoints: { increment: totalPoints } },
-      });
-
-      // Create karma transaction
-      await this.prisma.karmaTransaction.create({
-        data: {
-          userId: authenticatedUserId,
-          points: totalPoints,
-          type: 'earned',
-          reason: `Ride feedback: ${KarmaCalculationService.getFeedbackRatingDescription(body.emoji)} | Distance: ${rideDistance || 'N/A'}km | Points: ${totalPoints}`,
-        },
-      });
-
-      this.logger.log({
-        level: 'info',
-        message: `Karma points awarded to rider using distance-based algorithm`,
-        tag: 'feedback',
-        userId: authenticatedUserId,
-        role: 'rider',
-        rideId: body.rideId,
-        algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
-        points: totalPoints,
-        calculation: {
-          distance: rideDistance,
-          distanceTier: karmaResult.distanceTier,
-          basePoints: karmaResult.basePoints,
-          distanceMultiplier: karmaResult.distanceMultiplier,
-          sentimentBonus: karmaResult.sentimentBonus,
-          formula: karmaResult.formula,
-        },
-      });
-    } else if (effectiveRole === USER_ROLE.PASSENGER) {
-      // Update passenger's credit score
-      await this.prisma.user.update({
-        where: { id: authenticatedUserId },
-        data: { creditScore: { increment: totalPoints } },
-      });
-
-      this.logger.log({
-        level: 'info',
-        message: `Credit score awarded to passenger using distance-based algorithm`,
-        tag: 'feedback',
-        userId: authenticatedUserId,
-        role: 'passenger',
-        rideId: body.rideId,
-        algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
-        points: totalPoints,
-        calculation: {
-          distance: rideDistance,
-          distanceTier: karmaResult.distanceTier,
-          basePoints: karmaResult.basePoints,
-          distanceMultiplier: karmaResult.distanceMultiplier,
-          sentimentBonus: karmaResult.sentimentBonus,
-          formula: karmaResult.formula,
-        },
-      });
-    }
-
-    // Check if both users have submitted feedback to determine response
-    const allFeedback = await this.prisma.feedback.findMany({
-      where: { rideId: body.rideId },
-    });
-
-    const riderFeedback = allFeedback.find(
-      (f) => (f.role as USER_ROLE) === USER_ROLE.RIDER,
-    );
-    const passengerFeedback = allFeedback.find(
-      (f) => (f.role as USER_ROLE) === USER_ROLE.PASSENGER,
-    );
-
-    // Since ride is already completed, check if both users have now submitted feedback
-    const bothSubmitted = riderFeedback && passengerFeedback;
-
-    // Get updated user data to return
-    const updatedUser = await this.prisma.user.findUnique({
-      where: { id: authenticatedUserId },
-      select: { id: true, karmaPoints: true, creditScore: true },
-    });
+    const result = await this.feedbackService.submit(req.user.userId, body);
 
     return {
       message: 'Feedback submitted successfully',
-      // Explicitly map Prisma Feedback model to FeedbackDto to ensure only expose intended fields (exclude id, createdAt, user objects, etc.)
-      feedback: {
-        rideId: feedback.rideId,
-        fromUserId: feedback.fromUserId,
-        toUserId: feedback.toUserId,
-        role: feedback.role as USER_ROLE,
-        emoji: feedback.emoji as FEEDBACK_EMOJI,
-        comment: feedback.comment,
-      } as FeedbackDto,
-      pointsAwarded: totalPoints,
+      feedback: result.feedback,
+      pointsAwarded: result.pointsAwarded,
       karmaCalculation: {
         algorithm: TIERED_LINEAR_SCALING_WITH_SENTIMENT_WEIGHTING,
-        distance: rideDistance,
-        distanceTier: karmaResult.distanceTier,
+        distance: result.distance,
+        distanceTier: result.karma.distanceTier,
         distanceTierDescription:
           KarmaCalculationService.getDistanceTierDescription(
-            karmaResult.distanceTier,
+            result.karma.distanceTier,
           ),
-        basePoints: karmaResult.basePoints,
-        distanceMultiplier: karmaResult.distanceMultiplier,
-        sentimentBonus: karmaResult.sentimentBonus,
-        totalPoints: karmaResult.totalPoints,
-        formula: karmaResult.formula,
-        breakdown: karmaResult.breakdown,
+        basePoints: result.karma.basePoints,
+        distanceMultiplier: result.karma.distanceMultiplier,
+        sentimentBonus: result.karma.sentimentBonus,
+        totalPoints: result.karma.totalPoints,
+        formula: result.karma.formula,
+        breakdown: result.karma.breakdown,
       },
-      user: updatedUser,
-      feedbackComplete: bothSubmitted,
-      waitingForOtherUser: !bothSubmitted,
+      user: result.user,
+      feedbackComplete: result.feedbackComplete,
+      waitingForOtherUser: !result.feedbackComplete,
     };
   }
 
@@ -459,24 +215,8 @@ export class RideController {
    * @returns Array of matched rides
    */
   @Get('match')
-  async matchRides(
-    @Query('fromLat') fromLat: string,
-    @Query('fromLng') fromLng: string,
-    @Query('timestamp') timestamp: string,
-    @Query('role') role: USER_ROLE,
-  ) {
-    if (!fromLat || !fromLng || !timestamp || !role) {
-      throw new BadRequestException(
-        'fromLat, fromLng, timestamp, and role are required',
-      );
-    }
-
-    const matches = await this.rideMatching.findMatches({
-      fromLat: Number(fromLat),
-      fromLng: Number(fromLng),
-      timestamp,
-      role,
-    });
+  async matchRides(@Query() query: MatchRidesQueryDto) {
+    const matches = await this.rideMatching.findMatches(query);
 
     // Match results are always still ACTIVE, so participants are exposed as
     // public profiles only - no contact details before a ride is confirmed.
@@ -486,112 +226,12 @@ export class RideController {
   @Post()
   @UseGuards(JwtAuthGuard)
   async createRide(
-    @Body() body: Omit<RideDto, 'createdBy'>,
+    @Body() body: CreateRideDto,
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId;
-    this.logger.log({
-      level: 'info',
-      message: `Create ride attempt by userId=${authenticatedUserId}, from='${body.from}' to='${body.to}', role='${body.role}'`,
-      tag: 'ride',
-      userId: authenticatedUserId,
-      from: body.from,
-      to: body.to,
-      role: body.role,
-    });
-    if (!body.from || !body.to || !body.role) {
-      throw new BadRequestException('Missing required fields');
-    }
-    // Fetch user and check role
-    const user = await this.prisma.user.findUnique({
-      where: { id: authenticatedUserId },
-    });
-    if (!user) {
-      this.logger.log({
-        level: 'warn',
-        message: `Ride creation failed: User not found (userId=${authenticatedUserId})`,
-        tag: 'ride',
-        userId: authenticatedUserId,
-      });
-      throw new NotFoundException('User not found');
-    }
-    // Case-insensitive role check
-    if (user.role.toLowerCase() !== body.role.toLowerCase()) {
-      this.logger.log({
-        level: 'warn',
-        message: `Ride creation failed: Role mismatch for userId=${authenticatedUserId} (userRole='${user.role}', requestedRole='${body.role}')`,
-        tag: 'ride',
-        userId: authenticatedUserId,
-        userRole: user.role,
-        requestedRole: body.role,
-      });
-      throw new BadRequestException(
-        `Role mismatch: You're a '${user.role}', not a '${body.role}'.`,
-      );
-    }
-    // Prevent posting while the user still has a live ride. The timestamp
-    // bound matters because the expiry sweep is scheduled: without it, a ride
-    // already past its grace period would keep blocking new posts until the
-    // next sweep happened to run.
-    const existingActiveRide = await this.prisma.ride.findFirst({
-      where: {
-        createdBy: authenticatedUserId,
-        status: { in: [RIDE_STATUS.ACTIVE, RIDE_STATUS.CONFIRMED] },
-        timestamp: { gte: RideExpiryService.expiryCutoff() },
-      },
-    });
-    if (existingActiveRide) {
-      this.logger.log({
-        level: 'warn',
-        message: `Ride creation failed: UserId=${authenticatedUserId} already has an active or confirmed ride`,
-        tag: 'ride',
-        userId: authenticatedUserId,
-        existingRideStatus: existingActiveRide.status,
-      });
-      throw new BadRequestException(
-        'You already have an active or confirmed ride and cannot post another at this time.',
-      );
-    }
+    const ride = await this.rideService.create(authenticatedUserId, body);
 
-    // Determine riderId and passengerId based on role
-    let riderId: number | null = null;
-    let passengerId: number | null = null;
-
-    if (body.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
-      riderId = authenticatedUserId;
-      passengerId = null;
-    } else if (body.role.toLowerCase() === USER_ROLE.PASSENGER.toLowerCase()) {
-      riderId = null;
-      passengerId = authenticatedUserId;
-    }
-
-    // Create ride with proper role-based assignment
-    const ride = await this.prisma.ride.create({
-      data: {
-        from: body.from,
-        fromLat: body.fromLat,
-        fromLng: body.fromLng,
-        to: body.to,
-        toLat: body.toLat,
-        toLng: body.toLng,
-        message: body.message,
-        role: body.role,
-        createdBy: authenticatedUserId,
-        riderId: riderId,
-        passengerId: passengerId,
-        estimatedTimeOfArrival: body.estimatedTimeOfArrival,
-        timestamp: body.timestamp ? new Date(body.timestamp) : undefined,
-        status: RIDE_STATUS.ACTIVE,
-      },
-      select: RIDE_WITH_PARTICIPANTS_SELECT,
-    });
-    this.logger.log({
-      level: 'info',
-      message: `Ride created by userId=${authenticatedUserId}`,
-      tag: 'ride',
-      userId: authenticatedUserId,
-      rideId: ride.id,
-    });
     return {
       message: 'Ride created',
       ride: toRideDto(ride, authenticatedUserId),
@@ -603,8 +243,9 @@ export class RideController {
   async getRides(
     @Request() req: OptionalAuthenticatedRequest,
     @Query() pagination: PaginationQueryDto,
-    @Query('role') role?: string,
+    @Query() filter: ListRidesQueryDto,
   ) {
+    const role = filter.role;
     const viewerId = req.user?.userId;
     const now = getNow();
     const limit = resolveLimit(pagination.limit);
@@ -670,14 +311,7 @@ export class RideController {
       throw new NotFoundException('User not found');
     }
 
-    // User.role is a free-text column ("Rider"/"rider"), so normalise before
-    // comparing against the enum.
-    const role =
-      user.role.toLowerCase() === String(USER_ROLE.RIDER)
-        ? USER_ROLE.RIDER
-        : USER_ROLE.PASSENGER;
-
-    return this.rideStats.getStatsForUser(userId, role);
+    return this.rideStats.getStatsForUser(userId, user.role as USER_ROLE);
   }
 
   // Get ride history for a user (as rider or passenger), newest first.
@@ -885,259 +519,41 @@ export class RideController {
   @Post(':id/confirm')
   @UseGuards(JwtAuthGuard)
   async confirmRide(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: ConfirmRideDto,
     @Request() req: AuthenticatedRequest,
   ) {
     const authenticatedUserId = req.user.userId;
-    const rideId = Number(id);
-    const currentRide = await this.prisma.ride.findUnique({
-      where: { id: rideId },
-      select: RIDE_WITH_PARTICIPANTS_SELECT,
-    });
-
-    if (!currentRide) {
-      this.logger.log({
-        level: 'warn',
-        message: `Confirm ride failed: Ride not found`,
-        tag: 'ride',
-        rideId: id,
-      });
-      throw new NotFoundException('Ride not found');
-    }
-
-    // Ownership and current state are both decided by the transition table,
-    // so confirm follows the same rules as every other status change.
-    assertTransition(currentRide, RIDE_STATUS.CONFIRMED, authenticatedUserId);
-
-    let targetRideId: number;
-    let updatedRiderId: number;
-    let updatedPassengerId: number;
-
-    // Determine the target ride and user IDs based on the current ride's role
-    if (currentRide.role.toLowerCase() === USER_ROLE.RIDER.toLowerCase()) {
-      // Current ride is by a rider, confirming a passenger's ride
-      if (!body.passengerId || !body.passengerRideId) {
-        throw new BadRequestException(
-          'passengerId and passengerRideId are required for confirming a passenger ride',
-        );
-      }
-      if (currentRide.riderId === null || currentRide.riderId === undefined) {
-        throw new BadRequestException(
-          'Current ride does not have a valid riderId',
-        );
-      }
-      targetRideId = body.passengerRideId;
-      updatedRiderId = currentRide.riderId;
-      updatedPassengerId = body.passengerId;
-    } else {
-      // Current ride is by a passenger, confirming a rider's ride
-      if (!body.riderId || !body.riderRideId) {
-        throw new BadRequestException(
-          'riderId and riderRideId are required for confirming a rider ride',
-        );
-      }
-      if (currentRide.passengerId === null) {
-        throw new BadRequestException(
-          'Current ride does not have a valid passengerId',
-        );
-      }
-      targetRideId = body.riderRideId;
-      updatedRiderId = body.riderId;
-      updatedPassengerId = currentRide.passengerId;
-    }
-
-    // Verify the target ride exists
-    const targetRide = await this.prisma.ride.findUnique({
-      where: { id: targetRideId },
-      select: RIDE_WITH_PARTICIPANTS_SELECT,
-    });
-
-    if (!targetRide) {
-      throw new NotFoundException('Target ride not found');
-    }
-
-    // Generate a unique match group ID for these paired rides
-    const matchGroupId = randomUUID();
-
-    // Claim both rides and link the passenger in one transaction.
-    //
-    // The ACTIVE requirement lives in the WHERE clause, so whichever request
-    // commits first wins and the loser matches fewer than two rows. Without
-    // it, two passengers confirming the same rider at once would both succeed
-    // and silently overwrite each other. Throwing inside the transaction rolls
-    // back a partial claim rather than leaving one ride confirmed alone.
-    await this.prisma.$transaction(async (tx) => {
-      const claimed = await tx.ride.updateMany({
-        where: {
-          id: { in: [rideId, targetRideId] },
-          status: RIDE_STATUS.ACTIVE,
-        },
-        data: {
-          status: RIDE_STATUS.CONFIRMED,
-          riderId: updatedRiderId,
-          passengerId: updatedPassengerId,
-          matchGroupId: matchGroupId,
-        },
-      });
-
-      if (claimed.count < 2) {
-        this.logger.log({
-          level: 'warn',
-          message: `Confirm ride failed: a ride was no longer active`,
-          tag: 'ride',
-          rideIds: [rideId, targetRideId],
-          claimedCount: claimed.count,
-        });
-        throw new BadRequestException(
-          'This ride is no longer available. It may have just been matched by someone else.',
-        );
-      }
-
-      // Connect the passenger to both rides in the many-to-many relationship
-      for (const id of [rideId, targetRideId]) {
-        await tx.ride.update({
-          where: { id },
-          data: { passengers: { connect: { id: updatedPassengerId } } },
-        });
-      }
-    });
-
-    this.logger.log({
-      level: 'info',
-      message: `Confirmed matched rides`,
-      tag: 'ride',
-      rideIds: [rideId, targetRideId],
-      riderId: updatedRiderId,
-      passengerId: updatedPassengerId,
-    });
-
-    // Fetch the updated rides
-    const updatedRides = await this.prisma.ride.findMany({
-      where: { id: { in: [rideId, targetRideId] } },
-      select: RIDE_WITH_PARTICIPANTS_SELECT,
-    });
-
-    // Notify clients about the confirmation
-    for (const confirmedRide of updatedRides) {
-      this.rideGateway.notifyRideConfirmation(confirmedRide);
-    }
+    const rides = await this.rideLifecycle.confirm(
+      id,
+      body,
+      authenticatedUserId,
+    );
 
     return {
       message: 'Rides confirmed successfully',
-      rides: toRideDtoList(updatedRides, authenticatedUserId),
+      rides: toRideDtoList(rides, authenticatedUserId),
     };
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/complete')
   async completeRide(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest,
   ) {
-    const authenticatedUserId = req.user.userId; // From JWT token
-    const rideId = Number(id);
-
-    const ride = await this.prisma.ride.findUnique({
-      where: { id: rideId },
-      select: RIDE_WITH_GROUP_SELECT,
-    });
-
-    if (!ride) {
-      this.logger.log({
-        level: 'warn',
-        message: `Complete ride failed: Ride not found`,
-        tag: 'ride',
-        rideId,
-      });
-      throw new NotFoundException('Ride not found');
-    }
-
-    assertTransition(ride, RIDE_STATUS.COMPLETED, authenticatedUserId);
-
-    const isRider = ride.riderId === authenticatedUserId;
-    const isPassenger = ride.passengerId === authenticatedUserId;
-
-    let distance: number | null = null;
-    if (
-      typeof ride.fromLat === 'number' &&
-      typeof ride.fromLng === 'number' &&
-      typeof ride.toLat === 'number' &&
-      typeof ride.toLng === 'number'
-    ) {
-      distance = haversineDistance(
-        ride.fromLat,
-        ride.fromLng,
-        ride.toLat,
-        ride.toLng,
-      );
-    }
-
-    const co2Saved =
-      typeof distance === 'number' ? estimateCO2FromDistance(distance) : null;
-    const peopleImpacted = ride.passengers.length;
-
-    // Update ALL rides in the same match group to COMPLETED status
-    let updatedRides: Prisma.RideGetPayload<{
-      select: typeof RIDE_WITH_GROUP_SELECT;
-    }>[];
-    if (ride.matchGroupId) {
-      // Update all rides with the same matchGroupId
-      await this.prisma.ride.updateMany({
-        where: { matchGroupId: ride.matchGroupId },
-        data: {
-          status: RIDE_STATUS.COMPLETED,
-          distance,
-          co2Saved,
-          peopleImpacted,
-        },
-      });
-
-      // Fetch the updated rides for response
-      updatedRides = await this.prisma.ride.findMany({
-        where: { matchGroupId: ride.matchGroupId },
-        select: RIDE_WITH_GROUP_SELECT,
-      });
-    } else {
-      // Fallback: update only the current ride if no matchGroupId
-      const updatedRide = await this.prisma.ride.update({
-        where: { id: rideId },
-        data: {
-          status: RIDE_STATUS.COMPLETED,
-          distance,
-          co2Saved,
-          peopleImpacted,
-        },
-        select: RIDE_WITH_GROUP_SELECT,
-      });
-      updatedRides = [updatedRide];
-    }
-
-    this.logger.log({
-      level: 'info',
-      message: `Ride(s) completed by authenticated user ${authenticatedUserId}`,
-      tag: 'ride',
-      rideId,
-      completedByUserId: authenticatedUserId,
-      isRider,
-      isPassenger,
-      distance,
-      co2Saved,
-      peopleImpacted,
-      matchGroupId: ride.matchGroupId,
-      updatedRideCount: updatedRides.length,
-    });
-
-    // Notify both users via socket that the ride is completed and they should show feedback modal
-    // Use the first ride for notification (both should have same essential data)
-    this.rideGateway.notifyRideCompletion(updatedRides[0]);
+    const authenticatedUserId = req.user.userId;
+    const { rides } = await this.rideLifecycle.complete(
+      id,
+      authenticatedUserId,
+    );
 
     return {
       message:
         'Ride completed successfully. Both users should now provide feedback.',
-      // Return the first ride (both should have same essential data)
-      ride: toRideDto(updatedRides[0], authenticatedUserId),
-      totalRidesUpdated: updatedRides.length,
+      // Both halves carry the same trip data; return the first.
+      ride: toRideDto(rides[0], authenticatedUserId),
+      totalRidesUpdated: rides.length,
     };
   }
 
@@ -1306,137 +722,18 @@ export class RideController {
   @Get('/user/:userId/people-impacted')
   @UseGuards(JwtAuthGuard)
   /**
-   * Get people impacted by the authenticated user (who they've ridden with)
-   * Returns users ranked by number of rides completed together
-   * Properly handles matchGroupId to avoid double-counting matched rides
+   * People the authenticated user has completed rides with, ranked by count.
    *
    * Restricted to the caller's own data: this is effectively their social
    * graph, and exposing it by user id would let anyone map who rides with whom.
-   *
-   * @param userId The user ID to get people impacted data for. Must match the caller.
-   * @returns Object containing people array and total count
    */
   async getPeopleImpacted(
     @Param('userId', ParseIntPipe) userId: number,
     @Request() req: AuthenticatedRequest,
-  ): Promise<{
-    people: Array<{
-      id: number;
-      name: string;
-      img: string;
-      rideCount: number;
-    }>;
-    totalImpacted: number;
-  }> {
+  ) {
     this.assertSelf(userId, req.user.userId);
-    try {
-      // Get all completed rides where user was involved (as rider or passenger)
-      const allRides = await this.prisma.ride.findMany({
-        where: {
-          status: RIDE_STATUS.COMPLETED,
-          OR: [{ riderId: userId }, { passengerId: userId }],
-        },
-        select: {
-          id: true,
-          riderId: true,
-          passengerId: true,
-          matchGroupId: true,
-        },
-      });
 
-      // Deduplicate rides by matchGroupId to avoid counting matched rides twice
-      const uniqueRides = new Map<string, (typeof allRides)[0]>();
-
-      allRides.forEach((ride) => {
-        if (ride.matchGroupId) {
-          // If ride has matchGroupId, use it as key to deduplicate
-          if (!uniqueRides.has(ride.matchGroupId)) {
-            uniqueRides.set(ride.matchGroupId, ride);
-          }
-        } else {
-          // If no matchGroupId, use ride ID as unique key
-          uniqueRides.set(`ride_${ride.id}`, ride);
-        }
-      });
-
-      // Count partners from deduplicated rides
-      const partnerCounts = new Map<number, number>();
-
-      Array.from(uniqueRides.values()).forEach((ride) => {
-        let partnerId: number | null = null;
-
-        if (ride.riderId === userId && ride.passengerId) {
-          // User was rider, partner is passenger
-          partnerId = ride.passengerId;
-        } else if (ride.passengerId === userId && ride.riderId) {
-          // User was passenger, partner is rider
-          partnerId = ride.riderId;
-        }
-
-        if (partnerId) {
-          const current = partnerCounts.get(partnerId) || 0;
-          partnerCounts.set(partnerId, current + 1);
-        }
-      });
-
-      // Get user details for all partners
-      const partnerIds = Array.from(partnerCounts.keys());
-
-      if (partnerIds.length === 0) {
-        return { people: [], totalImpacted: 0 };
-      }
-
-      const partnerUsers = await this.prisma.user.findMany({
-        where: {
-          id: { in: partnerIds },
-        },
-        select: {
-          id: true,
-          fullname: true,
-          profilePicture: true,
-        },
-      });
-
-      // Combine user data with ride counts and sort
-      const people = partnerUsers
-        .map((user) => ({
-          id: user.id,
-          name: user.fullname,
-          img: user.profilePicture || '',
-          rideCount: partnerCounts.get(user.id) || 0,
-        }))
-        .sort((a, b) => b.rideCount - a.rideCount);
-
-      this.logger.log({
-        level: 'info',
-        message: `People impacted data fetched for user ${userId}`,
-        tag: 'ride',
-        userId,
-        totalRidesFound: allRides.length,
-        uniqueRidesAfterDedup: uniqueRides.size,
-        totalImpacted: people.length,
-        topPartners: people.slice(0, 3).map((p) => ({
-          name: p.name,
-          rides: p.rideCount,
-        })),
-      });
-
-      return {
-        people,
-        totalImpacted: people.length,
-      };
-    } catch (error) {
-      this.logger.error({
-        level: 'error',
-        message: `Failed to fetch people impacted for user ${userId}`,
-        tag: 'ride',
-        userId,
-        error: (error as Error).message,
-      });
-      throw new InternalServerErrorException(
-        'Failed to fetch people impacted data',
-      );
-    }
+    return this.peopleImpacted.getForUser(userId);
   }
 
   /**

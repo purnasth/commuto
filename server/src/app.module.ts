@@ -24,6 +24,9 @@ import { RideStatsService } from './services/ride-stats.service';
 import { RideHistoryService } from './services/ride-history.service';
 import { RideLifecycleService } from './services/ride-lifecycle.service';
 import { RideMatchingService } from './services/ride-matching.service';
+import { RideService } from './services/ride.service';
+import { FeedbackService } from './services/feedback.service';
+import { PeopleImpactedService } from './services/people-impacted.service';
 
 import { RideGateway } from './rides/rides.gateway';
 import { JwtStrategy } from './auth/jwt.strategy';
@@ -71,6 +74,9 @@ import { winstonLoggerConfig } from './logger.config';
     RideHistoryService,
     RideLifecycleService,
     RideMatchingService,
+    RideService,
+    FeedbackService,
+    PeopleImpactedService,
     RideGateway,
     JwtStrategy,
   ],

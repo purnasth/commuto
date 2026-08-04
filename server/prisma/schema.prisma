@@ -19,7 +19,7 @@ model User {
   fullname          String
   email             String             @unique
   password          String
-  role              String
+  role              UserRole
   phone             String?
   address           String?
   profilePicture    String?
@@ -62,7 +62,7 @@ model Ride {
   toLat                  Float?
   toLng                  Float?
   message                String?
-  role                   String
+  role                   UserRole
   timestamp              DateTime      @default(now())
   createdBy              Int // ID of user who created the ride (could be passenger or rider)
   createdByUser          User          @relation("CreatedUser", fields: [createdBy], references: [id])
@@ -91,6 +91,13 @@ model Ride {
   @@index([passengerId])
   // Grouping the two rows that make up one matched trip.
   @@index([matchGroupId])
+}
+
+/// The two sides of a shared commute. Values are lowercase to match the
+/// USER_ROLE enum the application already uses.
+enum UserRole {
+  rider
+  passenger
 }
 
 enum RideStatus {
@@ -159,7 +166,7 @@ model Feedback {
   fromUserId Int
   toUser     User     @relation("ToUser", fields: [toUserId], references: [id])
   toUserId   Int
-  role       String // role of the person giving feedback (rider/passenger)
+  role       UserRole // role of the person giving feedback
   emoji      Int // emoji reaction index: 0=😊, 1=😐, 2=😠
   comment    String? // optional comment
   createdAt  DateTime @default(now())
